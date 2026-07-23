@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { RegistrationRecord, getRegistrations, saveRegistration } from '@/lib/storage'
+import { getRegistrations, saveRegistration } from '@/lib/supabase'
+import type { RegistrationRecord } from '@/lib/supabase'
 
 export default function Enregistrement() {
   const [nom, setNom] = useState('')
@@ -11,10 +12,13 @@ export default function Enregistrement() {
   const [hotel, setHotel] = useState('')
   const [records, setRecords] = useState<RegistrationRecord[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
-    setRecords(getRegistrations())
-    setIsLoaded(true)
+    getRegistrations()
+      .then(setRecords)
+      .catch(() => setErrorMessage('Une erreur est survenue.'))
+      .finally(() => setIsLoaded(true))
   }, [])
 
   const hotels = [
@@ -25,21 +29,26 @@ export default function Enregistrement() {
     'واحة احياد',
   ]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nom.trim() || !prenom.trim() || !hotel) {
       return
     }
-    saveRegistration(nom, prenom, hotel)
-    setNom('')
-    setPrenom('')
-    setHotel('')
-    setRecords(getRegistrations())
+    setErrorMessage('')
+    try {
+      await saveRegistration(nom, prenom, hotel)
+      setNom('')
+      setPrenom('')
+      setHotel('')
+      setRecords(await getRegistrations())
+    } catch {
+      setErrorMessage('Une erreur est survenue.')
+    }
   }
 
   if (!isLoaded) return null
 
-  const recentRecords = records.slice(-5).reverse()
+  const recentRecords = records.slice(-5)
 
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -91,6 +100,7 @@ export default function Enregistrement() {
           <Button type="submit" className="w-full">
             Enregistrer
           </Button>
+          {errorMessage && <p className="text-sm">{errorMessage}</p>}
         </form>
 
         <div className="mb-8">
