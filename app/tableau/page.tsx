@@ -3,15 +3,19 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { RegistrationRecord, getRegistrations } from '@/lib/storage'
+import { getRegistrations } from '@/lib/supabase'
+import type { RegistrationRecord } from '@/lib/supabase'
 
 export default function Tableau() {
   const [records, setRecords] = useState<RegistrationRecord[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
-    setRecords(getRegistrations())
-    setIsLoaded(true)
+    getRegistrations()
+      .then(setRecords)
+      .catch(() => setErrorMessage('Une erreur est survenue.'))
+      .finally(() => setIsLoaded(true))
   }, [])
 
   if (!isLoaded) return null
@@ -20,6 +24,7 @@ export default function Tableau() {
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-4xl">
         <h1 className="mb-8 text-3xl font-bold">Tableau des enregistrements</h1>
+        {errorMessage && <p className="mb-8 text-sm">{errorMessage}</p>}
 
         {records.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center">
