@@ -45,6 +45,7 @@ export default function Enregistrement() {
     <div className="min-h-screen bg-background px-4 py-8">
       <div className="mx-auto max-w-2xl">
         <h1 className="mb-8 text-3xl font-bold">Enregistrement des personnes</h1>
+        <p className="text-sm">Test effectué depuis VS Code avec Codex</p>
 
         <form onSubmit={handleSubmit} className="mb-8 space-y-4 rounded-lg border border-border bg-card p-6">
           <div>
