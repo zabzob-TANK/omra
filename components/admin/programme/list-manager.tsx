@@ -6,10 +6,11 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useConfirm } from '@/components/admin/confirm-provider'
+import type { ProgrammeItem } from '@/lib/omra-programme'
 
 export type ListManagerProps = {
   title: string
-  items: string[]
+  items: ProgrammeItem[]
   placeholder: string
   onAdd: (value: string) => void
   onEdit: (index: number, value: string) => void
@@ -56,7 +57,7 @@ export function ListManager({
 
   function startEdit(index: number) {
     setEditingIndex(index)
-    setEditingValue(items[index])
+    setEditingValue(items[index].label)
     setEditError(null)
   }
 
@@ -79,7 +80,7 @@ export function ListManager({
   }
 
   async function handleDelete(index: number) {
-    const value = items[index]
+    const value = items[index].label
     const warning = getDeleteWarning?.(value) ?? null
     const ok = await confirm({
       title: 'Confirmer la suppression',
@@ -148,7 +149,7 @@ export function ListManager({
         ) : (
           <ul className="flex flex-col gap-1">
             {items.map((item, index) => (
-              <li key={`${item}-${index}`}>
+              <li key={item.id}>
                 {editingIndex === index ? (
                   <div className="flex flex-col gap-1.5 rounded-lg bg-secondary/50 p-1.5">
                     <div className="flex gap-1.5">
@@ -198,14 +199,14 @@ export function ListManager({
                         rtl ? 'text-right' : 'text-left',
                       )}
                     >
-                      {item}
+                      {item.label}
                     </span>
                     <div className="flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100">
                       <Button
                         size="icon-sm"
                         variant="ghost"
                         onClick={() => startEdit(index)}
-                        aria-label={`Modifier ${item}`}
+                        aria-label={`Modifier ${item.label}`}
                       >
                         <Pencil />
                       </Button>
@@ -213,7 +214,7 @@ export function ListManager({
                         size="icon-sm"
                         variant="ghost"
                         onClick={() => handleDelete(index)}
-                        aria-label={`Supprimer ${item}`}
+                        aria-label={`Supprimer ${item.label}`}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 />

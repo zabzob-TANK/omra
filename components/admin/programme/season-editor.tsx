@@ -13,7 +13,13 @@ import {
   Info,
   CalendarRange,
 } from 'lucide-react'
-import type { PriceRow, Season } from '@/lib/omra-store'
+import {
+  temporaryId,
+  type PriceRow,
+  type ProgrammeItem,
+  type RoomItem,
+  type Season,
+} from '@/lib/omra-programme'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,10 +50,6 @@ import {
 import { ListManager } from '@/components/admin/programme/list-manager'
 import { useConfirm } from '@/components/admin/confirm-provider'
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10)
-}
-
 function statusBadge(status: Season['status']) {
   switch (status) {
     case 'active':
@@ -66,8 +68,7 @@ function statusBadge(status: Season['status']) {
 }
 
 const currency = new Intl.NumberFormat('fr-FR', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 })
 
 type Props = {
@@ -75,6 +76,7 @@ type Props = {
   isNew: boolean
   isDirty: boolean
   canDelete: boolean
+  pending: boolean
   onChange: (next: Season) => void
   onSave: () => void
   onActivate: () => void
@@ -89,6 +91,7 @@ export function SeasonEditor({
   isNew,
   isDirty,
   canDelete,
+  pending,
   onChange,
   onSave,
   onActivate,
@@ -104,6 +107,8 @@ export function SeasonEditor({
   const [selFlight, setSelFlight] = useState<string | null>(null)
   const [selRoom, setSelRoom] = useState<string | null>(null)
   const [priceInput, setPriceInput] = useState('')
+  const [useDefaultDiscount, setUseDefaultDiscount] = useState(true)
+  const [discountOverrideInput, setDiscountOverrideInput] = useState('0')
   const [comboError, setComboError] = useState<string | null>(null)
 
   // Édition d'une ligne de prix
@@ -119,12 +124,23 @@ export function SeasonEditor({
       return
     }
     const price = Number(priceInput)
-    if (!priceInput || Number.isNaN(price) || price <= 0) {
-      setComboError('Le prix est requis et doit être supérieur à zéro.')
+    if (!priceInput || !Number.isSafeInteger(price) || price <= 0) {
+      setComboError('Le prix doit être un entier strictement positif.')
+      return
+    }
+    const discountOverride = Number(discountOverrideInput)
+    if (
+      !useDefaultDiscount &&
+      (!Number.isSafeInteger(discountOverride) || discountOverride < 0)
+    ) {
+      setComboError('La réduction spécifique doit être un entier positif ou nul.')
       return
     }
     const duplicate = draft.prices.some(
-      (p) => p.hotel === selHotel && p.flight === selFlight && p.room === selRoom,
+      (p) =>
+        p.hotelId === selHotel &&
+        p.flightId === selFlight &&
+        p.roomId === selRoom,
     )
     if (duplicate) {
       setComboError(
@@ -135,13 +151,22 @@ export function SeasonEditor({
     update({
       prices: [
         ...draft.prices,
-        { id: uid(), hotel: selHotel, flight: selFlight, room: selRoom, price },
+        {
+          id: temporaryId(),
+          hotelId: selHotel,
+          flightId: selFlight,
+          roomId: selRoom,
+          amountDh: price,
+          maxDiscountOverrideDh: useDefaultDiscount ? null : discountOverride,
+        },
       ],
     })
     setSelHotel(null)
     setSelFlight(null)
     setSelRoom(null)
     setPriceInput('')
+    setUseDefaultDiscount(true)
+    setDiscountOverrideInput('0')
     setComboError(null)
   }
 
@@ -159,9 +184,9 @@ export function SeasonEditor({
     const duplicate = draft.prices.some(
       (p) =>
         p.id !== next.id &&
-        p.hotel === next.hotel &&
-        p.flight === next.flight &&
-        p.room === next.room,
+        p.hotelId === next.hotelId &&
+        p.flightId === next.flightId &&
+        p.roomId === next.roomId,
     )
     if (duplicate) return 'Cette combinaison existe déjà.'
     update({ prices: draft.prices.map((p) => (p.id === next.id ? next : p)) })
@@ -282,20 +307,35 @@ export function SeasonEditor({
           items={draft.hotels}
           placeholder="أضف فندقًا"
           rtl
-          onAdd={(v) => update({ hotels: [...draft.hotels, v] })}
+          onAdd={(v) =>
+            update({ hotels: [...draft.hotels, { id: temporaryId(), label: v }] })
+          }
           onEdit={(i, v) =>
-            update({ hotels: draft.hotels.map((h, idx) => (idx === i ? v : h)) })
+            update({
+              hotels: draft.hotels.map((hotel, idx) =>
+                idx === i ? { ...hotel, label: v } : hotel,
+              ),
+            })
           }
-          onDelete={(i) =>
-            update({ hotels: draft.hotels.filter((_, idx) => idx !== i) })
-          }
+          onDelete={(i) => {
+            const id = draft.hotels[i].id
+            update({
+              hotels: draft.hotels.filter((_, idx) => idx !== i),
+              prices: draft.prices.filter((price) => price.hotelId !== id),
+            })
+          }}
           validate={(value, currentIndex) =>
-            draft.hotels.some((h, idx) => h === value && idx !== currentIndex)
+            draft.hotels.some(
+              (hotel, idx) => hotel.label === value && idx !== currentIndex,
+            )
               ? 'Cet hôtel existe déjà.'
               : null
           }
           getDeleteWarning={(value) => {
-            const count = draft.prices.filter((p) => p.hotel === value).length
+            const hotel = draft.hotels.find((item) => item.label === value)
+            const count = draft.prices.filter(
+              (price) => price.hotelId === hotel?.id,
+            ).length
             return count > 0
               ? `Cet hôtel est utilisé dans ${count} combinaison(s) de prix. Ces combinaisons sont concernées.`
               : null
@@ -306,22 +346,35 @@ export function SeasonEditor({
           title="Vols / Compagnies"
           items={draft.flights}
           placeholder="Ajouter un vol / compagnie"
-          onAdd={(v) => update({ flights: [...draft.flights, v] })}
+          onAdd={(v) =>
+            update({ flights: [...draft.flights, { id: temporaryId(), label: v }] })
+          }
           onEdit={(i, v) =>
             update({
-              flights: draft.flights.map((f, idx) => (idx === i ? v : f)),
+              flights: draft.flights.map((flight, idx) =>
+                idx === i ? { ...flight, label: v } : flight,
+              ),
             })
           }
-          onDelete={(i) =>
-            update({ flights: draft.flights.filter((_, idx) => idx !== i) })
-          }
+          onDelete={(i) => {
+            const id = draft.flights[i].id
+            update({
+              flights: draft.flights.filter((_, idx) => idx !== i),
+              prices: draft.prices.filter((price) => price.flightId !== id),
+            })
+          }}
           validate={(value, currentIndex) =>
-            draft.flights.some((f, idx) => f === value && idx !== currentIndex)
+            draft.flights.some(
+              (flight, idx) => flight.label === value && idx !== currentIndex,
+            )
               ? 'Ce vol / compagnie existe déjà.'
               : null
           }
           getDeleteWarning={(value) => {
-            const count = draft.prices.filter((p) => p.flight === value).length
+            const flight = draft.flights.find((item) => item.label === value)
+            const count = draft.prices.filter(
+              (price) => price.flightId === flight?.id,
+            ).length
             return count > 0
               ? `Ce vol est utilisé dans ${count} combinaison(s) de prix.`
               : null
@@ -333,22 +386,44 @@ export function SeasonEditor({
           items={draft.rooms}
           placeholder="Nombre de lits (ex. : 4)"
           numeric
-          onAdd={(v) => update({ rooms: [...draft.rooms, v] })}
+          onAdd={(v) =>
+            update({
+              rooms: [
+                ...draft.rooms,
+                { id: temporaryId(), label: v, bedCount: Number(v) },
+              ],
+            })
+          }
           onEdit={(i, v) =>
-            update({ rooms: draft.rooms.map((r, idx) => (idx === i ? v : r)) })
+            update({
+              rooms: draft.rooms.map((room, idx) =>
+                idx === i ? { ...room, label: v, bedCount: Number(v) } : room,
+              ),
+            })
           }
-          onDelete={(i) =>
-            update({ rooms: draft.rooms.filter((_, idx) => idx !== i) })
-          }
+          onDelete={(i) => {
+            const id = draft.rooms[i].id
+            update({
+              rooms: draft.rooms.filter((_, idx) => idx !== i),
+              prices: draft.prices.filter((price) => price.roomId !== id),
+            })
+          }}
           validate={(value, currentIndex) => {
             if (!/^\d+$/.test(value) || Number(value) <= 0)
               return 'Veuillez saisir un nombre entier positif.'
-            if (draft.rooms.some((r, idx) => r === value && idx !== currentIndex))
+            if (
+              draft.rooms.some(
+                (room, idx) => room.label === value && idx !== currentIndex,
+              )
+            )
               return 'Ce nombre existe déjà.'
             return null
           }}
           getDeleteWarning={(value) => {
-            const count = draft.prices.filter((p) => p.room === value).length
+            const room = draft.rooms.find((item) => item.label === value)
+            const count = draft.prices.filter(
+              (price) => price.roomId === room?.id,
+            ).length
             return count > 0
               ? `Cette chambre est utilisée dans ${count} combinaison(s) de prix.`
               : null
@@ -359,10 +434,16 @@ export function SeasonEditor({
           title="Rabatteurs"
           items={draft.rabatteurs}
           placeholder="Ajouter un rabatteur"
-          onAdd={(v) => update({ rabatteurs: [...draft.rabatteurs, v] })}
+          onAdd={(v) =>
+            update({
+              rabatteurs: [...draft.rabatteurs, { id: temporaryId(), label: v }],
+            })
+          }
           onEdit={(i, v) =>
             update({
-              rabatteurs: draft.rabatteurs.map((r, idx) => (idx === i ? v : r)),
+              rabatteurs: draft.rabatteurs.map((rabatteur, idx) =>
+                idx === i ? { ...rabatteur, label: v } : rabatteur,
+              ),
             })
           }
           onDelete={(i) =>
@@ -372,7 +453,8 @@ export function SeasonEditor({
           }
           validate={(value, currentIndex) =>
             draft.rabatteurs.some(
-              (r, idx) => r === value && idx !== currentIndex,
+              (rabatteur, idx) =>
+                rabatteur.label === value && idx !== currentIndex,
             )
               ? 'Ce rabatteur existe déjà.'
               : null
@@ -385,84 +467,89 @@ export function SeasonEditor({
         <h2 className="mb-4 text-sm font-semibold text-foreground">
           Construire une combinaison de prix
         </h2>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          <div className="flex flex-1 flex-col gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,1.2fr)_auto] xl:items-end">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label>Hôtel</Label>
             <Select value={selHotel} onValueChange={(v) => setSelHotel(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner un hôtel" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  {selHotel ? (
+                    <span dir="rtl" className="truncate text-right">
+                      {draft.hotels.find((item) => item.id === selHotel)?.label}
+                    </span>
+                  ) : (
+                    'Sélectionner un hôtel'
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {draft.hotels.map((h) => (
-                  <SelectItem key={h} value={h}>
-                    <span dir="rtl">{h}</span>
+                {draft.hotels.map((hotel) => (
+                  <SelectItem key={hotel.id} value={hotel.id}>
+                    <span dir="rtl" className="text-right">{hotel.label}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <span className="hidden pb-2 text-lg font-medium text-accent lg:block">
-            +
-          </span>
-
-          <div className="flex flex-1 flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label>Vol / Compagnie</Label>
             <Select
               value={selFlight}
               onValueChange={(v) => setSelFlight(v as string)}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner un vol / compagnie" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  {selFlight
+                    ? draft.flights.find((item) => item.id === selFlight)?.label
+                    : 'Sélectionner un vol / compagnie'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {draft.flights.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
+                {draft.flights.map((flight) => (
+                  <SelectItem key={flight.id} value={flight.id}>
+                    {flight.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <span className="hidden pb-2 text-lg font-medium text-accent lg:block">
-            +
-          </span>
-
-          <div className="flex flex-1 flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label>Chambre</Label>
             <Select value={selRoom} onValueChange={(v) => setSelRoom(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner une chambre" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  {selRoom
+                    ? `${draft.rooms.find((item) => item.id === selRoom)?.bedCount} lits`
+                    : 'Sélectionner une chambre'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {draft.rooms.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
+                {draft.rooms.map((room) => (
+                  <SelectItem key={room.id} value={room.id}>
+                    {room.bedCount} lits
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          <span className="hidden pb-2 text-lg font-medium text-accent lg:block">
-            =
-          </span>
-
-          <div className="flex flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2">
             <Label htmlFor="combo-price">Prix (DH)</Label>
             <div className="relative">
               <Input
                 id="combo-price"
                 type="number"
-                min={0}
+                min={1}
+                step={1}
                 value={priceInput}
                 onChange={(e) => {
                   setPriceInput(e.target.value)
                   setComboError(null)
                 }}
-                placeholder="0.00"
-                className="w-40 pr-10"
+                placeholder="0"
+                className="w-full pr-10"
               />
               <span className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-xs text-muted-foreground">
                 DH
@@ -470,7 +557,32 @@ export function SeasonEditor({
             </div>
           </div>
 
-          <Button onClick={addToTable} className="lg:mb-0">
+          <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 xl:col-span-1">
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={useDefaultDiscount}
+                onChange={(event) => setUseDefaultDiscount(event.target.checked)}
+                className="size-4 accent-primary"
+              />
+              Utiliser la réduction par défaut
+            </label>
+            {!useDefaultDiscount ? (
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={discountOverrideInput}
+                onChange={(event) => setDiscountOverrideInput(event.target.value)}
+                aria-label="Réduction spécifique en DH"
+              />
+            ) : null}
+          </div>
+
+          <Button
+            onClick={addToTable}
+            className="w-full sm:col-span-2 xl:col-span-1 xl:w-auto"
+          >
             <Plus />
             <span>Ajouter au tableau</span>
           </Button>
@@ -496,6 +608,7 @@ export function SeasonEditor({
               <TableHead>Vol / Compagnie</TableHead>
               <TableHead>Chambre</TableHead>
               <TableHead>Prix (DH)</TableHead>
+              <TableHead>Réduction maximale</TableHead>
               <TableHead className="w-28 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -503,7 +616,7 @@ export function SeasonEditor({
             {draft.prices.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   Aucune combinaison de prix pour l’instant.
@@ -513,11 +626,20 @@ export function SeasonEditor({
               draft.prices.map((row) => (
                 <TableRow key={row.id}>
                   <TableCell className="text-right font-medium" dir="rtl">
-                    {row.hotel}
+                    {draft.hotels.find((item) => item.id === row.hotelId)?.label}
                   </TableCell>
-                  <TableCell>{row.flight}</TableCell>
-                  <TableCell>{row.room}</TableCell>
-                  <TableCell>{currency.format(row.price)} DH</TableCell>
+                  <TableCell>
+                    {draft.flights.find((item) => item.id === row.flightId)?.label}
+                  </TableCell>
+                  <TableCell>
+                    {draft.rooms.find((item) => item.id === row.roomId)?.label}
+                  </TableCell>
+                  <TableCell>{currency.format(row.amountDh)} DH</TableCell>
+                  <TableCell>
+                    {row.maxDiscountOverrideDh === null
+                      ? `Par défaut (${currency.format(draft.maxDiscountDh)} DH)`
+                      : `${currency.format(row.maxDiscountOverrideDh)} DH`}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-0.5">
                       <Button
@@ -555,10 +677,14 @@ export function SeasonEditor({
               id="max-discount"
               type="number"
               min={0}
-              value={String(draft.maxDiscount)}
-              onChange={(e) =>
-                update({ maxDiscount: Math.max(0, Number(e.target.value) || 0) })
-              }
+              step={1}
+              value={String(draft.maxDiscountDh)}
+              onChange={(e) => {
+                const value = Number(e.target.value)
+                if (Number.isSafeInteger(value) && value >= 0) {
+                  update({ maxDiscountDh: value })
+                }
+              }}
               className="pr-10"
             />
             <span className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-xs text-muted-foreground">
@@ -582,19 +708,19 @@ export function SeasonEditor({
           <Button
             variant="ghost"
             onClick={handleRevert}
-            disabled={!isDirty}
+            disabled={!isDirty || pending}
           >
             <Undo2 />
             <span>Annuler les modifications</span>
           </Button>
           {draft.status !== 'archivee' && (
-            <Button variant="outline" onClick={handleArchive} disabled={isNew}>
+            <Button variant="outline" onClick={handleArchive} disabled={isNew || pending}>
               <Archive />
               <span>Archiver la saison</span>
             </Button>
           )}
           {canDelete && (
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} disabled={pending}>
               <Trash2 />
               <span>Supprimer</span>
             </Button>
@@ -603,16 +729,16 @@ export function SeasonEditor({
             <Button
               variant="secondary"
               onClick={handleActivate}
-              disabled={isNew}
+              disabled={isNew || pending}
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
               <CheckCircle2 />
               <span>Activer la saison</span>
             </Button>
           )}
-          <Button onClick={onSave} disabled={!isDirty}>
+          <Button onClick={onSave} disabled={!isDirty || pending}>
             <Save />
-            <span>Enregistrer</span>
+            <span>{pending ? 'Enregistrement…' : 'Enregistrer'}</span>
           </Button>
         </div>
       </div>
@@ -640,16 +766,22 @@ function EditPriceDialog({
   onSave,
 }: {
   row: PriceRow
-  hotels: string[]
-  flights: string[]
-  rooms: string[]
+  hotels: ProgrammeItem[]
+  flights: ProgrammeItem[]
+  rooms: RoomItem[]
   onClose: () => void
   onSave: (next: PriceRow) => string | null
 }) {
-  const [hotel, setHotel] = useState(row.hotel)
-  const [flight, setFlight] = useState(row.flight)
-  const [roomVal, setRoomVal] = useState(row.room)
-  const [price, setPrice] = useState(String(row.price))
+  const [hotel, setHotel] = useState(row.hotelId)
+  const [flight, setFlight] = useState(row.flightId)
+  const [roomVal, setRoomVal] = useState(row.roomId)
+  const [price, setPrice] = useState(String(row.amountDh))
+  const [useDefaultDiscount, setUseDefaultDiscount] = useState(
+    row.maxDiscountOverrideDh === null,
+  )
+  const [discountOverride, setDiscountOverride] = useState(
+    String(row.maxDiscountOverrideDh ?? 0),
+  )
   const [error, setError] = useState<string | null>(null)
 
   function submit() {
@@ -658,11 +790,26 @@ function EditPriceDialog({
       setError('Tous les champs sont requis.')
       return
     }
-    if (!price || Number.isNaN(numeric) || numeric <= 0) {
-      setError('Le prix doit être supérieur à zéro.')
+    if (!price || !Number.isSafeInteger(numeric) || numeric <= 0) {
+      setError('Le prix doit être un entier strictement positif.')
       return
     }
-    const err = onSave({ ...row, hotel, flight, room: roomVal, price: numeric })
+    const numericDiscount = Number(discountOverride)
+    if (
+      !useDefaultDiscount &&
+      (!Number.isSafeInteger(numericDiscount) || numericDiscount < 0)
+    ) {
+      setError('La réduction spécifique doit être un entier positif ou nul.')
+      return
+    }
+    const err = onSave({
+      ...row,
+      hotelId: hotel,
+      flightId: flight,
+      roomId: roomVal,
+      amountDh: numeric,
+      maxDiscountOverrideDh: useDefaultDiscount ? null : numericDiscount,
+    })
     if (err) setError(err)
   }
 
@@ -676,13 +823,18 @@ function EditPriceDialog({
           <div className="flex flex-col gap-2">
             <Label>Hôtel</Label>
             <Select value={hotel} onValueChange={(v) => setHotel(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner un hôtel" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  <span dir="rtl" className="truncate text-right">
+                    {hotels.find((item) => item.id === hotel)?.label ??
+                      'Sélectionner un hôtel'}
+                  </span>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {hotels.map((h) => (
-                  <SelectItem key={h} value={h}>
-                    <span dir="rtl">{h}</span>
+                {hotels.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    <span dir="rtl" className="text-right">{item.label}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -691,13 +843,16 @@ function EditPriceDialog({
           <div className="flex flex-col gap-2">
             <Label>Vol / Compagnie</Label>
             <Select value={flight} onValueChange={(v) => setFlight(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner un vol" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  {flights.find((item) => item.id === flight)?.label ??
+                    'Sélectionner un vol'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {flights.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
+                {flights.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -706,13 +861,17 @@ function EditPriceDialog({
           <div className="flex flex-col gap-2">
             <Label>Chambre</Label>
             <Select value={roomVal} onValueChange={(v) => setRoomVal(v as string)}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sélectionner une chambre" />
+              <SelectTrigger className="min-w-0 w-full">
+                <SelectValue>
+                  {rooms.find((item) => item.id === roomVal)
+                    ? `${rooms.find((item) => item.id === roomVal)!.bedCount} lits`
+                    : 'Sélectionner une chambre'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {rooms.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
+                {rooms.map((item) => (
+                  <SelectItem key={item.id} value={item.id}>
+                    {item.bedCount} lits
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -723,13 +882,38 @@ function EditPriceDialog({
             <Input
               id="edit-price"
               type="number"
-              min={0}
+              min={1}
+              step={1}
               value={price}
               onChange={(e) => {
                 setPrice(e.target.value)
                 setError(null)
               }}
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={useDefaultDiscount}
+                onChange={(event) => setUseDefaultDiscount(event.target.checked)}
+                className="size-4 accent-primary"
+              />
+              Utiliser la réduction par défaut
+            </label>
+            {!useDefaultDiscount ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="edit-discount">Réduction spécifique (DH)</Label>
+                <Input
+                  id="edit-discount"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={discountOverride}
+                  onChange={(event) => setDiscountOverride(event.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
           {error && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
