@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { isTestAdmin } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdministrator } from '@/lib/admin-guard'
 
 const errorMessages: Record<string, string> = {
-  champs: 'Veuillez renseigner votre email et votre mot de passe.',
-  identifiants: 'Email ou mot de passe incorrect.',
+  champs: 'Veuillez renseigner votre identifiant et votre mot de passe.',
+  identifiants: 'Identifiant ou mot de passe incorrect.',
   acces: 'Ce compte n’est pas autorisé à accéder à l’administration.',
 }
 
@@ -21,10 +20,16 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string }>
 }) {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  let isAdministrator = false
 
-  if (data?.claims?.sub && isTestAdmin(data.claims)) {
+  try {
+    await requireAdministrator()
+    isAdministrator = true
+  } catch {
+    // The login form remains available to unauthenticated users.
+  }
+
+  if (isAdministrator) {
     redirect('/admin')
   }
 
@@ -52,11 +57,11 @@ export default async function LoginPage({
           <CardContent className="pt-5">
             <form action={login} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="identifier">Identifiant</Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
                   autoComplete="username"
                   required
                   autoFocus

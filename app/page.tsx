@@ -1,10 +1,15 @@
 import { redirect } from 'next/navigation'
-import { isTestAdmin } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdministrator } from '@/lib/admin-guard'
 
 export default async function Home() {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
+  let isAdministrator = false
 
-  redirect(data?.claims?.sub && isTestAdmin(data.claims) ? '/admin' : '/login')
+  try {
+    await requireAdministrator()
+    isAdministrator = true
+  } catch {
+    // Unauthenticated users are sent to the login page.
+  }
+
+  redirect(isAdministrator ? '/admin' : '/login')
 }

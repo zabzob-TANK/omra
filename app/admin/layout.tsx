@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
-import { isTestAdmin } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdministrator } from '@/lib/admin-guard'
 import { NavGuardProvider } from '@/components/admin/nav-guard'
 import { ConfirmProvider } from '@/components/admin/confirm-provider'
 import { AdminNav } from '@/components/admin/admin-nav'
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const supabase = await createClient()
-  const { data } = await supabase.auth.getClaims()
-
-  if (!data?.claims?.sub || !isTestAdmin(data.claims)) {
-    redirect('/login')
+  try {
+    await requireAdministrator()
+  } catch {
+    redirect('/logout?error=acces')
   }
 
   return (
