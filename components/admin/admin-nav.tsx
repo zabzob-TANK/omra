@@ -1,10 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { LogOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/admin/logo'
 import { ThemeToggle } from '@/components/admin/theme-toggle'
+import { LogoutButton } from '@/components/admin/logout-button'
 import { useNavGuard } from '@/components/admin/nav-guard'
 
 export function AdminNav() {
@@ -25,14 +24,7 @@ export function AdminNav() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => requestLeave(() => router.push('/'))}
-          >
-            <LogOut />
-            <span>Déconnexion</span>
-          </Button>
+          <LogoutButton />
         </div>
       </div>
     </header>

@@ -1,10 +1,20 @@
 import type { ReactNode } from 'react'
+import { redirect } from 'next/navigation'
+import { isTestAdmin } from '@/lib/auth'
 import { OmraStoreProvider } from '@/lib/omra-store'
+import { createClient } from '@/lib/supabase/server'
 import { NavGuardProvider } from '@/components/admin/nav-guard'
 import { ConfirmProvider } from '@/components/admin/confirm-provider'
 import { AdminNav } from '@/components/admin/admin-nav'
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  const supabase = await createClient()
+  const { data } = await supabase.auth.getClaims()
+
+  if (!data?.claims?.sub || !isTestAdmin(data.claims)) {
+    redirect('/login')
+  }
+
   return (
     <OmraStoreProvider>
       <NavGuardProvider>
