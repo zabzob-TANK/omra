@@ -18,14 +18,19 @@ import 'server-only'
  */
 
 import { createClient } from '@/lib/supabase/server'
-import type { BillingAnomaly, BillingReceiptRow, ReusablePaymentOperation } from '@/lib/facturation/types'
+import type {
+  BillingAnomaly,
+  BillingReceiptDetail,
+  BillingReceiptRow,
+  ReusablePaymentOperation,
+} from '@/lib/facturation/types'
 import type { FiltreRecus } from '../ports'
 import type { OperationPartagee, Recu } from '../../domain/types'
 import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 
 const TAILLE_PAGE = 200
 
-function messageErreur(erreur: { message?: string } | null): string {
+export function messageErreur(erreur: { message?: string } | null): string {
   const message = erreur?.message?.trim()
   return message || 'Impossible de charger les données de Facturation.'
 }
@@ -73,16 +78,27 @@ async function listerLignesRecus(filtre?: FiltreRecus): Promise<BillingReceiptRo
   return lignes
 }
 
-/** Construit un `Recu` complet pour un identifiant de reçu donné. */
-async function chargerRecuParId(id: string): Promise<Recu | null> {
+/**
+ * Détail brut de `get_billing_receipt_details`, avant traduction vers le
+ * domaine. Exporté pour l'adaptateur d'écriture (`write.ts`), qui a besoin de
+ * champs bruts que la traduction n'expose pas — par exemple
+ * `payment_operation_id` d'un versement unique, volontairement effacé dans
+ * `Versement.operationPartageeId` par `mapVersement()` (R-38).
+ */
+export async function chargerDetailRecuBrut(id: string): Promise<BillingReceiptDetail | null> {
   const supabase = await createClient()
   const resultat = await supabase.rpc('get_billing_receipt_details', { p_receipt_id: id })
   if (resultat.error) {
     if (resultat.error.message?.includes('not found')) return null
     throw new Error(messageErreur(resultat.error))
   }
-  if (!resultat.data) return null
-  return mapReceiptDetailToRecu(resultat.data)
+  return (resultat.data as BillingReceiptDetail | null) ?? null
+}
+
+/** Construit un `Recu` complet pour un identifiant de reçu donné. */
+async function chargerRecuParId(id: string): Promise<Recu | null> {
+  const detail = await chargerDetailRecuBrut(id)
+  return detail ? mapReceiptDetailToRecu(detail) : null
 }
 
 /**

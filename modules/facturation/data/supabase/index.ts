@@ -1,11 +1,40 @@
 /**
- * Adaptateur Supabase — partie lecture uniquement (fusion.md §6, étape 5a).
+ * Point d'assemblage de l'adaptateur Supabase : implémente `SourceDonnees`
+ * (`ports.ts`) sur les RPC réelles du projet officiel omra.
  *
- * N'exporte pas encore d'implémentation de `SourceDonnees` ni de `RecusPort` /
- * `OperationsPartageesPort` complets : il manque les méthodes d'écriture, la
- * session, les référentiels et le stockage de fichiers. Voir le rapport de
- * portage pour ce qui reste à faire avant l'étape d'écriture.
+ * Aucun état par requête n'est nécessaire ici — chaque méthode appelle
+ * `createClient()`/`createAdminClient()` en interne, déjà liés à la requête
+ * en cours (cookies, `next/headers`) — donc un unique objet partagé suffit,
+ * sans fabrique ni instance mémorisée (contrairement à l'adaptateur de
+ * démonstration, qui doit conserver un état en mémoire entre les appels).
  */
+
+import type { RecusPort, SourceDonnees } from '../ports'
+import { clientsSupabase, operationsPartageesSupabase } from './clients-operations'
+import { horloge, identifiants } from './ids'
+import { referentielsSupabase } from './referentiels'
+import { listerAnomaliesBase, listerOperationsPartageesReutilisables, listerRecus, recuParId, recuParNumero } from './read'
+import { sessionSupabase } from './session'
+import { stockageSupabase } from './storage'
+import {
+  acquittementsAnomalieSupabase,
+  impressionsFinanceSupabase,
+  journalAuditSupabase,
+  lecteurPasseportSupabase,
+  mouvementsCaisseSupabase,
+} from './stubs'
+import {
+  ajouterVersementSupabase,
+  annulerRecuSupabase,
+  appliquerModificationSupabase,
+  corrigerPremierVersementSupabase,
+  creerRecuSupabase,
+  definirImageVersementSupabase,
+  definirImagesPasseportSupabase,
+  incrementerImpressionsSupabase,
+  reserverNumeroSupabase,
+} from './write'
+
 export { dhVersCentimes, dhVersCentimesOuNull, centimesVersDh, centimesVersDhOuNull } from './dh'
 export {
   natureDepuisModePaiement,
@@ -25,3 +54,35 @@ export {
   listerAnomaliesBase,
   type AnomalieBase,
 } from './read'
+
+const recusSupabase: RecusPort = {
+  lister: listerRecus,
+  parId: recuParId,
+  parNumero: recuParNumero,
+  reserverNumero: reserverNumeroSupabase,
+  creer: creerRecuSupabase,
+  ajouterVersement: ajouterVersementSupabase,
+  appliquerModification: appliquerModificationSupabase,
+  corrigerPremierVersement: corrigerPremierVersementSupabase,
+  annuler: annulerRecuSupabase,
+  incrementerImpressions: incrementerImpressionsSupabase,
+  definirImageVersement: definirImageVersementSupabase,
+  definirImagesPasseport: definirImagesPasseportSupabase,
+}
+
+/** Implémentation complète de `SourceDonnees` branchée sur le projet officiel omra. */
+export const sourceSupabase: SourceDonnees = {
+  referentiels: referentielsSupabase,
+  session: sessionSupabase,
+  recus: recusSupabase,
+  clients: clientsSupabase,
+  operationsPartagees: operationsPartageesSupabase,
+  mouvementsCaisse: mouvementsCaisseSupabase,
+  impressionsFinance: impressionsFinanceSupabase,
+  acquittementsAnomalie: acquittementsAnomalieSupabase,
+  audit: journalAuditSupabase,
+  fichiers: stockageSupabase,
+  lecteurPasseport: lecteurPasseportSupabase,
+  horloge,
+  identifiants,
+}

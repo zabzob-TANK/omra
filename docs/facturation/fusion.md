@@ -362,3 +362,91 @@ l'étape 8. Détail dans `supabase/migrations-en-attente/README.md`.
 
 Seules `202608030001`, `202608030002` et `202608030003` sont déployées à
 cette occasion.
+
+---
+
+## 9. Étape 5b — l'adaptateur d'écriture (2026-08-03)
+
+`modules/facturation/data/supabase/write.ts` (et `clients-operations.ts`,
+`stubs.ts`, `session.ts`, `referentiels.ts`, `programme.ts`, `storage.ts`,
+`ids.ts`) implémentent la partie écriture de `SourceDonnees`, branchée dans
+`modules/facturation/data/index.ts` (`FACTURATION_SOURCE=supabase`). Décisions
+prises pendant ce travail, faute d'une réconciliation déjà actée :
+
+**1. Client et opération partagée ne se créent jamais séparément.** Le
+prototype traite `ClientsPort.creer()`/`OperationsPartageesPort.creer()`
+comme des dépôts distincts, appelés avant `RecusPort.creer()`/
+`ajouterVersement()`. omra crée voyageur + inscription + reçu + versement +
+opération de paiement **atomiquement**, en une seule RPC
+(`create_complete_facturation_receipt`/`add_billing_receipt_payment`).
+`ClientsPort` et `OperationsPartageesPort.creer()` sont donc des no-op
+assumés ; `write.ts` reconnaît une opération « nouvelle » à son identifiant
+provisoire plutôt qu'à un objet transmis séparément (`ids.ts`,
+`estIdentifiantReel` — un UUID nu vient de la base, un identifiant préfixé
+vient du domaine).
+
+**2. Aucune réutilisation de voyageur.** Le domaine ne propose jamais ce
+choix explicitement (pas de champ « voyageur existant » dans le fichier de
+référence) : chaque reçu crée donc un nouveau `travelers`, jamais de
+rapprochement automatique sur le nom — conforme à CLAUDE.md, qui interdit
+justement ce rapprochement silencieux.
+
+**3. `reserverNumero()` ne réserve rien réellement.** omra n'expose pas de
+réservation de numéro séparée : `create_complete_facturation_receipt`
+réserve et attribue le numéro dans la même transaction que la création. La
+valeur renvoyée par ce port (`0`) n'est ni validée ni affichée par le domaine
+(commentaire P08 de `create-receipt.ts`) ; le numéro réel vient du `Recu`
+que `creer()` renvoie après coup.
+
+**4. Groupe/dossier — décision technique provisoire, pas une résolution de
+§5.4.** Chaque reçu crée son propre dossier `omra_dossiers` (référence
+technique aléatoire, libellé = tag groupe saisi ou `null`). Aucun
+rapprochement entre reçus partageant le même tag n'est tenté. Ce n'est pas la
+correspondance groupe/famille attendue par `reprise.md` §5.4 — seulement ce
+qu'il fallait pour que la création de reçu fonctionne sans bloquer sur une
+décision produit encore ouverte. La modification du groupe sur un reçu
+existant (section `group` de `appliquerModification`) reste indisponible :
+`update_billing_receipt_dossier` déplace une inscription entre dossiers
+réels, ce qui ne correspond pas à un simple changement de libellé.
+
+**5. Payeur par défaut pour un instrument bancaire unique.** Le domaine
+n'exige `payeur` que pour une opération **partagée** (R-26) ; la RPC omra
+l'exige aussi pour un chèque/virement **unique** (« Bank instrument details
+are required »). Repli sur le nom du client du reçu, de fait le seul payeur
+possible d'un instrument qui lui est propre — accommodation technique, pas
+une règle métier nouvelle.
+
+**6. Motif de suppression d'image non collecté par le domaine.**
+`delete_payment_operation_evidence_image` exige un motif non vide ; ni
+`RecusPort.definirImageVersement(…, null)` ni
+`OperationsPartageesPort.definirImage(…, null)` n'en reçoivent un du
+domaine. Un texte fixe (« Suppression demandée depuis l'écran Facturation »)
+est utilisé — l'autorisation reste vérifiée par `require_facturation_admin()`
+côté serveur, seul le motif est générique.
+
+**7. Confirmation de dépassement toujours transmise à la RPC.** Le domaine
+obtient déjà la confirmation de l'utilisateur avant d'appeler
+`RecusPort.creer()`/`ajouterVersement()` (R-32,
+`preparerCreationRecu`/`preparerVersement` → `depassementConfirme`) : ces
+méthodes ne sont jamais invoquées tant qu'elle manque. `p_confirm_over_allocation: true`
+est donc systématique. Limite résiduelle assumée : sous concurrence rare (une
+même opération partagée modifiée entre la lecture du domaine et cette
+écriture), la RPC pourrait confirmer un dépassement plus élevé que celui
+montré à l'utilisateur — entièrement tracé (`payment_operation.over_allocation_confirmed`),
+jamais perdu, mais pas revalidé auprès de l'utilisateur. À traiter si la
+Facturation passe un jour à plusieurs postes simultanés sur les mêmes
+opérations partagées.
+
+**8. Toujours indisponibles, chacun pour une raison déjà actée ailleurs** :
+`corrigerPremierVersement` (RPC non déployée, §4.2/étape 8),
+`incrementerImpressions` (migration `202608020003` non déployée),
+`definirImagesPasseport` (hors périmètre du noyau, R-90),
+`mouvementsCaisse`/`impressionsFinance`/`acquittementsAnomalie` (aucune table
+côté omra, §5/étape 9). `JournalAuditPort` est un no-op **intentionnel** :
+`facturation_action_history`, alimentée automatiquement par chaque RPC
+d'écriture, fait déjà ce travail.
+
+**Vérifié** : `pnpm exec tsc --noEmit`, `pnpm exec vitest run` (467 tests),
+`pnpm run build` — tous au vert. Aucune route n'est encore branchée sur cet
+adaptateur ; `app/facturation/page.tsx` utilise toujours `BillingDashboard` et
+`demo-data.ts` jusqu'à l'étape 6.

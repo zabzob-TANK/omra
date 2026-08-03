@@ -7,9 +7,14 @@
  *
  * Bascule pilotée par `FACTURATION_SOURCE` :
  *  - `demo` (défaut) — adaptateur en mémoire, aucun secret requis ;
- *  - `supabase` — projet Supabase **de test**, dédié à cette reconstruction.
+ *  - `supabase` — le projet Supabase réel du projet officiel omra
+ *    (`modules/facturation/data/supabase/`), branché sur ses RPC sécurisées
+ *    existantes.
  *
- * ⚠️ La base du projet officiel Omra n'est jamais une cible valide de ce module.
+ * En dehors du développement local, `FACTURATION_SOURCE` doit toujours valoir
+ * `supabase` : la garde ci-dessous refuse `demo` en production (reprise.md
+ * §5.13), mais un environnement de développement mal configuré resterait sur
+ * de fausses données sans avertissement.
  */
 
 import type { SourceDonnees } from './ports'
@@ -46,14 +51,15 @@ export function sourceDonnees(): SourceDonnees {
   }
 
   if (sourceConfiguree() === 'supabase') {
-    // L'adaptateur Supabase sera ajouté lorsque la persistance réelle deviendra
-    // nécessaire. Il implémentera `SourceDonnees` sans modifier ni le domaine
-    // ni l'interface. Les migrations correspondantes sont déjà versionnées dans
-    // `db/facturation/migrations/`.
-    throw new Error(
-      "FACTURATION_SOURCE=supabase : l'adaptateur Supabase n'est pas encore branché. " +
-        'Utilisez FACTURATION_SOURCE=demo, ou implémentez SourceDonnees dans data/supabase/.',
-    )
+    // Import différé (`require`, pas d'`import` statique) : les fichiers de
+    // `./supabase` portent `import 'server-only'`, qui lève dès qu'il est
+    // chargé hors du bundler Next.js. Un `import` statique ici forcerait ce
+    // chargement même pour des tests qui n'exercent jamais cette branche
+    // (`service.test.ts`, entièrement bâti sur l'adaptateur de démonstration).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { sourceSupabase } = require('./supabase') as typeof import('./supabase')
+    instance = sourceSupabase
+    return instance
   }
 
   // Scénario de démonstration. Le jeu volumineux servant à vérifier
