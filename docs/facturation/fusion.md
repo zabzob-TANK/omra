@@ -177,21 +177,34 @@ peut corriger le montant ; l'employé ne corrige que la méthode et l'instrument
 **Ne pas déployer cette migration en l'état.** Elle doit être reprise avant
 application, ou remplacée.
 
-### 4.3 Mode démonstration mal isolé
+### 4.3 Mode démonstration mal isolé — corrigé le 2026-08-03
 
-`app/facturation/page.tsx` :
+`app/facturation/page.tsx` utilisait :
 
 ```ts
 const demoData = process.env.VERCEL ? null : createDemoBillingDataset()
 ```
 
-L'absence de la variable `VERCEL` n'est pas une garantie de non-production. Un
-déploiement ailleurs, ou une exécution locale d'un build de production,
-réactive le jeu de démonstration.
+L'absence de la variable `VERCEL` n'était pas une garantie de non-production.
+Un déploiement ailleurs, ou une exécution locale d'un build de production,
+réactivait le jeu de démonstration.
 
-`reprise.md` §5.13 exige une séparation **matérielle**. Le prototype applique
-déjà la bonne forme dans `data/index.ts` : une erreur au démarrage si
-`NODE_ENV=production` et que la source est la démonstration.
+`reprise.md` §5.13 exige une séparation **matérielle** — masquer un bouton ne
+suffit pas. Remplacé par une constante de module dérivée de `NODE_ENV`, seule
+source fiable et indépendante de l'hébergeur (le même principe que `data/index.ts`,
+qui refuse déjà `FACTURATION_SOURCE=demo` en production) :
+
+```ts
+const DEMO_AUTORISEE = process.env.NODE_ENV !== 'production'
+// ...
+const demoData = DEMO_AUTORISEE ? createDemoBillingDataset() : null
+```
+
+En production, `createDemoBillingDataset()` n'est jamais invoqué : le jeu de
+démonstration est matériellement inatteignable, pas seulement caché derrière
+un bouton. Ce correctif est provisoire — l'étape 6 du plan d'exécution
+remplacera `app/facturation/page.tsx` en entier et retirera `demo-data.ts` ;
+il protège l'état actuellement déployé en attendant.
 
 ---
 

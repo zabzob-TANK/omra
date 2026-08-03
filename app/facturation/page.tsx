@@ -7,6 +7,11 @@ import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
+// Garde matérielle (reprise.md §5.13) : `VERCEL` n'est qu'un indice d'hébergement,
+// pas une preuve de production — un build de production exécuté ailleurs le
+// contournerait. `NODE_ENV` est la seule source fiable et indépendante de l'hébergeur.
+const DEMO_AUTORISEE = process.env.NODE_ENV !== 'production'
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -22,9 +27,7 @@ export default async function BillingPage({
 
   const references = await loadFacturationReferenceData()
   const result = await loadBillingDashboard(references.activeSeason?.id ?? null)
-  // Le jeu de démonstration reste strictement local et n'est jamais exposé
-  // par le déploiement Vercel officiel.
-  const demoData = process.env.VERCEL ? null : createDemoBillingDataset()
+  const demoData = DEMO_AUTORISEE ? createDemoBillingDataset() : null
   const { demo } = await searchParams
 
   return (
