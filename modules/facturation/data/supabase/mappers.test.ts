@@ -64,6 +64,17 @@ function detailFixture(overrides: Partial<BillingReceiptDetail> = {}): BillingRe
         payment_operation_id: 'operation-1',
         payment_mode: 'cash',
         usage_kind: 'unique',
+        snapshot: {
+          client_name: 'فاطمة الزهراء',
+          hotel_name: 'منار الشروق',
+          room_label: '3',
+          flight_label: 'الخطوط السعودية',
+          program_label: 'منار الشروق / غرفة 3 / الخطوط السعودية',
+          agreed_amount_dh: 300,
+          rabatteur_name: 'صفية',
+          remaining_after_dh: 100,
+          settled_after: false,
+        },
       },
     ],
     operations: [
@@ -125,23 +136,42 @@ describe('mapReceiptDetailToRecu', () => {
     expect(versement.image).toBeNull()
   })
 
-  it('reconstruit un instantané approximatif cohérent avec le montant convenu actuel', () => {
+  it('lit l’instantané figé du versement tel quel, sans le recalculer', () => {
     const recu = mapReceiptDetailToRecu(detailFixture())
     const [versement] = recu.versements
-    // convenu 30000 - payé jusqu'à ce rang 20000 = 10000 restant.
     expect(versement.instantane.restantApresCentimes).toBe(10000)
     expect(versement.instantane.statutApres).toBe('•')
     expect(versement.instantane.hotel).toBe('منار الشروق')
+    expect(versement.instantane.chambre).toBe('3')
+    expect(versement.instantane.vol).toBe('الخطوط السعودية')
+    expect(versement.instantane.programme).toBe('منار الشروق / غرفة 3 / الخطوط السعودية')
     expect(versement.instantane.client).toBe('فاطمة الزهراء')
+    expect(versement.instantane.rabatteur).toBe('صفية')
+    expect(versement.instantane.convenuCentimes).toBe(30000)
   })
 
-  it('marque le versement comme soldé quand le cumul atteint le convenu', () => {
+  it('traduit settled_after=true en statutApres soldé, sans recalculer depuis le convenu actuel', () => {
     const detail = detailFixture({
-      registration: { ...detailFixture().registration, agreed_amount_dh: 200 },
+      // Le convenu actuel diverge délibérément de l'instantané figé : la
+      // traduction ne doit dépendre que de la colonne stockée sur le
+      // paiement, jamais d'une nouvelle somme à partir du reçu courant.
+      registration: { ...detailFixture().registration, agreed_amount_dh: 9999 },
+      payments: [
+        {
+          ...detailFixture().payments[0],
+          snapshot: {
+            ...detailFixture().payments[0].snapshot,
+            remaining_after_dh: 0,
+            settled_after: true,
+          },
+        },
+      ],
     })
     const recu = mapReceiptDetailToRecu(detail)
     expect(recu.versements[0].instantane.restantApresCentimes).toBe(0)
     expect(recu.versements[0].instantane.statutApres).toBe('✓')
+    // Le convenu de l'instantané reste celui figé au versement, pas le convenu actuel du reçu.
+    expect(recu.versements[0].instantane.convenuCentimes).toBe(30000)
   })
 
   it('traduit une opération partagée avec instrument et image, sans propager l’image au versement', () => {
@@ -159,6 +189,17 @@ describe('mapReceiptDetailToRecu', () => {
           payment_operation_id: 'operation-2',
           payment_mode: 'cheque',
           usage_kind: 'shared',
+          snapshot: {
+            client_name: 'فاطمة الزهراء',
+            hotel_name: 'منار الشروق',
+            room_label: '3',
+            flight_label: 'الخطوط السعودية',
+            program_label: 'منار الشروق / غرفة 3 / الخطوط السعودية',
+            agreed_amount_dh: 300,
+            rabatteur_name: 'صفية',
+            remaining_after_dh: 100,
+            settled_after: false,
+          },
         },
       ],
       operations: [

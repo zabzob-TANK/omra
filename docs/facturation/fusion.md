@@ -256,3 +256,49 @@ commit : `git branch --show-current`.
 **Les montants de la base sont des entiers.** Un arrondi silencieux dans
 l'adaptateur produirait des écarts de caisse invisibles. Refuser plutôt
 qu'arrondir.
+
+---
+
+## 8. Décisions du 2026-08-03 — partie lecture de l'étape 5
+
+L'adaptateur Supabase en lecture (`modules/facturation/data/supabase/`) a
+soulevé six points. Décisions du commanditaire :
+
+**1. Instantané de versement — la reconstruction approximative est écartée.**
+Elle était silencieusement fausse dès qu'une correction commerciale avait
+changé le montant convenu après le versement. La base financière étant vide
+aujourd'hui, la migration `202608030001_add_receipt_payment_instant_snapshot.sql`
+ajoute les colonnes d'instantané à `receipt_payments` (client, hôtel, chambre,
+vol, programme, convenu, rabatteur, restant après, soldé après), renseignées
+par `create_billing_receipt_with_first_payment` et `add_billing_receipt_payment`
+au moment de l'écriture, jamais recalculées — et lues telles quelles par
+`get_billing_receipt_details`. `construireInstantaneApproximatif` est
+supprimée de `mappers.ts`.
+
+**2. Migration `202608020004` scindée.** `list_reusable_payment_operations`
+est extraite dans `202608030002_extract_list_reusable_payment_operations.sql`,
+déployable seule. `correct_billing_receipt_first_payment_method` reste dans
+`202608020004`, toujours non conforme à §4.2 (montant immuable pour tous), et
+sa reprise reste prévue à l'étape 8 du plan d'exécution — pas avant.
+
+**3. `groupe` / `omra_dossiers` — en attente.** Aucune décision du
+commanditaire pour l'instant sur la correspondance entre le tag groupe/famille
+du prototype et `omra_dossiers`. Rien n'est branché ; le commentaire
+d'avertissement reste dans `mappers.ts` tel quel.
+
+**4. `listerAnomaliesBase` reste non branchée.** Le domaine calcule ses
+propres anomalies depuis les reçus (`rules/daily.ts`, `rules/finance-day.ts`) :
+c'est la source de vérité, pas la RPC. Réexaminé à l'étape 9 (journal
+financier), pas avant.
+
+**5. Champs indisponibles (`impressions`, `modifications`, `creeePar`/
+`statut`/`image` d'une opération réutilisable) — normal à ce stade.** Ces
+champs viennent d'autres RPC (`get_billing_receipt_print_summary`, historique
+détaillé par champ) hors périmètre de la partie lecture. Notés dans ce
+document (§5, §4.2), pas forcés par une approximation.
+
+**6. `montantRembourseCentimes` se lit tel quel, sans plafonnement a
+posteriori.** Le plafond `min(total payé, convenu)` de §4.1 gouverne les
+**futures** annulations, pas la relecture d'un enregistrement déjà survenu :
+la lecture rapporte ce qui s'est réellement passé, elle ne corrige jamais un
+fait passé.

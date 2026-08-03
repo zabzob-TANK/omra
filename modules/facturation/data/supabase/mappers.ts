@@ -11,7 +11,6 @@ import type {
   BillingReceiptDetail,
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
-import { symboleSituation } from '../../domain/rules/receipt'
 import type {
   OperationPartagee,
   PorteeVersement,
@@ -56,54 +55,26 @@ function trouverOperation(
 }
 
 /**
- * Reconstruction **approximative** de l'instantané d'un versement.
+ * Traduit l'instantané figé stocké sur le paiement (`receipt_payments.
+ * payment_snapshot_*`, migration `202608030001`) vers `InstantaneVersement`.
  *
- * ⚠️ Ce n'est PAS l'instantané figé exigé par reprise.md §5.7. Le schéma
- * `omra` ne stocke aujourd'hui aucune colonne d'instantané par versement
- * (hôtel/chambre/vol/convenu/restant/statut au moment du paiement) — seul le
- * niveau inscription (`traveler_registrations`) porte des `*_snapshot`, figés
- * une fois à l'inscription, jamais par versement.
- *
- * Cette fonction recalcule `restantApresCentimes` et `statutApres` à partir
- * du montant convenu **actuel** et de la somme des versements dont le rang
- * est inférieur ou égal à celui-ci. Cette valeur est correcte tant qu'aucune
- * correction commerciale n'a changé le montant convenu depuis ce versement ;
- * elle devient silencieusement fausse pour les versements antérieurs à une
- * telle correction, puisque le montant convenu au moment du versement n'est
- * conservé nulle part.
- *
- * Les autres champs (client, hôtel, chambre, vol, programme, rabatteur)
- * proviennent des `*_snapshot` de l'inscription : ceux-là sont réellement
- * figés et donc fiables, contrairement à `convenuCentimes`.
- *
- * Une vraie correction exige une migration ajoutant des colonnes
- * d'instantané à `receipt_payments`, renseignées à l'écriture — hors
- * périmètre de cette étape de lecture.
+ * Lu tel quel, champ par champ — reprise.md §5.7 exige que cet instantané ne
+ * soit jamais recalculé. `statutApres` traduit directement le booléen stocké
+ * `settled_after` (lui-même vérifié cohérent avec `remaining_after_dh` par une
+ * contrainte en base) : ce n'est pas une nouvelle dérivation depuis le
+ * restant, seulement la traduction anglais → symbole exigée par le domaine.
  */
-function construireInstantaneApproximatif(
-  detail: BillingReceiptDetail,
-  rangVersement: number,
-  convenuCentimesActuel: number,
-): Versement['instantane'] {
-  const cumulJusquauRang = detail.payments
-    .filter((paiement) => paiement.payment_number <= rangVersement)
-    .reduce((somme, paiement) => somme + dhVersCentimes(paiement.amount_dh), 0)
-  const restantApresCentimes = Math.max(0, convenuCentimesActuel - cumulJusquauRang)
-
-  const hotel = detail.registration.hotel_name_snapshot
-  const chambre = detail.registration.room_label_snapshot
-  const vol = detail.registration.flight_label_snapshot
-
+function traduireInstantane(snapshot: BillingReceiptDetail['payments'][number]['snapshot']): Versement['instantane'] {
   return {
-    client: `${detail.registration.first_name_snapshot} ${detail.registration.last_name_snapshot}`,
-    hotel,
-    chambre,
-    vol,
-    programme: `${hotel} / غرفة ${chambre} / ${vol}`,
-    convenuCentimes: convenuCentimesActuel,
-    rabatteur: detail.registration.rabatteur_name_snapshot ?? '',
-    restantApresCentimes,
-    statutApres: symboleSituation(restantApresCentimes),
+    client: snapshot.client_name,
+    hotel: snapshot.hotel_name,
+    chambre: snapshot.room_label,
+    vol: snapshot.flight_label,
+    programme: snapshot.program_label,
+    convenuCentimes: dhVersCentimes(snapshot.agreed_amount_dh),
+    rabatteur: snapshot.rabatteur_name ?? '',
+    restantApresCentimes: dhVersCentimes(snapshot.remaining_after_dh),
+    statutApres: snapshot.settled_after ? '✓' : '•',
   }
 }
 
@@ -119,7 +90,6 @@ function construireInstantaneApproximatif(
 function mapVersement(
   detail: BillingReceiptDetail,
   paiement: BillingReceiptDetail['payments'][number],
-  convenuCentimesActuel: number,
 ): Versement {
   const operation = trouverOperation(detail, paiement.payment_operation_id)
   if (!operation) {
@@ -153,7 +123,7 @@ function mapVersement(
     image: portee === 'unique' && operation.supporting_image
       ? mapImage(operation.supporting_image)
       : null,
-    instantane: construireInstantaneApproximatif(detail, paiement.payment_number, convenuCentimesActuel),
+    instantane: traduireInstantane(paiement.snapshot),
   }
 }
 
@@ -172,9 +142,11 @@ function mapVersement(
  *    `after_data` en JSON libre dans `history`) ne correspond pas à
  *    `ChangementChamp[]` (avant/après par champ nommé) attendu par le
  *    domaine — la traduire exige de décider quels champs diffuser et sous
- *    quels libellés, ce que cette étape ne tranche pas ;
- *  - chaque `versement.instantane` est une reconstruction approximative, voir
- *    `construireInstantaneApproximatif`.
+ *    quels libellés, ce que cette étape ne tranche pas.
+ *
+ * `versement.instantane` n'est plus une approximation : il est lu tel quel
+ * depuis `receipt_payments.payment_snapshot_*` (migration `202608030001`),
+ * figé à l'écriture, jamais recalculé — voir `traduireInstantane`.
  */
 export function mapReceiptDetailToRecu(detail: BillingReceiptDetail): Recu {
   const convenuCentimes = dhVersCentimes(detail.registration.agreed_amount_dh)
@@ -228,7 +200,7 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail): Recu {
     versements: detail.payments
       .slice()
       .sort((a, b) => a.payment_number - b.payment_number)
-      .map((paiement) => mapVersement(detail, paiement, convenuCentimes)),
+      .map((paiement) => mapVersement(detail, paiement)),
   }
 }
 

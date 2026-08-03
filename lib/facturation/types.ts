@@ -80,6 +80,22 @@ export type BillingPayment = {
   payment_operation_id: string | null
   payment_mode: PaymentMode
   usage_kind: PaymentUsage
+  /**
+   * Instantané figé au moment de ce versement (reprise.md §5.7), renseigné
+   * par create_billing_receipt_with_first_payment / add_billing_receipt_payment
+   * et jamais recalculé.
+   */
+  snapshot: {
+    client_name: string
+    hotel_name: string
+    room_label: string
+    flight_label: string
+    program_label: string
+    agreed_amount_dh: number
+    rabatteur_name: string | null
+    remaining_after_dh: number
+    settled_after: boolean
+  }
 }
 
 export type BillingOperation = {

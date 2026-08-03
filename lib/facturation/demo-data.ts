@@ -191,19 +191,36 @@ function detail(input: DemoReceiptInput, row: BillingReceiptRow): BillingReceipt
   })
   const shared = input.usage === 'shared'
   const operationId = shared ? 'demo-shared-operation-1' : `${input.id}-operation`
-  const payments: BillingPayment[] = paymentAmounts.map((amount, index) => ({
-    id: `${input.id}-payment-${index + 1}`,
-    payment_number: index + 1,
-    amount_dh: amount,
-    registered_at: new Date(new Date(input.date).getTime() + index * 86_400_000).toISOString(),
-    created_by: createdBy,
-    allocation_id: `${input.id}-allocation-${index + 1}`,
-    allocation_count: 1,
-    has_expected_allocation: true,
-    payment_operation_id: index === 0 ? operationId : `${input.id}-operation-${index + 1}`,
-    payment_mode: input.mode,
-    usage_kind: index === 0 && shared ? 'shared' : 'unique',
-  }))
+  const programLabel = `${row.hotel_name_snapshot} / غرفة ${row.room_label_snapshot} / ${row.flight_label_snapshot}`
+  let cumulativePaid = 0
+  const payments: BillingPayment[] = paymentAmounts.map((amount, index) => {
+    cumulativePaid += amount
+    const remainingAfter = Math.max(row.agreed_amount_dh - cumulativePaid, 0)
+    return {
+      id: `${input.id}-payment-${index + 1}`,
+      payment_number: index + 1,
+      amount_dh: amount,
+      registered_at: new Date(new Date(input.date).getTime() + index * 86_400_000).toISOString(),
+      created_by: createdBy,
+      allocation_id: `${input.id}-allocation-${index + 1}`,
+      allocation_count: 1,
+      has_expected_allocation: true,
+      payment_operation_id: index === 0 ? operationId : `${input.id}-operation-${index + 1}`,
+      payment_mode: input.mode,
+      usage_kind: index === 0 && shared ? 'shared' : 'unique',
+      snapshot: {
+        client_name: `${input.firstName} ${input.lastName}`,
+        hotel_name: row.hotel_name_snapshot,
+        room_label: row.room_label_snapshot,
+        flight_label: row.flight_label_snapshot,
+        program_label: programLabel,
+        agreed_amount_dh: row.agreed_amount_dh,
+        rabatteur_name: null,
+        remaining_after_dh: remainingAfter,
+        settled_after: remainingAfter <= 0,
+      },
+    }
+  })
   const operations: BillingOperation[] = payments.map((payment, index) => ({
     id: payment.payment_operation_id!,
     payment_mode: payment.payment_mode,
