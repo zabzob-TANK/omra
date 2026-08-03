@@ -1,0 +1,760 @@
+/*
+ * Reçu imprimable — dimensions reprises au millimètre du fichier de référence.
+ *
+ * Le papier réel mesure 143,8 mm × 232 mm et se place dans une feuille A4 à
+ * 34,7 mm du bord gauche. Toutes les cotes ci-dessous sont celles du fichier :
+ * ne pas les convertir en pixels, l'alignement sur le papier préimprimé en
+ * dépend.
+ */
+
+.recu-atelier {
+  --offset-x: 0mm;
+  --offset-y: 0mm;
+  --ink: #171717;
+  --line: #cfcfcf;
+  --header: #888;
+  --row: rgba(222, 222, 222, 0.86);
+
+  min-height: 100vh;
+  background: #eef1f4;
+  font-family: Arial, Tahoma, sans-serif;
+  color: var(--ink);
+  direction: ltr;
+
+  /*
+   * Le reçu est un document à part dans le fichier de référence : une page
+   * autonome qui ne fixe aucune hauteur de ligne et laisse donc `normal`.
+   * Sans cette remise à zéro, il héritait du 1,6 de l'application et chaque
+   * ligne de paiement passait de 4,2 mm à 6,75 mm — le tableau débordait de
+   * son emplacement sur le papier préimprimé. Sa police de base est celle du
+   * navigateur — 16 px —, dont hérite le `font: inherit` de la barre d'outils.
+   */
+  line-height: normal;
+  font-size: 16px;
+}
+
+.recu-atelier * {
+  box-sizing: border-box;
+}
+
+/* -------------------------------------------------------- Barre retour */
+
+/* Cotes du fichier : barre centrée sur 1180 px de large, bouton clair. */
+.recu-barre-retour {
+  max-width: 1180px;
+  margin: 0 auto 12px;
+  padding: 14px 16px 0;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+  direction: rtl;
+  font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+}
+
+.recu-atelier .recu-barre-retour button {
+  padding: 10px 16px;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.recu-atelier .recu-barre-retour button:hover {
+  background: #f9f7f2;
+}
+
+/* ------------------------------------------------------------- Outils */
+
+.recu-outils {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(20, 27, 36, 0.94);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.recu-outils strong {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.recu-atelier .recu-outils button,
+.recu-atelier .recu-outils input {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font: inherit;
+}
+
+.recu-atelier .recu-outils button {
+  padding: 0 13px;
+  color: #fff;
+  background: #364152;
+  cursor: pointer;
+}
+
+.recu-atelier .recu-outils button:hover {
+  background: #465369;
+}
+
+.recu-atelier .recu-outils button.primary {
+  background: #c18b2d;
+}
+
+.recu-atelier .recu-outils button.primary:hover {
+  background: #d49a34;
+}
+
+.recu-outils label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #dbe3eb;
+}
+
+.recu-atelier .recu-outils input {
+  width: 62px;
+  padding: 0 7px;
+  background: #fff;
+  color: #111;
+}
+
+.recu-outils .indication {
+  margin-left: auto;
+  max-width: 420px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #bac5d1;
+}
+
+.recu-outils .alerte-depassement {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #9c3b32;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------ Feuille */
+
+.recu-espace {
+  padding: 28px;
+  display: grid;
+  place-items: start center;
+  overflow: auto;
+}
+
+/* À l'écran, seul le petit papier du reçu est visible.
+   Le canevas A4 n'est rétabli qu'à l'impression. */
+.recu-page {
+  position: relative;
+  width: 143.8mm;
+  height: 232mm;
+  flex: none;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(23, 31, 43, 0.22);
+  transform-origin: top center;
+}
+
+.recu-fond {
+  position: absolute;
+  inset: 0;
+  width: 143.8mm;
+  height: 232mm;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
+.recu-atelier.sans-fond .recu-fond {
+  visibility: hidden;
+}
+
+/* Zone physique approximative du petit papier dans la feuille A4. */
+.recu-reperes {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 143.8mm;
+  height: 232mm;
+  border: 0.35mm solid transparent;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.recu-reperes::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 147mm;
+  border-top: 0.3mm dashed transparent;
+}
+
+.recu-atelier.reperes .recu-reperes {
+  border-color: rgba(230, 44, 44, 0.78);
+}
+
+.recu-atelier.reperes .recu-reperes::after {
+  border-top-color: rgba(230, 44, 44, 0.78);
+}
+
+/* Cadre physique du petit reçu. Rien ne peut dépasser. */
+.recu-calque {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 143.8mm;
+  height: 232mm;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.recu-contenu {
+  position: absolute;
+  inset: 0;
+  transform: translate(calc(-1.3mm + var(--offset-x)), var(--offset-y));
+  transform-origin: top left;
+}
+
+.recu-rtl {
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.recu-ltr {
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+/* ------------------------------------------- Partie remise au client */
+
+.recu-haut {
+  position: absolute;
+  left: 4.3mm;
+  top: 23.8mm;
+  width: 137.2mm;
+  height: 110mm;
+  font-size: 3.45mm;
+}
+
+.recu-meta {
+  position: relative;
+  height: 16.2mm;
+}
+
+.recu-carte-date,
+.recu-carte-numero {
+  position: absolute;
+  top: 0;
+  height: 15mm;
+  border: 0.55mm solid #d2d2d2;
+  border-radius: 1.8mm;
+  background: rgba(255, 255, 255, 0.38);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  line-height: 1.15;
+}
+
+.recu-carte-date {
+  left: 0;
+  width: 31mm;
+}
+
+.recu-carte-numero {
+  right: 0;
+  width: 31mm;
+}
+
+.recu-carte-date .etiquette,
+.recu-carte-numero .etiquette {
+  font-size: 3.2mm;
+  margin-bottom: 1.3mm;
+}
+
+.recu-carte-date .valeur {
+  font-size: 4mm;
+}
+
+.recu-carte-numero .valeur {
+  font-size: 7.1mm;
+  line-height: 0.88;
+}
+
+.recu-nom-client {
+  position: absolute;
+  left: 48mm;
+  top: 0.5mm;
+  width: 43mm;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.recu-nom-client .etiquette {
+  font-size: 3.25mm;
+}
+
+.recu-nom-client .valeur {
+  font-size: 4.2mm;
+  margin-top: 1mm;
+}
+
+.recu-accord {
+  direction: ltr;
+  height: 14mm;
+  border: 0.55mm solid #d2d2d2;
+  border-radius: 1.6mm;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 38mm 48mm 1fr;
+  background: rgba(255, 255, 255, 0.33);
+}
+
+.recu-accord > div {
+  min-width: 0;
+}
+
+.recu-programme {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  text-align: center;
+  font-size: 3.25mm;
+  padding: 0.4mm 1mm;
+}
+
+.recu-programme .petit {
+  font-size: 2.75mm;
+}
+
+.recu-montants {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  justify-items: center;
+  font-size: 5.1mm;
+  font-weight: 400;
+  letter-spacing: 0.1mm;
+}
+
+.recu-montants-etiquettes {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  align-items: center;
+  text-align: right;
+  padding: 0 4mm 0 2mm;
+  font-size: 3.7mm;
+}
+
+.recu-atelier table {
+  border-collapse: collapse;
+}
+
+.recu-paiements {
+  direction: ltr;
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 2.7mm;
+  font-size: 3.05mm;
+  text-align: center;
+}
+
+/*
+ * Le tableau des paiements du fichier de référence ne déclare aucun
+ * remplissage : il s'appuie sur le `padding: 1px` que le navigateur applique
+ * par défaut aux cellules. Le socle CSS du projet remet tous les
+ * remplissages à zéro, ce qui rétrécissait chaque ligne de 0,53 mm et
+ * remontait de 3,17 mm tout le bas du reçu — signature et lignes de
+ * règlement comprises — par rapport au papier préimprimé.
+ */
+.recu-paiements th,
+.recu-paiements td {
+  padding: 1px;
+}
+
+.recu-paiements th {
+  direction: rtl;
+  height: 6mm;
+  background: var(--header);
+  color: #111;
+  border-right: 0.2mm solid #fff;
+  font-weight: 700;
+}
+
+.recu-paiements td {
+  height: 4.2mm;
+  background: var(--row);
+  border-right: 0.2mm solid #fff;
+  border-top: 0.2mm solid #fff;
+  white-space: nowrap;
+}
+
+.recu-paiements .montant {
+  font-size: 4.05mm;
+  text-align: right;
+  padding-right: 1.5mm;
+}
+
+.recu-paiements .rang {
+  font-size: 4.05mm;
+  background: rgba(226, 226, 226, 0.92);
+}
+
+/* R-79 — les lignes sans versement restent présentes mais invisibles. */
+.recu-paiements tr.vide {
+  opacity: 0;
+}
+
+.recu-bas {
+  position: relative;
+  height: 25mm;
+  margin-top: 4.8mm;
+  transform: translateY(-1.5mm);
+}
+
+.recu-signature {
+  position: absolute;
+  left: 5.5mm;
+  top: 3.8mm;
+  width: 39mm;
+  height: 20.5mm;
+  border: 1mm solid #888;
+  border-radius: 4mm;
+  display: grid;
+  place-items: center;
+  color: #777;
+  font-size: 3.5mm;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.recu-signature::after {
+  content: '';
+  position: absolute;
+  inset: 1.7mm;
+  border: 0.45mm solid #9a9a9a;
+  border-radius: 2.8mm;
+}
+
+.recu-signature span {
+  position: relative;
+  z-index: 2;
+}
+
+.recu-lignes-reglement {
+  position: absolute;
+  right: 0;
+  top: 4.2mm;
+  width: 84mm;
+  display: grid;
+  direction: ltr;
+  grid-template-columns: 51mm 33mm;
+  grid-template-rows: repeat(3, 7mm);
+  align-items: center;
+  font-size: 3.4mm;
+}
+
+.recu-lignes-reglement .trait {
+  height: 0;
+  border-bottom: 0.45mm dashed #bcbcbc;
+  margin-right: 5mm;
+}
+
+.recu-lignes-reglement .etiquette {
+  text-align: right;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+/* ---------------------------------------- Souche conservée par l'agence */
+
+.recu-souche {
+  position: absolute;
+  left: 4.3mm;
+  top: 159.2mm;
+  width: 137.2mm;
+  height: 67.5mm;
+  overflow: hidden;
+  font-size: 2.65mm;
+}
+
+.recu-souche table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.recu-souche th,
+.recu-souche td {
+  padding: 0;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.recu-souche-principale th,
+.recu-souche-principale td,
+.recu-souche-details th,
+.recu-souche-details td,
+.recu-souche-entete th,
+.recu-souche-contact td {
+  border: 0.35mm solid #111;
+}
+
+.recu-souche-principale th {
+  height: 3.7mm;
+  font-size: 2.2mm;
+  line-height: 0.95;
+  font-weight: 400;
+  background: #efefef;
+}
+
+.recu-souche-principale td {
+  height: 7.4mm;
+  text-align: center;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.recu-souche-principale td.grand {
+  font-size: 4.1mm;
+  background: rgba(210, 210, 210, 0.82);
+}
+
+.recu-souche-principale td.date {
+  font-size: 3.8mm;
+  background: #fff;
+}
+
+.recu-souche-principale .receveur {
+  font-size: 4.3mm;
+  font-weight: 700;
+  background: #fff;
+}
+
+.recu-souche-details {
+  margin-top: 0.5mm;
+}
+
+.recu-souche-details th {
+  height: 2.8mm;
+  font-size: 2.15mm;
+  font-weight: 400;
+  background: #efefef;
+}
+
+.recu-souche-details td {
+  height: 5mm;
+  text-align: center;
+  font-weight: 700;
+  font-size: 3.25mm;
+}
+
+.recu-souche-details .programme {
+  font-size: 3.15mm;
+  font-weight: 400;
+}
+
+.recu-souche-entete {
+  margin-top: 0.15mm;
+}
+
+.recu-souche-entete th {
+  height: 3.4mm;
+  font-size: 2.15mm;
+  background: #f0f0f0;
+  font-weight: 400;
+}
+
+.recu-souche-lignes {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 2.9mm;
+}
+
+.recu-souche-lignes td {
+  height: 3.8mm;
+  font-size: 2.45mm;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.recu-souche-lignes .montant {
+  font-size: 3.55mm;
+  font-weight: 700;
+  text-align: right;
+  padding-right: 1.4mm;
+}
+
+.recu-souche-lignes .methode {
+  font-weight: 700;
+}
+
+.recu-souche-contact {
+  position: relative;
+  margin-top: 0.3mm;
+}
+
+.recu-souche-contact td {
+  height: 5.8mm;
+  text-align: center;
+  background: #fff;
+}
+
+.recu-souche-contact .nom-valeur {
+  font-size: 3.25mm;
+  font-weight: 700;
+}
+
+.recu-souche-contact .telephone-valeur {
+  font-size: 3.8mm;
+  direction: ltr;
+}
+
+.recu-souche-contact .cellule-etiquette {
+  width: 21mm;
+  background: #e8e8e8;
+}
+
+@media (max-width: 950px) {
+  .recu-outils .indication {
+    display: none;
+  }
+  .recu-espace {
+    padding: 14px;
+    justify-content: start;
+  }
+  .recu-page {
+    transform: scale(0.78);
+    transform-origin: top left;
+    margin-bottom: -50mm;
+  }
+}
+
+/* --------------------------------------------------------- Impression */
+
+/*
+ * À l'impression, la feuille A4 est rétablie et le petit papier est replacé à
+ * 34,7 mm du bord gauche, exactement comme dans le fichier de référence.
+ * La règle `@page` est injectée par l'écran pendant qu'il est affiché, afin de
+ * ne pas interférer avec les autres impressions de l'application.
+ */
+@media print {
+  body.recu-impression {
+    position: relative !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.recu-impression .recu-barre-retour,
+  body.recu-impression .recu-outils,
+  body.recu-impression .recu-reperes {
+    display: none !important;
+  }
+
+  body.recu-impression .recu-atelier {
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  body.recu-impression .recu-espace {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+  }
+
+  body.recu-impression .recu-page {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: hidden !important;
+  }
+
+  /* Le papier à en-tête est préimprimé : il ne doit jamais sortir sur la feuille. */
+  body.recu-impression .recu-fond {
+    display: none !important;
+  }
+
+  body.recu-impression .recu-calque {
+    position: absolute !important;
+    left: 34.7mm !important;
+    top: 0 !important;
+    width: 143.8mm !important;
+    height: 232mm !important;
+    overflow: hidden !important;
+  }
+}
+
+/*
+ * Largeurs relatives de la souche.
+ *
+ * Le fichier de référence déclare deux fois les largeurs de ces colonnes :
+ * en millimètres sur les `<col>`, puis en pourcentages `!important` dans sa
+ * feuille de style. Ce sont les pourcentages qui gagnent, et c'est ce qui
+ * maintient les tableaux exactement dans les 137,2 mm de la souche : la somme
+ * des millimètres, elle, vaut 138,5 mm et débordait du repère de 1,55 mm.
+ */
+.recu-souche-principale col:nth-child(1) { width: 16.61% !important; }
+.recu-souche-principale col:nth-child(2) { width: 8.3% !important; }
+.recu-souche-principale col:nth-child(3) { width: 28.16% !important; }
+.recu-souche-principale col:nth-child(4) { width: 23.1% !important; }
+.recu-souche-principale col:nth-child(5) { width: 23.83% !important; }
+
+.recu-souche-details col:nth-child(1) { width: 20.22% !important; }
+.recu-souche-details col:nth-child(2) { width: 9.39% !important; }
+.recu-souche-details col:nth-child(3) { width: 13.72% !important; }
+.recu-souche-details col:nth-child(4) { width: 14.44% !important; }
+.recu-souche-details col:nth-child(5) { width: 42.23% !important; }
+
+.recu-souche-entete col:nth-child(1),
+.recu-souche-lignes col:nth-child(1) { width: 15.88% !important; }
+.recu-souche-entete col:nth-child(2),
+.recu-souche-lignes col:nth-child(2) { width: 15.16% !important; }
+.recu-souche-entete col:nth-child(3),
+.recu-souche-lignes col:nth-child(3) { width: 15.88% !important; }
+.recu-souche-entete col:nth-child(4),
+.recu-souche-lignes col:nth-child(4) { width: 14.44% !important; }
+.recu-souche-entete col:nth-child(5),
+.recu-souche-lignes col:nth-child(5) { width: 17.33% !important; }
+.recu-souche-entete col:nth-child(6),
+.recu-souche-lignes col:nth-child(6) { width: 21.31% !important; }
+
+.recu-souche-contact col:nth-child(1) { width: 41.88% !important; }
+.recu-souche-contact col:nth-child(2) { width: 36.1% !important; }
+.recu-souche-contact col:nth-child(3) { width: 22.02% !important; }

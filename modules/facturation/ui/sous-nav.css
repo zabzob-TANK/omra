@@ -1,0 +1,51 @@
+/*
+ * Sous-navigation de la rubrique financière — cotes du fichier de référence
+ * (`.omra-section-subnav`) : collante sous l'en-tête, centrée, de gauche à
+ * droite, deux boutons de largeur fixe.
+ */
+
+.omra-sous-nav {
+  position: sticky;
+  top: 64px;
+  z-index: 88;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: rgba(249, 247, 242, 0.98);
+  border-bottom: 1px solid #e7e3d6;
+  backdrop-filter: blur(8px);
+  direction: ltr;
+}
+
+.omra-sous-nav button {
+  height: 34px;
+  min-width: 132px;
+  padding: 0 14px;
+  border: 1px solid #d9d5c8;
+  border-radius: 8px;
+  background: #fff;
+  color: #47593c;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.omra-sous-nav button:hover {
+  background: #edf0e5;
+  border-color: #c9d0c0;
+}
+
+.omra-sous-nav button.active {
+  background: #47593c;
+  color: #fff;
+  border-color: #47593c;
+}
+
+@media print {
+  .omra-sous-nav {
+    display: none !important;
+  }
+}

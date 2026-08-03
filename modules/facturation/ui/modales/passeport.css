@@ -1,0 +1,182 @@
+/*
+ * Fenêtre du passeport — cotes reprises du fichier de référence.
+ */
+
+.passeport-fond {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 23, 15, 0.6);
+  z-index: 130;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.passeport-fenetre {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 900px;
+  box-shadow: var(--ombre-fenetre);
+  margin: auto;
+  overflow: hidden;
+}
+
+.passeport-entete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e7e3d6;
+}
+
+.passeport-icone {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #edf0e5;
+  color: #47593c;
+  display: grid;
+  place-items: center;
+}
+
+.passeport-entete h2 {
+  font-size: 16.5px;
+  font-weight: 700;
+}
+
+.passeport-entete p {
+  font-size: 11px;
+  color: #6e7565;
+  margin-top: 2px;
+}
+
+.passeport-fermer {
+  width: 31px;
+  height: 31px;
+  border: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #6e7565;
+  background: transparent;
+  cursor: pointer;
+}
+
+.passeport-fermer:hover {
+  background: #edf0e5;
+}
+
+.passeport-corps {
+  padding: 18px 20px 20px;
+}
+
+.passeport-note {
+  background: #fff7e8;
+  border: 1px solid #e4c98b;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: #7a5a18;
+  line-height: 1.65;
+  margin-bottom: 14px;
+}
+
+.passeport-colonnes {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.passeport-image {
+  border: 1px solid #e7e3d6;
+  border-radius: 12px;
+  background: #f9f7f2;
+  padding: 12px;
+  text-align: center;
+}
+
+.passeport-image img {
+  width: 100%;
+  height: 170px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #fff;
+  border: 1px solid #e7e3d6;
+  display: block;
+}
+
+.passeport-image-vide {
+  height: 170px;
+  border: 1px dashed #cfcbbe;
+  border-radius: 8px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: #9ca28f;
+  font-size: 11.5px;
+}
+
+.passeport-choisir {
+  display: block;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #47593c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.passeport-choisir input {
+  display: none;
+}
+
+.passeport-demo {
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #d9d5c8;
+  color: #47593c;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.passeport-aide {
+  font-size: 10.5px;
+  color: #8c9185;
+  line-height: 1.5;
+  margin-top: 9px;
+}
+
+.passeport-champs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.passeport-pied {
+  display: flex;
+  gap: 9px;
+  padding: 13px 20px;
+  border-top: 1px solid #e7e3d6;
+  background: #f9f7f2;
+}
+
+.passeport-pied .omra-btn.primary {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 760px) {
+  .passeport-colonnes,
+  .passeport-champs {
+    grid-template-columns: 1fr;
+  }
+}

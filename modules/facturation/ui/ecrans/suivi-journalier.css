@@ -1,0 +1,440 @@
+/*
+ * Suivi journalier — cotes reprises du fichier de référence (`.daily-*`).
+ *
+ * Écran français, de gauche à droite. Les largeurs de colonnes, les hauteurs de
+ * ligne et les tailles de police sont celles du fichier : la densité fait
+ * partie de la lisibilité attendue.
+ */
+
+.daily-ecran {
+  min-height: 100vh;
+  background: #f9f7f2;
+  color: #20251b;
+  direction: ltr;
+}
+
+.daily-ecran * {
+  box-sizing: border-box;
+}
+
+.daily-principal {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 18px 20px 40px;
+}
+
+/* ------------------------------------------------------------------ Entête */
+
+.daily-entete {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.daily-entete h1 {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.daily-entete p {
+  font-size: 11.5px;
+  color: #7a7f75;
+  margin-top: 3px;
+}
+
+.daily-mois {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.daily-ecran .daily-mois button,
+.daily-ecran .daily-mois input {
+  height: 34px;
+  border: 1px solid #dcd8cb;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: #394432;
+}
+
+.daily-ecran .daily-mois button {
+  padding: 0 11px;
+  font-weight: 700;
+}
+
+.daily-ecran .daily-mois button.icone {
+  width: 34px;
+  padding: 0;
+  font-size: 17px;
+}
+
+.daily-ecran .daily-mois input {
+  padding: 0 10px;
+  font-weight: 700;
+  direction: ltr;
+}
+
+.daily-ecran input:focus {
+  outline: none;
+  border-color: #8fa07e;
+  box-shadow: 0 0 0 3px rgb(71 89 60 / 14%);
+}
+
+/* ---------------------------------------------------------------- Synthèse */
+
+.daily-synthese-defilement {
+  overflow-x: auto;
+  margin-bottom: 7px;
+}
+
+.daily-synthese {
+  display: grid;
+  grid-template-columns: 1.22fr 1.08fr 1.18fr 1.18fr 0.96fr 1.14fr;
+  gap: 7px;
+  min-width: 1050px;
+}
+
+.daily-carte {
+  min-height: 58px;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: var(--ombre-carte);
+}
+
+.daily-carte.principale {
+  border-width: 2px;
+  border-color: #47593c;
+}
+
+.daily-carte .etiquette {
+  font-size: 10.5px;
+  color: #777d70;
+  white-space: nowrap;
+}
+
+.daily-carte .valeur {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+}
+
+.daily-carte.principale .valeur {
+  font-size: 17px;
+}
+
+.daily-total-bancaire {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-height: 25px;
+  padding: 0 4px 5px;
+  color: #7a7f75;
+  font-size: 10.5px;
+}
+
+.daily-total-bancaire b {
+  color: #47593c;
+  font-size: 12px;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.daily-total-bancaire .point {
+  color: #c1bdaf;
+}
+
+/* ----------------------------------------------------------------- Actions */
+
+.daily-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin: 3px 0 8px;
+  padding: 5px 7px;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  flex-wrap: wrap;
+}
+
+.daily-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.8px;
+  font-weight: 700;
+  color: #47593c;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.daily-actions input[type='checkbox'],
+.daily-tableau input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: #47593c;
+  cursor: pointer;
+}
+
+.daily-etat-selection {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #edf0e5;
+  color: #47593c;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.daily-etat-selection.actif {
+  background: #47593c;
+  color: #fff;
+}
+
+.daily-ecran .daily-action {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid #dcd8cb;
+  border-radius: 8px;
+  background: #fff;
+  color: #596251;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.daily-ecran .daily-action:hover {
+  background: #f5f5ef;
+}
+
+.daily-ecran .daily-action.vides {
+  margin-left: auto;
+}
+
+.daily-ecran .daily-action.vides.actif {
+  background: #edf0e5;
+  border-color: #c9d0c0;
+  color: #394a32;
+}
+
+/* ----------------------------------------------------------------- Tableau */
+
+.daily-carte-tableau {
+  background: #fff;
+  border: 1px solid #e7e3d6;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--ombre-carte);
+}
+
+.daily-defilement {
+  overflow: auto;
+  max-height: calc(100vh - 248px);
+}
+
+.daily-tableau {
+  width: 100%;
+  min-width: 1358px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 11px;
+  direction: ltr;
+}
+
+/*
+ * Pas de largeurs par colonne : le fichier de référence déclare bien des
+ * règles `col.c-*`, mais son tableau ne contient aucun `<colgroup>`. Les dix
+ * colonnes s'y répartissent donc à parts égales, et c'est ce que l'on
+ * reproduit ici.
+ */
+
+.daily-tableau th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #edf0e5;
+  color: #35422f;
+  padding: 8px 7px;
+  border-bottom: 1px solid #dcd8cb;
+  font-size: 9.8px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.daily-tableau td {
+  height: 43px;
+  padding: 6px 7px;
+  border-bottom: 1px solid #eeeadf;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #fff;
+}
+
+.daily-tableau tr:last-child td {
+  border-bottom: 0;
+}
+
+.daily-tableau tbody tr:hover td {
+  background: #f2f5ea;
+}
+
+.daily-tableau tr.selectionnee td {
+  background: #f2f5ec;
+}
+
+.daily-tableau tr.selectionnee td:first-child {
+  box-shadow: inset 3px 0 0 #6c8058;
+}
+
+.daily-tableau tr.week-end.selectionnee td {
+  background: #fff2d2;
+}
+
+.daily-tableau td.cellule-case {
+  padding: 0;
+  text-align: center;
+  overflow: visible;
+}
+
+.daily-tableau th.colonne-case {
+  padding: 0;
+  text-align: center;
+}
+
+.daily-tableau td.majeur {
+  font-size: 13px;
+  font-weight: 700;
+  color: #20251b;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.daily-tableau td.cellule-jour {
+  font-weight: 700;
+  color: #47593c;
+  text-align: left;
+  padding-left: 13px;
+}
+
+.daily-tableau td.cellule-date {
+  font-size: 12.5px;
+  font-weight: 700;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.daily-tableau td.instrument {
+  font-size: 11.5px;
+  font-weight: 700;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.daily-tableau td.nouveaux {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.daily-tableau td.controle {
+  text-align: left;
+  color: #777d70;
+  font-size: 9.7px;
+  letter-spacing: 0.005em;
+  padding-left: 12px;
+}
+
+.daily-etat-controle {
+  font-weight: 700;
+}
+
+.daily-etat-controle.printed {
+  color: #536a46;
+}
+
+.daily-etat-controle.pending {
+  color: #a27318;
+}
+
+.daily-etat-controle.changed {
+  color: #9a5908;
+}
+
+.daily-etat-controle.empty {
+  color: #9ca28f;
+  font-weight: 600;
+}
+
+/* R-71 — samedi et dimanche teintés. */
+.daily-tableau tr.week-end td {
+  background: #fff8e8;
+}
+
+.daily-tableau tr.week-end td:first-child {
+  box-shadow: inset 3px 0 0 #c9a24a;
+}
+
+.daily-tableau tr.week-end:hover td {
+  background: #fff4d9;
+}
+
+.daily-tableau tr.vide td {
+  height: 32px;
+  color: #9ca28f;
+  font-size: 10.5px;
+}
+
+.daily-tableau tr.vide td.majeur {
+  font-size: 12px;
+  color: #6e7565;
+}
+
+.daily-tableau tr.vide td.cellule-jour {
+  color: #7c8377;
+}
+
+.daily-tableau tr.week-end.vide td {
+  background: #fffaef;
+}
+
+.daily-pied {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border-top: 1px solid #e7e3d6;
+  color: #8c9185;
+  font-size: 9.5px;
+}
+
+@media (max-width: 1000px) {
+  .daily-principal {
+    padding: 14px 12px 30px;
+  }
+
+  .daily-defilement {
+    max-height: none;
+  }
+
+  .daily-ecran .daily-action.vides {
+    margin-left: 0;
+  }
+}

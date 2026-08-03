@@ -1,0 +1,2966 @@
+/*
+ * Design repris du fichier de référence « Zemzem Asfar.dc.html ».
+ *
+ * Les valeurs (couleurs, rayons, hauteurs, graisses, ombres) sont celles du
+ * prototype. La seule transformation systématique est le passage de `rtl` à
+ * `ltr` : l'interface est en français et se lit de gauche à droite, tandis que
+ * les valeurs arabes conservent leur direction via les primitives de `bidi.tsx`.
+ */
+
+.omra {
+  --accent: #47593c;
+  --accent-deep: #2e3b27;
+  --accent-soft: #edf0e5;
+  --page: #f9f7f2;
+  --surface: #ffffff;
+  --border: #e7e3d6;
+  --border-strong: #d9d5c8;
+  --ink: #1c2117;
+  --ink-2: #20251b;
+  --muted: #6e7565;
+  --muted-2: #9ca28f;
+  --danger: #9c3b32;
+  --danger-soft: #f7e8e5;
+  --warn: #a3801f;
+  --warn-soft: #f6eeda;
+  --info: #2e5870;
+  --info-soft: #e6eef2;
+
+  /*
+   * Restant nul : un reçu soldé n'a plus rien à payer, et cet état mérite sa
+   * propre couleur. C'est un troisième bleu, volontairement distinct des deux
+   * autres : plus clair et plus saturé que l'ardoise `--info` des états, moins
+   * violacé que l'indigo `--mode-virement` des virements. Les trois peuvent se
+   * croiser dans une même ligne de tableau sans se confondre.
+   */
+  --solde: #1668b3;
+  --solde-soft: #e6eff9;
+
+  /*
+   * Modes de paiement : vert pour les espèces, jaune pour le chèque, bleu
+   * pour le virement. Ce bleu est volontairement plus franc et plus violacé
+   * que le bleu d'état `--info`, qui reste un ardoise désaturé : les deux ne
+   * doivent pas se confondre dans une même ligne de tableau.
+   */
+  --mode-especes: #3f6336;
+  --mode-especes-fond: #eaf3e6;
+  --mode-especes-bord: #cadfbf;
+  --mode-cheque: #8a5c12;
+  --mode-cheque-fond: #fff0d8;
+  --mode-cheque-bord: #e8c98f;
+  --mode-virement: #3a4f9c;
+  --mode-virement-fond: #e7ecfb;
+  --mode-virement-bord: #c4cef0;
+
+  /*
+   * Zones interactives : un fond un peu plus soutenu que celui de la page,
+   * qui s'éclaircit quand le champ prend la main, et une bordure qui se
+   * précise. Ni contraste fort, ni blanc pur : la teinte reste dans la
+   * famille chaude du fond général.
+   */
+  --champ-fond: #f2efe6;
+  --champ-fond-actif: #fdfcf8;
+  --champ-bord: #e2ded1;
+  --champ-bord-survol: #d2ccbb;
+  --champ-bord-actif: #8fa07e;
+  --champ-halo: rgba(71, 89, 60, 0.14);
+  --row-pad: 10px;
+
+  /*
+   * Échelles de forme.
+   *
+   * Le fichier de référence écrit ses valeurs écran par écran : la
+   * reconstruction en avait hérité quinze rayons différents et treize graisses
+   * de police. Les voici ramenés à deux échelles courtes, seules employées
+   * désormais. Aucune valeur intermédiaire ne doit être réintroduite.
+   *
+   * Les graisses correspondent exactement à celles que la police embarque —
+   * IBM Plex Sans Arabic 400/500/600/700. Au-delà, le navigateur retombait de
+   * toute façon sur 700 : 650, 720, 740, 750, 760, 780 et 800 rendaient tous
+   * le même trait, et donnaient l'illusion d'une hiérarchie inexistante.
+   */
+  --r-xs: 4px;
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 16px;
+  --r-pilule: 999px;
+
+  --gras-normal: 400;
+  --gras-doux: 500;
+  --gras-moyen: 600;
+  --gras-fort: 700;
+
+  /* Durée unique des retours visuels : survol, prise de main, sélection. */
+  --transition: 0.16s ease;
+
+  /*
+   * Élévation. Trois niveaux, et trois seulement : ce qui repose sur la page,
+   * ce qui flotte au-dessus d'elle, ce qui la recouvre. Les fenêtres portaient
+   * trois ombres voisines mais distinctes selon le fichier où elles étaient
+   * écrites — elles se ressemblaient sans se répondre.
+   */
+  --ombre-carte: 0 1px 2px rgba(28, 33, 23, 0.035);
+  --ombre-flottante: 0 8px 30px -24px rgba(28, 33, 23, 0.35);
+  --ombre-fenetre: 0 28px 70px -22px rgba(28, 33, 23, 0.5);
+
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans Arabic', 'Noto Sans Arabic', Tahoma, Arial, sans-serif;
+
+  /*
+   * Typographie de base de la racine du fichier de référence : 14 px et une
+   * hauteur de ligne de 1,6. Sans elles, tout ce qui ne déclare pas sa propre
+   * taille héritait des 16 px et du 1,5 du socle CSS, ce qui gonflait les
+   * boutons, les titres et la densité des tableaux.
+   */
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* Les écrans de ce lot sont en arabe, de droite à gauche, comme dans le
+     fichier de référence. Les écrans français du fichier — suivi journalier et
+     registre des chèques — porteront la classe `.omra-ltr` à leur arrivée. */
+  direction: rtl;
+}
+
+.omra-ltr {
+  direction: ltr;
+}
+
+.omra *,
+.omra *::before,
+.omra *::after {
+  box-sizing: border-box;
+}
+
+/*
+ * Remise à zéro des commandes.
+ *
+ * `:where()` annule la spécificité du sélecteur : cette remise à zéro doit
+ * céder devant la moindre règle de classe. Écrite `.omra button`, elle pesait
+ * plus lourd que `.omra-nav-item` ou `.finance-bouton` et effaçait la bordure
+ * et le fond de la plupart des boutons de l'application.
+ *
+ * Les commandes héritent de la police du texte, mais pas de sa hauteur de
+ * ligne : le raccourci `font: inherit` leur imposait le 1,6 de l'application
+ * là où le fichier de référence laisse le `normal` du navigateur. Les champs
+ * de la connexion mesuraient 46,4 px au lieu de 40.
+ */
+:where(.omra) button {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: normal;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  color: inherit;
+}
+
+:where(.omra) input,
+:where(.omra) select,
+:where(.omra) textarea {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: normal;
+  color: inherit;
+}
+
+.mono {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/*
+ * Rendu du texte et des chiffres, repris du fichier de référence.
+ *
+ * `optimizeLegibility` sur l'en-tête et les trois écrans financiers ; chiffres
+ * à chasse fixe partout où des montants s'empilent en colonne, faute de quoi
+ * les colonnes de montants ne s'alignent pas d'une ligne à l'autre.
+ */
+.omra-header,
+.finance-ecran,
+.daily-ecran,
+.cheque-ecran {
+  text-rendering: optimizeLegibility;
+}
+
+.mono,
+.finance-montant,
+.finance-tableau td,
+.finance-tableau th,
+.daily-tableau td,
+.daily-carte-tableau td,
+.cheque-tableau td,
+.cheque-carte-tableau td,
+/*
+ * Les écrans arabes empilent eux aussi des montants en colonne — convenu,
+ * payé, restant — et n'étaient pas couverts : leurs chiffres dansaient d'une
+ * ligne à l'autre. La règle vaut maintenant pour tous les tableaux et pour
+ * tous les blocs qui alignent des sommes.
+ */
+.omra-table td,
+.omra-mini-table td,
+.detail-finance-cellule .valeur,
+.recu-encadre .ligne b,
+.versement-resume-ligne b,
+.omra-stat-valeur,
+input[inputmode='numeric'],
+input[type='number'] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ------------------------------------------------------- Retours visuels */
+
+/*
+ * Une seule durée pour tous les retours visuels de l'application. Le fichier
+ * de référence n'en pose que sur trois éléments : partout ailleurs, le survol
+ * et la prise de main basculaient d'un coup sec. Seules les propriétés de
+ * couleur sont animées — jamais la géométrie, qui doit rester stable.
+ */
+.omra-btn,
+.omra-action,
+.omra-icon-btn,
+.omra-row-btn,
+.omra-nav-item,
+.omra-sous-nav button,
+.omra-choice button,
+.omra-lien,
+.omra-table tbody tr,
+.omra-pill,
+.omra-method {
+  transition:
+    background-color var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+/*
+ * Prise de main au clavier : un seul anneau, sur tout ce qui est actionnable.
+ * Les champs de saisie gardent le leur, déjà défini plus bas et plus précis.
+ */
+.omra :focus-visible {
+  outline: 2px solid var(--champ-bord-actif);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omra *,
+  .omra *::before,
+  .omra *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- En-tête */
+
+.omra-header {
+  position: sticky;
+  top: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--ombre-carte);
+  backdrop-filter: saturate(1.5) blur(10px);
+}
+
+.omra-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.omra-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #c9a24a, #a3801f);
+  color: #fff;
+  box-shadow:
+    inset 0 -2px 6px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(28, 33, 23, 0.06);
+}
+
+.omra-brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+.omra-brand-sub {
+  font-size: 10px;
+  color: #5f6557;
+  margin-top: 2px;
+}
+
+/*
+ * Le fichier de référence détache la navigation du flux et la centre sur la
+ * largeur de l'en-tête. Placée dans le flux, elle se collait à la marque, à
+ * droite : c'est l'écart le plus visible de l'application, puisque cet
+ * en-tête est présent sur presque tous les écrans.
+ */
+.omra-nav {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0;
+  direction: rtl;
+}
+
+.omra-nav-item {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 13px;
+  border: 1px solid #e2ded1;
+  border-radius: 8px;
+  background: #fff;
+  color: #35422f;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.omra-nav-item:hover {
+  background: #f3f5ef;
+  border-color: #c9d0c0;
+}
+
+.omra-nav-item.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 7px 16px -10px rgba(71, 89, 60, 0.85);
+}
+
+.omra-spacer {
+  flex: 1 1 auto;
+  min-width: 10px;
+}
+
+.omra-season {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: #394432;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.omra-season-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6c8058;
+  display: inline-block;
+  box-shadow: 0 0 0 3px rgba(108, 128, 88, 0.16);
+}
+
+/* Le reset des boutons effaçait le cadre blanc de ces trois commandes. */
+.omra .omra-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  flex: 0 0 auto;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.omra .omra-icon-btn:hover {
+  background: var(--accent-soft);
+  color: #2e3b27;
+}
+
+/* Bascule jour / nuit : liseré un peu plus marqué et léger retrait. */
+.omra .omra-bascule-theme {
+  margin-inline-start: 2px;
+  border-color: var(--border-strong);
+}
+
+.omra .omra-bascule-theme:hover {
+  border-color: #b9c3ac;
+}
+
+.omra-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 11px;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.omra-avatar {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow:
+    inset 0 -2px 6px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(28, 33, 23, 0.06);
+}
+
+.omra-user-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.omra-user-role {
+  font-size: 9.5px;
+  color: #5f6557;
+  margin-top: 1px;
+}
+
+/* ------------------------------------------------------- Barre d'outils */
+
+.omra-page {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 22px 24px 44px;
+}
+
+.omra-tools {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.omra-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.omra-action {
+  height: 39px;
+  padding: 0 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.omra-action:hover {
+  background: var(--accent-soft);
+}
+
+.omra-action.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.omra-action.primary:hover {
+  background: var(--accent-deep);
+}
+
+.omra-searches {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.omra-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.omra-search label {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.omra-search input {
+  height: 39px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.omra-search.name input {
+  width: 170px;
+}
+
+.omra-search.receipt input {
+  width: 135px;
+}
+
+.omra-title {
+  margin-inline-start: auto;
+  min-width: 210px;
+  text-align: start;
+}
+
+.omra-title h1 {
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.omra-title p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+
+.omra-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+  height: 39px;
+}
+
+/* ------------------------------------------------------------- Tableau */
+
+.omra-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(28, 33, 23, 0.06),
+    0 8px 24px -14px rgba(28, 33, 23, 0.18);
+}
+
+.omra-scroll {
+  overflow-x: auto;
+}
+
+.omra-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 1620px;
+}
+
+.omra-table th {
+  position: sticky;
+  top: 0;
+  background: var(--accent-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  text-align: start;
+}
+
+.omra-table th.secondaire {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.omra-table th.centre,
+.omra-table td.centre {
+  text-align: center;
+}
+
+.omra-table td {
+  padding: var(--row-pad) 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.omra-table tbody tr {
+  cursor: pointer;
+}
+
+.omra-table tbody tr:hover {
+  background: var(--accent-soft);
+}
+
+.omra-table tbody tr.annule {
+  opacity: 0.55;
+}
+
+.omra-cell-muted {
+  color: var(--muted-2);
+  font-size: 11.5px;
+}
+
+.omra-note {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.omra-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/*
+ * États d'un reçu : forme plutôt que couleur.
+ *
+ * La couleur est le langage des modes de paiement — vert espèces, jaune
+ * chèque, bleu virement — et elle ne doit servir qu'à cela. Les états
+ * portaient eux aussi du vert et du bleu, dans des colonnes voisines : dans
+ * une même ligne, « مسدد » vert jouxtait « نقد » vert, et « غير مكتمل » bleu
+ * jouxtait « تحويل » bleu. Deux informations sans rapport, deux fois la même
+ * teinte.
+ *
+ * Les états routiniers se distinguent donc désormais par la forme : pastille
+ * pleine pour ce qui est terminé, contour seul pour ce qui est en cours, avec
+ * un point plein ou creux qui redit la même chose à petite taille. Seule
+ * l'annulation garde une couleur, parce qu'elle n'est pas un état de routine
+ * mais une exception, et qu'elle doit se voir immédiatement.
+ */
+.omra-pill.solde,
+.omra-pill.incomplet,
+.omra-pill.annule {
+  border: 1px solid transparent;
+}
+
+.omra-pill.solde::before,
+.omra-pill.incomplet::before,
+.omra-pill.annule::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pilule);
+  margin-inline-end: 6px;
+  vertical-align: 1px;
+}
+
+/* Terminé : pastille pleine, point plein, encre affirmée. */
+.omra-pill.solde {
+  background: #eeece2;
+  color: var(--ink);
+}
+
+.omra-pill.solde::before {
+  background: currentColor;
+}
+
+/* En cours : contour seul, point creux, encre estompée. */
+.omra-pill.incomplet {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+
+.omra-pill.incomplet::before {
+  border: 1.5px solid currentColor;
+}
+
+/* Exception : la seule qui garde une couleur. */
+.omra-pill.annule {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.omra-pill.annule::before {
+  background: currentColor;
+}
+
+.omra-method {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.omra-method.cash {
+  background: var(--mode-especes-fond);
+  color: var(--mode-especes);
+  border-color: var(--mode-especes-bord);
+}
+
+.omra-method.cheque {
+  background: var(--mode-cheque-fond);
+  color: var(--mode-cheque);
+  border-color: var(--mode-cheque-bord);
+}
+
+.omra-method.transfer {
+  background: var(--mode-virement-fond);
+  color: var(--mode-virement);
+  border-color: var(--mode-virement-bord);
+}
+
+.omra-method.none {
+  color: var(--muted-2);
+}
+
+.omra-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 128px;
+  margin: 0 auto;
+}
+
+/*
+ * Les quatre actions de ligne reposent sur une pastille grise dans le
+ * fichier de référence, avec une bordure transparente qui réserve sa place.
+ */
+.omra-row-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #efefef;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.omra-row-btn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.omra-row-btn.danger:not(:disabled):hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.omra-row-btn.warn:not(:disabled):hover {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.omra-row-btn.accent:not(:disabled):hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.omra-empty {
+  padding: 54px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.omra-empty strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.omra-empty span {
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- Fiche reçu */
+
+.omra-fiche-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.omra-back {
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid #e2ded1;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #35422f;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.omra-back:hover {
+  background: #f3f5ef;
+}
+
+.omra-fiche-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.omra-stat {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.omra-stat-label {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.omra-stat-value {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.omra-section {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
+.omra-section h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  margin: 0 0 12px;
+}
+
+.omra-defs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 20px;
+}
+
+.omra-def-label {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.omra-def-value {
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------- Fenêtres */
+
+.omra-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(28, 33, 23, 0.42);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow-y: auto;
+}
+
+.omra-modal {
+  width: 100%;
+  max-width: 620px;
+  background: var(--page);
+  border-radius: 16px;
+  box-shadow: var(--ombre-fenetre);
+  overflow: hidden;
+}
+
+.omra-modal.large {
+  max-width: 880px;
+}
+
+/* Le formulaire de création reprend la largeur du fichier de référence. */
+.omra-modal.recu-coque {
+  max-width: 760px;
+  transition: max-width 0.18s ease;
+}
+
+.omra-modal.small {
+  max-width: 470px;
+}
+
+.omra-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.omra-modal-head h2 {
+  font-size: 16.5px;
+  font-weight: 700;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.omra-modal-body {
+  padding: 18px;
+}
+
+/* Le fichier grise légèrement la croix de fermeture des fenêtres. */
+.omra .omra-modal-head .omra-icon-btn {
+  background: #efefef;
+  border-color: transparent;
+}
+
+.omra .omra-modal-head .omra-icon-btn:hover {
+  background: var(--accent-soft);
+}
+
+.omra-modal-foot {
+  display: flex;
+  gap: 9px;
+  justify-content: flex-start;
+  padding: 14px 18px;
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+.omra-btn {
+  height: 40px;
+  padding: 0 17px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.omra-btn:hover {
+  background: var(--accent-soft);
+}
+
+.omra-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.omra-btn.primary:hover {
+  background: var(--accent-deep);
+}
+
+.omra-btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.omra-btn.danger:hover {
+  background: #7f2f28;
+}
+
+.omra-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------ Formulaires */
+
+.omra-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 13px;
+}
+
+.omra-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.omra-field.pleine {
+  grid-column: 1 / -1;
+}
+
+/* Taille du fichier de référence : 12,5 px, nettement plus lisible que 11. */
+.omra-field label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.omra-input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--champ-bord);
+  border-radius: 12px;
+  background: var(--champ-fond);
+  font-size: 13px;
+}
+
+/*
+ * Aspect commun des zones interactives.
+ *
+ * Seules les couleurs sont posées ici : ni hauteur, ni remplissage, ni rayon,
+ * pour ne déplacer aucun écran déjà calé. Au repos le fond est légèrement
+ * plus soutenu que la page ; à la prise de main il s'éclaircit, la bordure
+ * se précise et un halo discret apparaît.
+ */
+.omra-input,
+.omra-search input,
+.omra select,
+.omra textarea,
+.finance-ecran input,
+.finance-ecran select,
+.daily-ecran input:not([type='checkbox']),
+.daily-ecran select,
+.cheque-ecran input,
+.cheque-ecran select {
+  background: var(--champ-fond);
+  border-color: var(--champ-bord);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.18s ease;
+}
+
+.omra-input:hover:not(:disabled),
+.omra-search input:hover,
+.omra select:hover:not(:disabled),
+.omra textarea:hover:not(:disabled),
+.finance-ecran input:hover,
+.finance-ecran select:hover,
+.daily-ecran input:not([type='checkbox']):hover,
+.daily-ecran select:hover,
+.cheque-ecran input:hover,
+.cheque-ecran select:hover {
+  border-color: var(--champ-bord-survol);
+}
+
+.omra-input:focus,
+.omra-search input:focus,
+.omra select:focus,
+.omra textarea:focus,
+.finance-ecran input:focus,
+.finance-ecran select:focus,
+.daily-ecran input:not([type='checkbox']):focus,
+.daily-ecran select:focus,
+.cheque-ecran input:focus,
+.cheque-ecran select:focus {
+  outline: none;
+  background: var(--champ-fond-actif);
+  border-color: var(--champ-bord-actif);
+  box-shadow: 0 0 0 3px var(--champ-halo);
+}
+
+/* Les cases à cocher gardent leur rendu natif, teinté à l'accent. */
+.omra input[type='checkbox'],
+.omra input[type='radio'] {
+  accent-color: var(--accent);
+  background: none;
+  box-shadow: none;
+}
+
+.omra-input.invalide {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.omra-input[type='checkbox'] {
+  width: auto;
+  padding: 0;
+}
+
+.omra-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.omra-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.omra-errors {
+  background: var(--danger-soft);
+  border: 1px solid #e3c4bf;
+  border-radius: 12px;
+  padding: 11px 13px;
+  margin-bottom: 14px;
+}
+
+.omra-errors strong {
+  display: block;
+  font-size: 12px;
+  color: var(--danger);
+  margin-bottom: 5px;
+}
+
+.omra-errors ul {
+  margin: 0;
+  padding-inline-start: 18px;
+}
+
+.omra-errors li {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.omra-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 13px;
+}
+
+.omra-panel h3 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--accent-deep);
+}
+
+.omra-choice {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.omra-choice button {
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid #e2ded1;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #35422f;
+}
+
+.omra-choice button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.omra-summary {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 11px 13px;
+  background: var(--accent-soft);
+  border-radius: 12px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.omra-summary div span {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+/* Tableau compact utilisé dans les fenêtres */
+.omra-mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.omra-mini-table th {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 7px 8px;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.omra-mini-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.omra-mini-table tr.vide td {
+  color: var(--muted-2);
+}
+
+/*
+ * Aperçu en direct : la dfp en cours de saisie, pas encore enregistrée. Le
+ * fond ambré la sépare des lignes réelles sans changer la structure du tableau.
+ */
+.omra-mini-table tr.apercu td {
+  background: var(--warn-soft);
+}
+
+/* --------------------------------------------------------------- Journal */
+
+.omra-log-entry {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+.omra-log-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+
+.omra-log-action {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.omra-log-meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-inline-start: auto;
+}
+
+.omra-log-detail {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------- Toast */
+
+.omra-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 300;
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent-deep);
+  box-shadow:
+    0 1px 2px rgba(28, 33, 23, 0.06),
+    0 8px 24px -14px rgba(28, 33, 23, 0.18);
+}
+
+.omra-toast.erreur {
+  background: var(--danger);
+}
+
+/* Le thème sombre vit dans `theme-sombre.css`. */
+
+@media print {
+  .omra-no-print {
+    display: none !important;
+  }
+}
+
+/* ------------------------------------------------------------- Connexion */
+
+.omra-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  /* Halo doux en haut, comme le fichier de référence. */
+  background: radial-gradient(1100px 500px at 50% -10%, #edf0e5, transparent 70%), var(--page);
+}
+
+.omra-login-card {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 44px 36px 34px;
+  /* Pile verticale centrée : logo, titre, sous-titre, filet, champs. */
+  text-align: center;
+  box-shadow:
+    0 1px 2px rgba(28, 33, 23, 0.06),
+    0 12px 32px -14px rgba(28, 33, 23, 0.2);
+}
+
+.omra-login-brand {
+  display: block;
+}
+
+.omra-login-logo {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #c9a24a, #a3801f);
+  color: #fff;
+  box-shadow: inset 0 -2px 7px rgba(0, 0, 0, 0.18);
+}
+
+/* Le fichier ne fixe pas de hauteur de ligne ici : le titre hérite du 1,6. */
+.omra-login-brand-name {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.omra-login-brand-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.omra-login-filet {
+  height: 1px;
+  background: var(--border);
+  margin: 26px 0;
+}
+
+.omra-login-champ {
+  display: block;
+  /* Les libellés et la saisie restent alignés à droite (arabe). */
+  text-align: right;
+  margin-bottom: 14px;
+}
+
+/* Le fichier resserre le second champ : 6 px au lieu de 14. */
+.omra-login-champ + .omra-login-champ {
+  margin-bottom: 6px;
+}
+
+.omra-login-champ span {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/*
+ * Cotes du bouton d'entrée dans le fichier : pas de hauteur fixe, un
+ * remplissage de 12 px tout autour, une graisse plus marquée — et aucune
+ * déclaration de bordure, si bien que le bouton garde le liseré en relief que
+ * le navigateur applique par défaut. C'est ce liseré qui lui donne ses 44 px.
+ */
+.omra .omra-login-bouton {
+  width: 100%;
+  height: auto;
+  padding: 12px;
+  margin-top: 16px;
+  border: 2px outset buttonborder;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.omra-login-erreur {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: right;
+  margin-bottom: 14px;
+}
+
+.omra-login-aide {
+  margin: 16px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------- Reçu */
+
+.omra-recu-page {
+  min-height: 100vh;
+  background: #eef1f4;
+  padding: 14px 16px 20px;
+}
+
+.omra-recu-barre {
+  max-width: 1180px;
+  margin: 0 auto 12px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.omra-recu-zone {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 82px);
+  min-height: 790px;
+  border-radius: 12px;
+  background: #eef1f4;
+  display: grid;
+  place-items: center;
+}
+
+.omra-recu-attente {
+  text-align: center;
+  color: #8a93a0;
+  font-size: 13px;
+}
+
+.omra-recu-attente-numero {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 40px;
+  font-weight: 700;
+  color: #b3bcc7;
+  margin-bottom: 8px;
+}
+
+/* ---- Carte « image de l'instrument » des formulaires (lot L5) -------------
+ * Cotes du fichier de référence (`.cheque-form-card`).
+ */
+
+.carte-image-instrument {
+  margin: 10px 0 13px;
+  border: 1px solid #d9d5c8;
+  border-radius: 12px;
+  background: #fdfcf9;
+  padding: 11px 12px;
+}
+
+.carte-image-instrument .entete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.carte-image-instrument .entete strong {
+  font-size: 12px;
+  color: #47593c;
+}
+
+.carte-image-instrument .entete span {
+  margin-inline-start: auto;
+  font-size: 10px;
+  color: #8c9185;
+}
+
+.carte-image-instrument .contenu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.carte-image-instrument .apercu {
+  width: 112px;
+  height: 48px;
+  border: 1px solid #d8d4c7;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f3f3ee;
+}
+
+.carte-image-instrument .etat {
+  font-size: 11px;
+  color: #6e7565;
+  line-height: 1.55;
+}
+
+.carte-image-instrument .etat b {
+  display: block;
+  color: #47593c;
+  font-size: 12px;
+}
+
+.carte-image-instrument .ajouter {
+  margin-inline-start: auto;
+  width: 34px;
+  height: 34px;
+  border: 1px dashed #8b987f;
+  border-radius: 8px;
+  background: #f3f6ee;
+  color: #47593c;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+/* ---- Section « المسافر » et bande du passeport (lot L7) -------------------
+ * Cotes du fichier de référence : puce `passport-chip`, portrait 88 × 108,
+ * bande verte pâle bordée de #C8D0BD.
+ */
+
+.voyageur-entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #e7e3d6;
+}
+
+.voyageur-entete h3 {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #47593c;
+  margin: 0;
+}
+
+.voyageur-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.passeport-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid #d9d5c8;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11.5px;
+  color: #47593c;
+}
+
+.passeport-chip.ok {
+  background: #edf0e5;
+  border-color: #c8d0bd;
+  color: #2e3b27;
+}
+
+.passeport-scan {
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fff;
+  border: 1px solid #d9d5c8;
+  color: #47593c;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.passeport-scan:hover {
+  background: #edf0e5;
+}
+
+.passeport-bande {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #c8d0bd;
+  background: #f5f7f1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+}
+
+.passeport-portrait {
+  width: 88px;
+  height: 108px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #d8d4c7;
+  background: #fff;
+}
+
+.passeport-portrait.vide {
+  display: block;
+}
+
+.passeport-bande .nom {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2e3b27;
+}
+
+.passeport-bande .numero {
+  font-size: 11px;
+  color: #6e7565;
+  margin-top: 4px;
+}
+
+.passeport-bande .aide {
+  font-size: 10.5px;
+  color: #8c9185;
+  margin-top: 3px;
+}
+
+.passeport-detacher {
+  padding: 7px 9px;
+  border: 1px solid #d9d5c8;
+  border-radius: 8px;
+  background: #fff;
+  color: #9c3b32;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---- Bande d'identité de la fenêtre « dossier » (lot L7) ------------------
+ * Dégradé, photo 68 × 82, numéro de reçu en 36 px doré : cotes du fichier.
+ */
+
+.detail-bande {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0;
+  background: linear-gradient(to left, #2e3b27, #47593c);
+  align-items: stretch;
+  /* Posée en bandeau, hors de la marge du corps : plus de marge négative. */
+  margin: 0;
+}
+
+.detail-photo {
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.detail-photo img {
+  width: 68px;
+  height: 82px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  object-fit: cover;
+  display: block;
+}
+
+.detail-photo .vide {
+  width: 68px;
+  height: 82px;
+  border-radius: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.detail-identite {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+}
+
+.detail-identite .nom {
+  font-size: 23px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.detail-identite .lignes {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.detail-numero {
+  padding: 18px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.detail-numero .etiquette {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.1em;
+}
+
+.detail-numero .valeur {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 36px;
+  font-weight: 700;
+  color: #f6d97a;
+  line-height: 1;
+}
+
+.detail-numero .date {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.45);
+  direction: ltr;
+}
+
+.detail-numero .heure {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  direction: ltr;
+}
+
+/* ---------------------------------------- Formulaire de création d'un reçu */
+/* Reprend `.new-modal-receipt-head` et les sections plates du fichier de
+   référence : un filet fin sous le titre, sans carte ni bordure. */
+
+.recu-bandeau {
+  text-align: center;
+  padding: 14px 24px 8px;
+  border-bottom: 1px solid var(--border);
+  background: #fcfbf8;
+}
+
+.recu-bandeau-label {
+  font-size: 10.5px;
+  color: #9ca28f;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.recu-bandeau-numero {
+  font-size: 42px;
+  font-weight: 600;
+  color: #a3801f;
+  line-height: 1;
+}
+
+.recu-bandeau-date {
+  font-size: 16px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Le fichier laisse davantage d'air entre voyageur, programme et paiement. */
+.recu-section {
+  margin-top: 24px;
+}
+
+.recu-section > h3 {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 14px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.omra-fields.trio {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.omra-fields.duo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/*
+ * Encadrés de montants, côte à côte sur une même rangée : le prix convenu et
+ * ce qui reste à payer se lisent d'un coup d'œil, et la fenêtre économise la
+ * hauteur d'un bloc. Sous 760 px, ils repassent l'un sous l'autre.
+ */
+.recu-encadres-paire {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  align-items: stretch;
+}
+
+.recu-encadre {
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Chaque bloc porte un liseré de sa propre teinte, pour qu'on ne les
+   confonde pas d'une rangée à l'autre. */
+.recu-encadre.prix {
+  border: 1px solid #e6d7ae;
+}
+
+.recu-encadre.totaux {
+  border: 1px solid #cddac2;
+}
+
+@media (max-width: 760px) {
+  .recu-encadres-paire {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.recu-encadre.prix {
+  background: #f6efdf;
+}
+
+.recu-encadre.totaux {
+  background: var(--accent-soft);
+}
+
+.recu-encadre .ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.recu-encadre .ligne b {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.recu-encadre .ligne.totale {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  margin-top: 6px;
+  padding-top: 10px;
+  font-size: 15px;
+}
+
+.recu-encadre .ligne.totale b {
+  font-size: 17px;
+}
+
+/*
+ * Le montant convenu se lit en vert ; le reste à payer en rouge, et en bleu
+ * lorsqu'il tombe à zéro — il ne reste alors plus rien à payer.
+ */
+.recu-encadre.prix .ligne.totale b {
+  color: var(--accent);
+}
+
+.recu-encadre.totaux .ligne.totale b {
+  color: var(--danger);
+}
+
+.recu-encadre.totaux .ligne.totale b.solde {
+  color: var(--solde);
+}
+
+@media (max-width: 760px) {
+  .omra-fields.trio,
+  .omra-fields.duo {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Deux colonnes du formulaire de création — cotes du fichier de référence.
+   La colonne d'instrument se place à gauche, la fenêtre s'élargit, et sous
+   980 px l'ensemble repasse sur une seule colonne, instrument en dessous. */
+
+.recu-colonnes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  direction: ltr;
+  align-items: start;
+}
+
+.recu-colonne-principale,
+.recu-colonne-instrument {
+  direction: rtl;
+  min-width: 0;
+}
+
+.omra-modal.recu-coque.instrument-ouvert {
+  max-width: 1180px;
+}
+
+.omra-modal.recu-coque.instrument-ouvert .recu-colonnes {
+  grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1.7fr);
+}
+
+.omra-modal.recu-coque.instrument-ouvert .recu-colonne-principale {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.omra-modal.recu-coque.instrument-ouvert .recu-colonne-instrument {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.instrument-panneau {
+  background: #fffdf7;
+  border: 1px solid #e4c98b;
+  border-radius: 12px;
+  padding: 13px 14px;
+}
+
+.instrument-entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.instrument-entete .titre {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.instrument-entete .mention {
+  margin-inline-start: auto;
+  font-size: 10px;
+  color: #9ca28f;
+}
+
+.instrument-sous-titre {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.omra-fields.empile {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 980px) {
+  .omra-modal.recu-coque.instrument-ouvert {
+    max-width: 760px;
+  }
+
+  .omra-modal.recu-coque.instrument-ouvert .recu-colonnes {
+    grid-template-columns: 1fr;
+  }
+
+  .omra-modal.recu-coque.instrument-ouvert .recu-colonne-principale,
+  .omra-modal.recu-coque.instrument-ouvert .recu-colonne-instrument {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .instrument-panneau {
+    box-shadow: inset 0 3px 0 #c9a24a;
+  }
+}
+
+/* Champ « numéro du reçu » mis en avant de la fenêtre d'ajout de dépense —
+   gabarit large et centré, comme dans le fichier de référence. */
+
+.omra-input.numero-recu {
+  height: 52px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.omra-input.numero-recu::placeholder {
+  font-size: 20px;
+  font-weight: 600;
+  color: #c9cdc0;
+}
+
+/* ------------------------------------------- Dossier complet du voyageur */
+
+/* Largeur propre au dossier : le fichier ouvre plus large que les autres. */
+.omra-modal.detail-coque {
+  width: min(980px, calc(100vw - 36px));
+  max-width: none;
+}
+
+/* En-tête : pastille d'icône, titre et nom du voyageur. */
+.omra-modal-icone {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.omra-modal-titres {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.omra-modal-titres h2 {
+  flex: none;
+}
+
+.omra-modal-sous-titre {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 1px;
+}
+
+.omra-pill.modifie {
+  background: #f6eeda;
+  color: #a3801f;
+}
+
+/* Bande financière : origine et remise, convenu, versé, restant. */
+.detail-finance {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr 1fr;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-finance-cellule {
+  padding: 13px 16px;
+  text-align: center;
+  border-left: 1px solid var(--border);
+  display: grid;
+  align-content: center;
+  gap: 2px;
+}
+
+.detail-finance-cellule:last-child {
+  border-left: 0;
+}
+
+.detail-finance-cellule .etiquette {
+  font-size: 9.5px;
+  color: var(--muted-2);
+  letter-spacing: 0.07em;
+}
+
+.detail-finance-cellule .etiquette.secondaire {
+  margin-top: 6px;
+}
+
+.detail-finance-cellule .valeur {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 17.5px;
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.detail-finance-cellule .valeur.petite {
+  font-size: 11.5px;
+  color: #4a5044;
+}
+
+.detail-finance-cellule .valeur.douce {
+  color: #7f8778;
+}
+
+.detail-finance-cellule .valeur.grande {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.detail-finance-cellule .appoint {
+  font-size: 9.5px;
+  color: var(--accent);
+  opacity: 0.6;
+  margin-top: 3px;
+}
+
+.detail-finance-cellule.convenu .etiquette,
+.detail-finance-cellule.paye .etiquette {
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+
+.detail-finance-cellule.paye {
+  background: var(--accent-soft);
+}
+
+.detail-finance-cellule.restant {
+  background: #fdf3f1;
+}
+
+.detail-finance-cellule.restant .etiquette,
+.detail-finance-cellule.restant .valeur {
+  color: var(--danger);
+}
+
+/* Restant nul : bleu, pour marquer qu'il ne reste plus rien à payer. */
+.detail-finance-cellule.restant.solde {
+  background: var(--solde-soft);
+}
+
+.detail-finance-cellule.restant.solde .etiquette,
+.detail-finance-cellule.restant.solde .valeur {
+  color: var(--solde);
+}
+
+/* Corps : identité à droite, programme et enregistrement empilés à gauche. */
+.detail-grille {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-pile {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.detail-carte {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.detail-carte h3 {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin: 0 0 13px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #f0ede4;
+}
+
+.detail-lignes {
+  display: grid;
+  gap: 10px;
+}
+
+.detail-lignes.duo {
+  grid-template-columns: 1fr 1fr;
+}
+
+.detail-ligne {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.detail-ligne-label {
+  color: var(--muted-2);
+  min-width: 50px;
+  flex: 0 0 auto;
+}
+
+.detail-ligne.large .detail-ligne-label {
+  min-width: 72px;
+}
+
+.detail-ligne-valeur {
+  font-weight: 600;
+  min-width: 0;
+}
+
+.detail-note {
+  white-space: pre-wrap;
+  font-weight: 500;
+  color: #4a5044;
+}
+
+.detail-passeport.present {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detail-passeport.absent {
+  color: var(--muted-2);
+}
+
+/* Tableau des versements. */
+.detail-carte.tableau {
+  margin-top: 14px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.detail-carte-entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-carte-entete h3 {
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.detail-compteur {
+  margin-inline-start: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+.detail-defilement {
+  overflow-x: auto;
+}
+
+.detail-table {
+  min-width: 900px;
+  text-align: center;
+}
+
+.detail-table .rang {
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.detail-table .montant {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-table .employe {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Vignette « Voir / + » de la colonne document. */
+.detail-doc {
+  border: 1px solid var(--border);
+  background: var(--page);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.detail-doc:hover {
+  background: var(--accent-soft);
+}
+
+/* Historique et annulation : repliés par défaut, comme le fichier. */
+.detail-repli {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.detail-repli > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 13px 18px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-repli > summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-repli-icone {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #f6eeda;
+  color: #a3801f;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+
+.detail-repli-compteur {
+  background: #f6eeda;
+  color: #a3801f;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.detail-repli-aide {
+  margin-inline-start: auto;
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.detail-repli-corps {
+  padding: 14px 18px;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #f0ede4;
+}
+
+.detail-modif {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fdfcf9;
+}
+
+.detail-modif-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.detail-modif-tete strong {
+  font-size: 12.5px;
+  color: var(--accent-deep);
+}
+
+.detail-modif-motif {
+  font-size: 11.5px;
+  margin-bottom: 8px;
+}
+
+.detail-modif-motif span {
+  color: var(--muted-2);
+}
+
+.detail-modif-changements {
+  display: grid;
+  gap: 5px;
+}
+
+/* Changement : ancienne valeur en rouge, nouvelle en vert. */
+.detail-changement {
+  font-size: 11px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 10px;
+  border: 1px solid #eeeae0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.detail-changement .champ {
+  font-weight: 700;
+  color: var(--accent-deep);
+}
+
+.detail-changement .ancienne {
+  color: var(--danger);
+  background: #fff2f0;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.detail-changement .fleche {
+  color: #c8c4b8;
+}
+
+.detail-changement .nouvelle {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.detail-repli.annulation {
+  border-color: #e4b9b3;
+  background: #fff8f7;
+}
+
+.detail-repli.annulation > summary {
+  color: var(--danger);
+}
+
+.detail-repli.annulation .detail-repli-icone {
+  background: #f7e8e5;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.detail-repli.annulation .detail-repli-corps {
+  border-top-color: #f0d8d5;
+  gap: 9px;
+}
+
+@media (max-width: 900px) {
+  .detail-grille {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-finance {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ------------------------------------------- Modification du reçu */
+
+.omra-modal.modif-coque {
+  width: min(760px, calc(100vw - 36px));
+  max-width: none;
+}
+
+/* Bandeau des valeurs figées, sous l'en-tête. */
+.modif-fixes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 17px 24px;
+  background: var(--page);
+  border-bottom: 1px solid var(--border);
+}
+
+.modif-fixes .etiquette {
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+
+.modif-fixes .valeur {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.modif-fixes .valeur.numero {
+  font-size: 21px;
+  color: var(--warn);
+  line-height: 1.15;
+}
+
+.modif-consigne {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+/* Choix de section : deux colonnes, titre vert et sous-titre. */
+.modif-sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.modif-section {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  text-align: start;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.modif-section:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: #c8cebe;
+}
+
+.modif-section:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modif-section .titre {
+  display: block;
+  color: var(--accent);
+}
+
+.modif-section small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 2px;
+  font-size: 11.5px;
+}
+
+.modif-avertissement {
+  background: var(--warn-soft);
+  border-radius: 12px;
+  padding: 10px 13px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+/* En-tête de la section choisie : retour puis libellé. */
+.modif-entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modif-retour {
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.modif-retour:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.modif-entete .etiquette {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.modif-entete .valeur {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Récapitulatif de prix de la section « programme ». */
+.modif-recap {
+  background: var(--warn-soft);
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin-bottom: 14px;
+}
+
+.modif-recap .ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.modif-recap .ligne .valeur {
+  margin-inline-start: auto;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.modif-recap .ligne.total {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.modif-recap .ligne.total .valeur {
+  font-size: 17px;
+  color: var(--accent);
+}
+
+.modif-recap .ligne.appoint {
+  padding-top: 5px;
+  font-size: 12px;
+}
+
+.modif-sans-prix {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 10px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 13px;
+}
+
+/* Montant figé de la première dépense. */
+.modif-montant-fixe {
+  background: var(--accent-soft);
+  border-radius: 12px;
+  padding: 11px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modif-montant-fixe .valeur {
+  margin-inline-start: auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.modif-collective {
+  background: var(--warn-soft);
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin: 10px 0 14px;
+}
+
+.modif-motif {
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Zone de texte multiligne. */
+.omra-zone {
+  min-height: 0;
+  height: auto;
+  padding: 9px 11px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+@media (max-width: 700px) {
+  .modif-fixes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .modif-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ------------------------------------------------- Annulation du reçu */
+
+.omra-modal.annul-coque {
+  width: min(490px, calc(100vw - 36px));
+  max-width: none;
+}
+
+.annul-consigne {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 15px;
+}
+
+/* Rappel du montant déjà encaissé, sur une seule ligne encadrée. */
+.annul-montant {
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.annul-montant strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ------------------------------------------- Registre : pied et état vide */
+
+/* Pied du tableau : nombre affiché puis bascule des reçus annulés. */
+.omra-table-pied {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+/* Bascule présentée en lien souligné, comme dans le fichier. */
+.omra-lien {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.omra-lien:hover {
+  color: var(--accent-deep);
+}
+
+/* Les actions de ligne gardent l'ordre du fichier, de gauche à droite. */
+.omra-row-actions {
+  direction: ltr;
+  width: 120px;
+}
+
+/* État vide posé dans le tableau : les en-têtes restent visibles. */
+.omra-empty svg {
+  color: var(--muted-2);
+  margin-bottom: 10px;
+}
+
+/* --------------------------------------------- Journal des opérations */
+
+.omra-modal.journal-coque {
+  width: min(760px, calc(100vw - 36px));
+  max-width: none;
+}
+
+.journal-liste {
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Une trace par ligne : horodatage, action, détail. */
+.journal-ligne {
+  display: flex;
+  gap: 11px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.journal-heure {
+  flex: 0 0 118px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: end;
+}
+
+.journal-action {
+  flex: 0 0 100px;
+  font-weight: 600;
+}
+
+.journal-detail {
+  flex: 1;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.journal-vide {
+  padding: 44px;
+  text-align: center;
+  color: var(--muted);
+  margin: 0;
+}
+
+/*
+ * Pied des deux fenêtres de saisie.
+ *
+ * Le fichier de référence y pose l'action principale à gauche et l'annulation
+ * à sa droite. En lecture de droite à gauche, cela revient à tasser le groupe
+ * vers la fin de la ligne.
+ */
+.recu-coque .omra-modal-foot,
+.versement-coque .omra-modal-foot {
+  justify-content: flex-end;
+}
+
+/* ------------------------------- Fenêtre « Ajouter un versement » -------- */
+
+/*
+ * Résumé du reçu visé.
+ *
+ * Le nom ouvre le bloc, les trois repères du dossier suivent en lignes
+ * compactes, et le reste après cette dfp se détache sous un filet : c'est le
+ * chiffre que l'on vient vérifier. La disposition en une seule rangée de six
+ * cellules tassait ces informations et noyait le nom.
+ */
+.versement-resume {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: var(--accent-soft);
+  border-radius: 12px;
+}
+
+.versement-resume-nom {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.versement-resume-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.versement-resume-ligne b {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.versement-resume-ligne.finale {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  margin-top: 6px;
+  padding-top: 10px;
+  font-size: 14px;
+}
+
+.versement-resume-ligne.finale b {
+  font-size: 17px;
+  color: var(--accent);
+}
+
+/* Plus rien à payer après cette dfp : le bleu du soldé, comme ailleurs. */
+.versement-resume-ligne.finale b.solde {
+  color: var(--solde);
+}
+
+/* La mention de lecture seule passe en tête de carte, face au titre. */
+.versement-recap-entete {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.versement-recap-entete h3 {
+  margin: 0;
+}
+
+.versement-recap-entete .omra-hint {
+  margin-inline-start: auto;
+}
+
+/* La colonne bancaire de cette fenêtre suit celle du formulaire de création. */
+.omra-modal.versement-coque.instrument-ouvert {
+  max-width: 1180px;
+}
+
+.omra-modal.versement-coque.instrument-ouvert .recu-colonnes {
+  grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1.7fr);
+}
+
+.omra-modal.versement-coque.instrument-ouvert .recu-colonne-principale {
+  grid-column: 2;
+}
+
+.omra-modal.versement-coque.instrument-ouvert .recu-colonne-instrument {
+  grid-column: 1;
+}
+
+@media (max-width: 980px) {
+  .omra-modal.versement-coque.instrument-ouvert .recu-colonnes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .omra-modal.versement-coque.instrument-ouvert .recu-colonne-principale,
+  .omra-modal.versement-coque.instrument-ouvert .recu-colonne-instrument {
+    grid-column: 1;
+  }
+}
+
+/*
+ * Numéro de reçu servant de référence.
+ *
+ * Cotes du fichier : pastille de 36 × 23 px, rayon 7, fond #F1F3EA, chiffres
+ * en mono doré #A3801F — brique #87443D lorsque le reçu est annulé, pour que
+ * l'annulation se lise sans relire la ligne entière.
+ */
+.omra-numero {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  height: 23px;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: #f1f3ea;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #a3801f;
+  font-variant-numeric: tabular-nums;
+}
+
+.omra-numero.annule {
+  color: #87443d;
+}
+
+/* Registre bancaire : un paiement peut référencer plusieurs reçus. */
+.cheque-recus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.cheque-recus-suite {
+  color: var(--muted-2);
+  font-size: 11px;
+}

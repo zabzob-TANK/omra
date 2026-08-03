@@ -1,0 +1,76 @@
+/*
+ * Statistiques — cotes reprises du fichier de référence.
+ *
+ * La page est volontairement réservée : quatre cartes en pointillés et une
+ * étiquette « مرحلة لاحقة ». Rien n'est calculé.
+ */
+
+.stats-principal {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+}
+
+.stats-entete {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.stats-entete h1 {
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.stats-entete p {
+  font-size: 12.5px;
+  color: #6e7565;
+  margin-top: 4px;
+}
+
+/* Une seule étiquette, en tête de page — jamais une par carte. */
+.stats-etiquette {
+  margin-inline-start: auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #edf0e5;
+  color: #47593c;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stats-grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.stats-carte {
+  min-height: 150px;
+  border: 1px dashed #cfcbbe;
+  border-radius: 12px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 20px;
+  color: #8c9185;
+}
+
+.stats-carte b {
+  display: block;
+  color: #47593c;
+  margin-bottom: 6px;
+}
+
+.stats-carte span {
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .stats-grille {
+    grid-template-columns: 1fr;
+  }
+}

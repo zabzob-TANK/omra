@@ -1,0 +1,912 @@
+/*
+ * Journal financier — reprise des cotes du fichier de référence.
+ *
+ * Le tableau y est volontairement très dense : petites polices, lignes basses,
+ * bordures fines. Cette densité fait partie de la lisibilité attendue et n'est
+ * pas allégée.
+ */
+
+.finance-ecran {
+  --finance-border: #cfcfc7;
+  --finance-soft: #f3f3ee;
+  --finance-ink: #20251b;
+
+  min-height: 100vh;
+  background: #f9f7f2;
+}
+
+/* Rayons du fichier : 8 px pour les boutons, 7 px pour les champs, 4 px pour
+ * les sections, puis 8 px pour la carte du tableau. */
+.finance-ecran button {
+  border-radius: 8px;
+}
+
+.finance-ecran input {
+  border-radius: 8px;
+}
+
+.finance-ecran section {
+  border-radius: 4px;
+}
+
+.finance-rapport {
+  max-width: 1540px;
+  margin: 0 auto;
+  padding: 18px 20px 42px;
+}
+
+/* --------------------------------------------------------- Barre d'outils */
+
+/* Le fichier dispose la barre d'outils de gauche à droite, et seul le groupe
+ * de filtres repasse de droite à gauche. */
+.finance-outils {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  direction: ltr;
+}
+
+/* Le code d'impression occupe une pastille bordée, présente même vide. */
+.finance-code {
+  min-width: 46px;
+  height: 34px;
+  padding: 0 10px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e7e3d6;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #7a7f75;
+}
+
+.finance-ecran .finance-bouton {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  color: #47593c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.finance-ecran .finance-bouton:hover:not(:disabled) {
+  background: #edf0e5;
+}
+
+.finance-ecran .finance-bouton.impression {
+  background: #47593c;
+  color: #fff;
+  border-color: #47593c;
+}
+
+.finance-ecran .finance-bouton.impression:disabled {
+  background: #9ca28f;
+  border-color: #9ca28f;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.finance-ecran .finance-bouton.icone {
+  width: 34px;
+  padding: 0;
+  font-size: 17px;
+  display: grid;
+  place-items: center;
+  color: #272b23;
+}
+
+/* Le sélecteur de journée est plus haut et plus large que les boutons, avec
+ * une bordure double : c'est la commande principale de la barre. */
+.finance-date {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 38px;
+  min-width: 178px;
+  padding: 0 11px;
+  border: 2px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.finance-ecran .finance-date input {
+  border: 0;
+  background: transparent;
+  direction: ltr;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 138px;
+  text-align: center;
+}
+
+.finance-indicateur {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid rgb(0 0 0 / 26%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 80%);
+}
+
+.finance-filtres {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  direction: rtl;
+}
+
+.finance-ecran .finance-filtre {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  color: #47593c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.finance-ecran .finance-filtre.actif {
+  background: #47593c;
+  color: #fff;
+  border-color: #47593c;
+}
+
+/* --------------------------------------------- Bandeau d'impression */
+
+/* Invisible à l'écran ; le bloc d'impression le fait apparaître. */
+.finance-bandeau-impression {
+  display: none;
+}
+
+/* ------------------------------------------------------------- Anomalie */
+
+.finance-ecran .finance-anomalie {
+  width: 100%;
+  text-align: right;
+  border: 1px solid #e2a84b;
+  background: #fff7e8;
+  color: #7a4c08;
+  padding: 9px 11px;
+  margin-bottom: 7px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------- Synthèse */
+
+/* Largeurs et sens de lecture du fichier : la grille se remplit de gauche à
+ * droite, chaque bloc restant de droite à gauche. */
+.finance-synthese {
+  display: grid;
+  grid-template-columns: 1.22fr 1.42fr 0.82fr 1.08fr 1.18fr 1.55fr;
+  gap: 7px;
+  margin-bottom: 10px;
+  align-items: stretch;
+  direction: ltr;
+}
+
+.finance-synthese > .finance-bloc {
+  direction: rtl;
+}
+
+.finance-bloc {
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 76px;
+  text-align: center;
+}
+
+.finance-bloc .etiquette {
+  font-size: 10px;
+  color: #666b5f;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.finance-bloc .valeur {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--finance-ink);
+  text-align: center;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* --- Bloc d'état : la coche surmonte deux cellules côte à côte ------------ */
+
+.finance-bloc.etat {
+  justify-content: flex-start;
+  gap: 2px;
+  padding-top: 5px;
+}
+
+.finance-bloc.etat .tick {
+  font-size: 54px;
+  line-height: 0.88;
+  font-weight: 700;
+  margin-top: 2px;
+  text-align: center;
+}
+
+.finance-bloc.etat .double {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  align-items: start;
+  margin-top: -1px;
+}
+
+.finance-bloc.etat .double > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.finance-bloc.etat .double .valeur {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.finance-bloc.etat .double .etiquette {
+  white-space: normal;
+  line-height: 1.28;
+}
+
+.finance-bloc.etat .secondaire .valeur {
+  font-size: 13px;
+  color: #9c3b32;
+}
+
+.finance-bloc.etat .secondaire .etiquette {
+  font-size: 9px;
+  color: #8e7465;
+}
+
+/* --- Blocs empilés : deux lignes séparées par un filet ------------------- */
+
+.finance-bloc.pile {
+  padding: 0;
+  overflow: hidden;
+}
+
+.finance-bloc.pile .ligne {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 7px 9px;
+  gap: 4px;
+  text-align: center;
+}
+
+.finance-bloc.pile .ligne + .ligne {
+  border-top: 1px solid #e7e3d6;
+}
+
+.finance-bloc.pile .etiquette,
+.finance-bloc.pile .valeur {
+  text-align: center;
+  margin-top: 0;
+}
+
+.finance-bloc .valeur.grande {
+  font-size: 22px;
+}
+
+/* --- Bloc annulations / caisse ------------------------------------------- */
+
+.finance-bloc.annulation-caisse {
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.finance-bloc.annulation-caisse .haut {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1.18fr;
+  align-items: stretch;
+  direction: ltr;
+  min-width: 0;
+}
+
+.finance-bloc.annulation-caisse .cellule {
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+  padding: 5px 5px 4px;
+}
+
+.finance-bloc.annulation-caisse .cellule .etiquette {
+  font-size: 9.5px;
+  line-height: 1.05;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.finance-bloc.annulation-caisse .cellule .valeur {
+  font-size: 15px;
+  line-height: 1.05;
+  margin-top: 3px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.finance-bloc.annulation-caisse .bas {
+  flex: 0 0 39%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 40px;
+  border-top: 1px solid #e7e3d6;
+  padding: 12px 9px;
+  text-align: center;
+}
+
+.finance-bloc.annulation-caisse .bas .valeur {
+  font-size: 16px;
+  margin-top: 0;
+}
+
+/* --- Total général : seul bloc à bordure épaisse ------------------------- */
+
+.finance-bloc.total {
+  align-items: center;
+  border: 2px solid #2e3b27;
+  background: #f3f5f3;
+}
+
+.finance-bloc.total .etiquette {
+  font-size: 12px;
+}
+
+.finance-bloc.total .valeur {
+  font-size: 29px;
+}
+
+/* --- Bloc méta : en-tête à trois colonnes puis grand montant ------------- */
+
+.finance-bloc.meta {
+  align-items: center;
+  padding: 0;
+  overflow: hidden;
+  background: #f5f2f0;
+}
+
+.finance-bloc.meta .haut {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e7e3d6;
+  font-size: 9.5px;
+  color: #7a7f75;
+  white-space: nowrap;
+}
+
+.finance-bloc.meta .haut b {
+  font-size: 12px;
+  font-weight: 700;
+  color: #20251b;
+}
+
+.finance-bloc.meta .periode {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--finance-ink);
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: center;
+}
+
+.finance-bloc.meta .grand {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  padding: 2px 8px 6px;
+  color: var(--finance-ink);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- Tableau */
+
+.finance-carte {
+  background: #fff;
+  border: 1px solid #e7e3d6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Le fichier donne aux annulations un cadre rosé qui leur est propre. */
+.finance-annulations {
+  margin-top: 10px;
+  border: 1px solid #e3c2be;
+  border-radius: 8px;
+}
+
+.finance-defilement {
+  overflow-x: auto;
+}
+
+.finance-tableau {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 1320px;
+  font-size: 10.8px;
+}
+
+/* Pas de quadrillage : seul un filet horizontal sépare les lignes. */
+.finance-tableau th,
+.finance-tableau td {
+  border: 0;
+  border-bottom: 1px solid #e7e3d6;
+  padding: 6px 3px;
+  vertical-align: middle;
+}
+
+.finance-tableau th {
+  background: #edf0e5;
+  color: #243019;
+  font-weight: 700;
+  letter-spacing: 0.012em;
+  white-space: nowrap;
+}
+
+.finance-tableau td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #fff;
+}
+
+.finance-tableau .mini {
+  font-size: 8.7px;
+}
+
+.finance-tableau .micro {
+  font-size: 8px;
+}
+
+.finance-tableau .centre {
+  text-align: center;
+}
+
+.finance-tableau .gauche {
+  text-align: left;
+}
+
+.finance-tableau .nom {
+  font-weight: 600;
+  text-align: right;
+}
+
+.finance-tableau tbody tr {
+  cursor: pointer;
+}
+
+/* Alternance des lignes, reprise du fichier. */
+.finance-tableau tbody tr:nth-child(even) td {
+  background: #fbfaf6;
+}
+
+.finance-tableau tbody tr:hover td {
+  background: #f2f5ea;
+}
+
+.finance-tableau tr.anomalie td {
+  background: #fff7e8 !important;
+}
+
+/* Les lignes annulées sont rosées et marquées d'un liseré rouge côté début. */
+.finance-tableau tr.annulee td {
+  background: #fcebe9 !important;
+  color: #3d2623 !important;
+}
+
+.finance-tableau tr.annulee td:first-child {
+  border-inline-start: 3px solid #b24d43;
+}
+
+.finance-numero {
+  font-weight: 700;
+  color: #a3801f;
+}
+
+/* Marque d'anomalie : un petit carré bordé, pas un simple point d'exclamation. */
+.finance-marque {
+  display: inline-grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #b46d12;
+  border-radius: 4px;
+  background: #fff7e8;
+  color: #9a5908;
+  font-size: 8px;
+  font-weight: 700;
+  margin-inline-start: 4px;
+  vertical-align: middle;
+}
+
+/*
+ * Seuls les badges « gris » — premier versement, reçu soldé, annulation —
+ * portent un cadre. Les autres restent des codes nus.
+ */
+.finance-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 19px;
+  height: 18px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #2e3b27;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.finance-badge.gris {
+  background: #e2e2dc;
+  color: #4d5148;
+  border-color: #73776f;
+  box-shadow: inset 0 0 0 1px #f7f7f4;
+}
+
+.finance-badge.simple {
+  background: transparent;
+  color: #2e3b27;
+  border-color: transparent;
+}
+
+.finance-badge.micro {
+  font-size: 8px;
+}
+
+/* Le fichier a fini par retirer le cadre des montants : ils sont centrés, nus. */
+.finance-montant {
+  display: block;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.finance-vide {
+  padding: 30px;
+  text-align: center;
+  color: #6e7565;
+  font-size: 12px;
+}
+
+.finance-pied {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  font-size: 8px;
+  color: #777;
+}
+
+/* ------------------------------------------------------------ Impression */
+
+/*
+ * R-67 — A4 paysage, marge 5 mm. La règle `@page` est injectée par l'écran
+ * pendant l'impression, comme le fait le fichier de référence.
+ *
+ * Le fichier bascule tout le rapport en noir et blanc : plus de couleurs de
+ * fond, plus de rosé sur les annulations, plus d'ambre sur les anomalies.
+ * Les cotes sont exprimées en millimètres et en points, comme dans le fichier.
+ */
+@media print {
+  body.finance-impression .omra-header,
+  body.finance-impression .finance-outils,
+  body.finance-impression .finance-anomalie,
+  body.finance-impression .finance-pied,
+  body.finance-impression .omra-no-print {
+    display: none !important;
+  }
+
+  /*
+   * Le papier est blanc, et rien d'autre que le rapport n'occupe la page.
+   *
+   * `.omra` porte le fond beige de l'application et un `min-height: 100vh`
+   * destiné à l'écran. Ni l'un ni l'autre n'avait de raison de survivre ici :
+   * le fond teintait toute la feuille derrière un rapport pourtant blanc, et la
+   * hauteur imposée poussait une seconde page vide.
+   */
+  body.finance-impression,
+  body.finance-impression .omra {
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  body.finance-impression .finance-ecran,
+  body.finance-impression .finance-rapport {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    break-after: avoid-page !important;
+  }
+
+  /* Une seule page : le fichier borne la hauteur pour éviter une page vide. */
+  body.finance-impression .finance-rapport.finance-une-page {
+    max-height: 199mm !important;
+    overflow: hidden !important;
+  }
+
+  /*
+   * Bandeau supérieur : code d'impression, état de la veille, compteur de
+   * pages. Invisible à l'écran, visible ici seulement.
+   */
+  body.finance-impression .finance-bandeau-impression {
+    display: flex !important;
+    justify-content: flex-start;
+    align-items: center;
+    direction: ltr;
+    gap: 3.2mm;
+    margin: 0 0 1.2mm;
+    font-size: 6.3pt;
+    font-weight: 600;
+    color: #1f241b;
+  }
+
+  body.finance-impression .finance-bandeau-impression .veille {
+    font-size: 7.2pt;
+    font-weight: 700;
+  }
+
+  body.finance-impression .finance-bandeau-impression .pages {
+    font-weight: 500;
+  }
+
+  /* ---- Synthèse : six blocs encadrés de noir, sur 14 mm de haut ---- */
+
+  body.finance-impression .finance-synthese {
+    gap: 1.3mm !important;
+    margin-bottom: 2mm !important;
+  }
+
+  body.finance-impression .finance-bloc {
+    min-height: 14mm !important;
+    padding: 1.1mm 1.2mm !important;
+    border: 0.3mm solid #000 !important;
+    border-radius: 1mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  body.finance-impression .finance-bloc .etiquette,
+  body.finance-impression .finance-bloc .haut {
+    font-size: 5.2pt !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-bloc .valeur {
+    font-size: 8pt !important;
+    margin-top: 0.6mm !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-bloc .haut b {
+    font-size: 6.3pt !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-bloc.total .valeur,
+  body.finance-impression .finance-bloc.meta .grand {
+    font-size: 18pt !important;
+    margin-top: 0 !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-bloc.meta .grand {
+    padding: 0 0.8mm 0.8mm !important;
+  }
+
+  /*
+   * Le fichier force le symbole d'état en noir à l'impression : la couleur
+   * d'état ne sert qu'à l'écran. L'état lui-même est inchangé.
+   */
+  body.finance-impression .finance-bloc.etat .tick {
+    color: #000 !important;
+    font-size: 16pt !important;
+  }
+
+  body.finance-impression .finance-bloc.pile .ligne + .ligne,
+  body.finance-impression .finance-bloc.meta .haut,
+  body.finance-impression .finance-bloc.annulation-caisse .bas {
+    border-color: #000 !important;
+  }
+
+  body.finance-impression .finance-bloc.annulation-caisse .cellule {
+    padding: 0.55mm 0.7mm 0.35mm !important;
+  }
+
+  body.finance-impression .finance-bloc.annulation-caisse .cellule .etiquette {
+    font-size: 4.8pt !important;
+    line-height: 1 !important;
+  }
+
+  body.finance-impression .finance-bloc.annulation-caisse .cellule .valeur {
+    font-size: 7.2pt !important;
+    line-height: 1 !important;
+    margin-top: 0.45mm !important;
+  }
+
+  body.finance-impression .finance-bloc.annulation-caisse .bas {
+    border-top-width: 0.25mm !important;
+    padding: 0.6mm 1mm !important;
+  }
+
+  body.finance-impression .finance-bloc.annulation-caisse .bas .valeur {
+    font-size: 8pt !important;
+  }
+
+  body.finance-impression .finance-indicateur {
+    background: #555 !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+  }
+
+  /* ---- Tableaux ---- */
+
+  body.finance-impression .finance-defilement {
+    overflow: visible !important;
+  }
+
+  body.finance-impression .finance-tableau {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 5.35pt !important;
+  }
+
+  body.finance-impression .finance-tableau th,
+  body.finance-impression .finance-tableau td {
+    border: 0 !important;
+    border-bottom: 0.2mm solid #bdbdbd !important;
+    padding: 0.65mm 0.3mm !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  body.finance-impression .finance-tableau .mini {
+    font-size: 4.8pt !important;
+  }
+
+  body.finance-impression .finance-tableau .micro {
+    font-size: 4.55pt !important;
+  }
+
+  body.finance-impression .finance-tableau thead {
+    display: table-header-group;
+  }
+
+  body.finance-impression .finance-tableau tr {
+    break-inside: avoid;
+  }
+
+  /* Les lignes annulées et les lignes en anomalie perdent leur couleur. */
+  body.finance-impression .finance-tableau tr.annulee td,
+  body.finance-impression .finance-tableau tr.anomalie td,
+  body.finance-impression .finance-tableau tbody tr:nth-child(even) td {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-carte {
+    border-color: #000 !important;
+    border-radius: 1.2mm !important;
+    background: #fff !important;
+  }
+
+  /* Le fichier garde le tableau des annulations d'un seul tenant. */
+  body.finance-impression .finance-annulations {
+    break-inside: avoid;
+    border-color: #000 !important;
+  }
+
+  body.finance-impression .finance-carte,
+  body.finance-impression .finance-defilement,
+  body.finance-impression .finance-tableau {
+    break-after: avoid-page !important;
+  }
+
+  /* ---- Badges et montants ---- */
+
+  body.finance-impression .finance-badge,
+  body.finance-impression .finance-badge.gris,
+  body.finance-impression .finance-badge.simple {
+    min-width: 4mm !important;
+    height: 4mm !important;
+    font-size: 5.3pt !important;
+    border-radius: 0.5mm !important;
+    background: #fff !important;
+    color: #000 !important;
+    border-color: #000 !important;
+  }
+
+  body.finance-impression .finance-badge.gris {
+    box-shadow: inset 0 0 0 0.25mm #fff !important;
+  }
+
+  /* R-67 — codes explicitement sans cadre à l'impression. */
+  body.finance-impression .finance-badge.sans-cadre {
+    min-width: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    line-height: 1 !important;
+  }
+
+  body.finance-impression .finance-montant {
+    border: 0 !important;
+    border-radius: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.finance-impression .finance-marque {
+    color: #6f4109 !important;
+    border-color: #6f4109 !important;
+    background: #fff !important;
+  }
+
+  /*
+   * Le rapport a besoin que ses encadrés noirs, son bandeau gris et ses
+   * marques sortent tels quels : `exact` demande au navigateur de ne pas les
+   * alléger, même quand « graphiques d'arrière-plan » est décoché.
+   *
+   * La règle visait `body.finance-impression *`, donc aussi le conteneur de
+   * l'application : son fond beige était forcé à l'impression, et l'utilisateur
+   * ne pouvait même pas s'en débarrasser en décochant l'option. Elle est
+   * désormais limitée au rapport lui-même.
+   */
+  body.finance-impression .finance-rapport,
+  body.finance-impression .finance-rapport * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

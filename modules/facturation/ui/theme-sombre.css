@@ -1,0 +1,1097 @@
+/*
+ * Thème sombre.
+ *
+ * Le fichier de référence n'en a pas : il a tenté un filtre CSS global puis
+ * l'a désactivé (`html.omra-dark { filter: none !important }`). Ce thème est
+ * donc une conception propre au projet, et non une reproduction.
+ *
+ * Principe : une couche additive. Le mode clair est calé au pixel sur le
+ * fichier de référence et ne doit pas bouger ; tout ce qui suit ne s'applique
+ * que sous `.omra.sombre`. Les écrans financiers, le registre bancaire et
+ * l'atelier du reçu écrivent leurs couleurs en dur et n'héritent pas des
+ * jetons : on leur donne ici leur contrepartie sombre, valeur par valeur.
+ *
+ * Repères de la palette :
+ *   fond de page      #191C17     surface           #22261F
+ *   surface haute     #272C23     surface creuse    #1E221B
+ *   filet             #343A2E     filet marqué      #3D4436
+ *   encre             #ECEEE7     encre secondaire  #C3C8BA
+ *   estompé           #9AA291     estompé faible    #7C8374
+ *   accent            #9DBE7E     accent profond    #6F8C57
+ *
+ * Les couleurs porteuses de sens — modes de paiement, états, week-ends,
+ * anomalies, annulations — sont éclaircies et désaturées jusqu'à rester
+ * lisibles sur fond sombre, sans changer de famille : le vert reste vert, le
+ * jaune reste jaune, le bleu reste bleu.
+ */
+
+/* ------------------------------------------------------------- Jetons ---- */
+
+.omra.sombre {
+  --page: #191c17;
+  --surface: #22261f;
+  --surface-haute: #272c23;
+  --surface-creuse: #1e221b;
+  --border: #343a2e;
+  --border-strong: #3d4436;
+  --ink: #eceee7;
+  --ink-2: #c3c8ba;
+  --muted: #9aa291;
+  --muted-2: #7c8374;
+
+  --accent: #9dbe7e;
+  --accent-deep: #b6d199;
+  --accent-soft: #2b3325;
+
+  --info: #8fc0dc;
+  --info-soft: #1f2c33;
+  --warn: #d9b567;
+  --warn-soft: #332c17;
+  --danger: #e08c82;
+  --danger-soft: #38221f;
+
+  /* Restant nul : le même bleu, éclairci pour rester lisible sur fond sombre
+     et toujours distinct de `--info` et de `--mode-virement`. */
+  --solde: #7fb6e6;
+  --solde-soft: #1c2a38;
+
+  /* Modes de paiement : mêmes familles, portées sur fond sombre. */
+  --mode-especes: #9ccc86;
+  --mode-especes-fond: #24301f;
+  --mode-especes-bord: #3d5433;
+  --mode-cheque: #e0b96e;
+  --mode-cheque-fond: #342b16;
+  --mode-cheque-bord: #5a4820;
+  --mode-virement: #9fb2ea;
+  --mode-virement-fond: #232841;
+  --mode-virement-bord: #3c4570;
+
+  /* Zones interactives : creusées plutôt qu'éclaircies, et l'inverse à la
+     prise de main — le champ actif remonte vers la lumière. */
+  --champ-fond: #1c201a;
+  --champ-fond-actif: #272c23;
+  --champ-bord: #3a4133;
+  --champ-bord-survol: #4a5340;
+  --champ-bord-actif: #7f9a66;
+  --champ-halo: rgba(157, 190, 126, 0.18);
+
+  /* Mêmes trois niveaux d'élévation, portés par des ombres plus franches :
+     sur fond sombre, une ombre légère ne se voit pas. */
+  --ombre-carte: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ombre-flottante: 0 8px 30px -24px rgba(0, 0, 0, 0.7);
+  --ombre-fenetre: 0 28px 70px -22px rgba(0, 0, 0, 0.75);
+
+  color-scheme: dark;
+}
+
+/* --------------------------------------------------- Coque et en-tête ---- */
+
+.omra.sombre .omra-header {
+  background: rgba(34, 38, 31, 0.98);
+  border-bottom-color: var(--border);
+  box-shadow: var(--ombre-carte);
+}
+
+.omra.sombre .omra-brand-sub,
+.omra.sombre .omra-user-role {
+  color: var(--muted);
+}
+
+.omra.sombre .omra-nav-item {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.omra.sombre .omra-nav-item:hover {
+  background: var(--accent-soft);
+  border-color: #4d5c40;
+}
+
+.omra.sombre .omra-nav-item.active {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .omra-season {
+  background: var(--accent-soft);
+  color: #cbdcb8;
+}
+
+.omra.sombre .omra-icon-btn,
+.omra.sombre .omra-btn,
+.omra.sombre .omra-action,
+.omra.sombre .omra-choice button,
+.omra.sombre .omra-row-btn {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .omra-icon-btn:hover,
+.omra.sombre .omra-btn:hover,
+.omra.sombre .omra-action:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.omra.sombre .omra-btn.primary,
+.omra.sombre .omra-action.primary,
+.omra.sombre .omra-choice button.active {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .omra-btn.primary:hover,
+.omra.sombre .omra-action.primary:hover {
+  background: #527043;
+}
+
+/* --------------------------------------------------- Sous-navigation ----- */
+
+.omra.sombre .omra-sous-nav {
+  background: rgba(25, 28, 23, 0.98);
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .omra-sous-nav button {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .omra-sous-nav button:hover {
+  background: var(--accent-soft);
+  border-color: #4d5c40;
+}
+
+.omra.sombre .omra-sous-nav button.active {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+/* --------------------------------------------------------- Registre ------ */
+
+.omra.sombre .omra-card,
+.omra.sombre .omra-section,
+.omra.sombre .omra-stat,
+.omra.sombre .omra-panel,
+.omra.sombre .omra-log-entry {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .omra-table th,
+.omra.sombre .omra-mini-table th {
+  background: var(--accent-soft);
+  color: #cbd6bf;
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .omra-table td,
+.omra.sombre .omra-mini-table td {
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .omra-table tbody tr:hover td {
+  background: #232a1e;
+}
+
+.omra.sombre .omra-table tbody tr.annule td {
+  background: #2c211f;
+}
+
+.omra.sombre .omra-numero {
+  background: #2a3024;
+  color: #d8b95f;
+}
+
+.omra.sombre .omra-numero.annule {
+  color: #d59389;
+}
+
+/* États : la forme porte le sens, la couleur reste aux modes de paiement. */
+.omra.sombre .omra-pill.solde {
+  background: #2c3128;
+  color: var(--ink);
+}
+
+.omra.sombre .omra-pill.incomplet {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+
+.omra.sombre .omra-pill.annule {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.omra.sombre .omra-hint {
+  color: var(--muted);
+}
+
+/* --------------------------------------------------------- Fenêtres ------ */
+
+.omra.sombre .omra-overlay {
+  background: rgba(8, 10, 7, 0.72);
+}
+
+.omra.sombre .omra-modal {
+  background: var(--page);
+  box-shadow: var(--ombre-fenetre);
+}
+
+.omra.sombre .omra-modal-head,
+.omra.sombre .omra-modal-foot {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .omra-modal-head .omra-icon-btn {
+  background: var(--surface-haute);
+}
+
+.omra.sombre .recu-bandeau {
+  background: var(--surface-creuse);
+  border-color: var(--border);
+}
+
+.omra.sombre .recu-section > h3,
+.omra.sombre .voyageur-entete h3 {
+  color: var(--accent);
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .voyageur-entete {
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .recu-encadre.prix {
+  background: #302818;
+  border-color: #4d4026;
+}
+
+.omra.sombre .recu-encadre.totaux {
+  background: #232c1e;
+  border-color: #3c4d33;
+}
+
+.omra.sombre .recu-encadre .ligne {
+  color: var(--muted);
+}
+
+.omra.sombre .recu-encadre .ligne b {
+  color: var(--ink);
+}
+
+.omra.sombre .recu-encadre .ligne.totale {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.omra.sombre .recu-encadre.prix .ligne.totale b {
+  color: #c9d9b4;
+}
+
+.omra.sombre .recu-encadre.totaux .ligne.totale b {
+  color: #e79c92;
+}
+
+.omra.sombre .recu-encadre.totaux .ligne.totale b.solde {
+  color: var(--solde);
+}
+
+.omra.sombre .versement-resume {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .versement-resume-nom {
+  color: var(--ink);
+}
+
+.omra.sombre .versement-resume-ligne {
+  color: var(--muted);
+}
+
+.omra.sombre .versement-resume-ligne b {
+  color: var(--ink);
+}
+
+.omra.sombre .versement-resume-ligne.finale {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.omra.sombre .versement-resume-ligne.finale b {
+  color: #c9d9b4;
+}
+
+.omra.sombre .versement-resume-ligne.finale b.solde {
+  color: var(--solde);
+}
+
+/* Aperçu en direct : même teinte ambrée que le thème clair, en version sombre. */
+.omra.sombre .omra-mini-table tr.apercu td {
+  background: var(--warn-soft);
+}
+
+.omra.sombre .instrument-panneau {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .passeport-scan,
+.omra.sombre .passeport-chip {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------- Journal financier --- */
+
+.omra.sombre .finance-ecran {
+  background: var(--page);
+  color: var(--ink);
+}
+
+.omra.sombre .finance-code,
+.omra.sombre .finance-ecran .finance-bouton,
+.omra.sombre .finance-ecran .finance-filtre,
+.omra.sombre .finance-date {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .finance-ecran .finance-bouton.impression,
+.omra.sombre .finance-ecran .finance-filtre.actif {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .finance-ecran .finance-bouton:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .finance-bloc {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .finance-bloc .etiquette {
+  color: var(--muted);
+}
+
+.omra.sombre .finance-bloc .valeur {
+  color: var(--ink);
+}
+
+.omra.sombre .finance-bloc.total {
+  background: #232a1e;
+  border-color: #6f8c57;
+}
+
+.omra.sombre .finance-bloc.meta {
+  background: #2a2622;
+}
+
+.omra.sombre .finance-bloc.pile .ligne + .ligne,
+.omra.sombre .finance-bloc.meta .haut,
+.omra.sombre .finance-bloc.annulation-caisse .bas {
+  border-color: var(--border);
+}
+
+.omra.sombre .finance-bloc.meta .haut,
+.omra.sombre .finance-bloc.annulation-caisse .cellule .etiquette {
+  color: var(--muted);
+}
+
+.omra.sombre .finance-bloc.meta .haut b,
+.omra.sombre .finance-bloc.meta .periode,
+.omra.sombre .finance-bloc.meta .grand {
+  color: var(--ink);
+}
+
+.omra.sombre .finance-carte {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .finance-tableau th {
+  background: var(--accent-soft);
+  color: #cbd6bf;
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .finance-tableau td {
+  background: var(--surface);
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .finance-tableau tbody tr:nth-child(even) td {
+  background: #1f241c;
+}
+
+.omra.sombre .finance-tableau tbody tr:hover td {
+  background: #262d21;
+}
+
+.omra.sombre .finance-tableau tr.anomalie td {
+  background: #322b18 !important;
+}
+
+.omra.sombre .finance-tableau tr.annulee td {
+  background: #2f2220 !important;
+  color: #e0c3bf !important;
+}
+
+.omra.sombre .finance-annulations {
+  border-color: #5a3b36;
+}
+
+.omra.sombre .finance-badge {
+  color: var(--ink);
+}
+
+.omra.sombre .finance-badge.gris {
+  background: #333a2c;
+  color: #d3d8cb;
+  border-color: #5c6553;
+  box-shadow: inset 0 0 0 1px #232821;
+}
+
+.omra.sombre .finance-badge.simple {
+  color: var(--ink-2);
+}
+
+.omra.sombre .finance-numero {
+  color: #d8b95f;
+}
+
+.omra.sombre .finance-marque {
+  background: #322b18;
+  border-color: #7a5a1c;
+  color: #dcb464;
+}
+
+.omra.sombre .finance-anomalie {
+  background: #322b18;
+  border-color: #7a5a1c;
+  color: #e2c078;
+}
+
+.omra.sombre .finance-vide,
+.omra.sombre .finance-pied {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------ Suivi journalier - */
+
+.omra.sombre .daily-ecran {
+  background: var(--page);
+  color: var(--ink);
+}
+
+.omra.sombre .daily-entete p,
+.omra.sombre .daily-total-bancaire,
+.omra.sombre .daily-pied {
+  color: var(--muted);
+}
+
+.omra.sombre .daily-total-bancaire b {
+  color: var(--accent);
+}
+
+.omra.sombre .daily-ecran .daily-mois button,
+.omra.sombre .daily-ecran .daily-mois input,
+.omra.sombre .daily-ecran .daily-action {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .daily-ecran .daily-action:hover {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .daily-ecran .daily-action.vides.actif {
+  background: var(--accent-soft);
+  border-color: #4d5c40;
+  color: #c9d9b4;
+}
+
+.omra.sombre .daily-carte {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--ombre-carte);
+}
+
+.omra.sombre .daily-carte.principale {
+  border-color: #6f8c57;
+}
+
+.omra.sombre .daily-carte .etiquette {
+  color: var(--muted);
+}
+
+.omra.sombre .daily-carte .valeur {
+  color: var(--ink);
+}
+
+.omra.sombre .daily-actions {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .daily-actions label {
+  color: var(--accent);
+}
+
+.omra.sombre .daily-etat-selection {
+  background: var(--accent-soft);
+  color: #c9d9b4;
+}
+
+.omra.sombre .daily-etat-selection.actif {
+  background: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .daily-carte-tableau {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--ombre-carte);
+}
+
+.omra.sombre .daily-tableau th {
+  background: var(--accent-soft);
+  color: #cbd6bf;
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .daily-tableau td {
+  background: var(--surface);
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .daily-tableau tbody tr:hover td {
+  background: #262d21;
+}
+
+.omra.sombre .daily-tableau tr.selectionnee td {
+  background: #26301f;
+}
+
+.omra.sombre .daily-tableau td.majeur,
+.omra.sombre .daily-tableau td.cellule-date {
+  color: var(--ink);
+}
+
+.omra.sombre .daily-tableau td.cellule-jour {
+  color: var(--accent);
+}
+
+.omra.sombre .daily-tableau td.controle {
+  color: var(--muted);
+}
+
+/* R-71 — samedi et dimanche gardent leur teinte chaude, assombrie. */
+.omra.sombre .daily-tableau tr.week-end td {
+  background: #2e2819;
+}
+
+.omra.sombre .daily-tableau tr.week-end:hover td {
+  background: #372f1d;
+}
+
+.omra.sombre .daily-tableau tr.week-end.selectionnee td {
+  background: #3b3320;
+}
+
+.omra.sombre .daily-tableau tr.vide td {
+  color: var(--muted-2);
+}
+
+.omra.sombre .daily-tableau tr.vide td.majeur {
+  color: var(--muted);
+}
+
+.omra.sombre .daily-tableau tr.vide td.cellule-jour {
+  color: var(--muted);
+}
+
+.omra.sombre .daily-tableau tr.week-end.vide td {
+  background: #292418;
+}
+
+.omra.sombre .daily-etat-controle.printed {
+  color: #a8c493;
+}
+
+.omra.sombre .daily-etat-controle.pending {
+  color: #d9b567;
+}
+
+.omra.sombre .daily-etat-controle.changed {
+  color: #e0a862;
+}
+
+.omra.sombre .daily-etat-controle.empty {
+  color: var(--muted-2);
+}
+
+/* --------------------------------------------- Registre chèques/virements  */
+
+.omra.sombre .cheque-ecran {
+  background: var(--page);
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-titre p,
+.omra.sombre .cheque-pied,
+.omra.sombre .cheque-vide {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-carte {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.omra.sombre .cheque-carte.principale {
+  border-color: #6f8c57;
+}
+
+.omra.sombre .cheque-carte span {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-carte b {
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-outils {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .cheque-champ label {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-ecran .cheque-champ input,
+.omra.sombre .cheque-ecran .cheque-champ select,
+.omra.sombre .cheque-ecran .cheque-bouton {
+  background: var(--champ-fond);
+  border-color: var(--champ-bord);
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-ecran .cheque-bouton {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .cheque-ecran .cheque-bouton.actif {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .cheque-carte-tableau {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: var(--ombre-flottante);
+}
+
+.omra.sombre .cheque-tableau th {
+  background: var(--accent-soft);
+  color: #cbd6bf;
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .cheque-tableau td {
+  background: var(--surface);
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-tableau tbody tr:hover td {
+  background: #262d21;
+}
+
+.omra.sombre .cheque-montant,
+.omra.sombre .cheque-numero {
+  color: #d8b95f;
+}
+
+.omra.sombre .cheque-ecran .cheque-vignette {
+  background: var(--surface-creuse);
+  border-color: var(--border-strong);
+}
+
+.omra.sombre .cheque-ecran .cheque-plus {
+  background: #232a1e;
+  border-color: #55684a;
+  color: var(--accent);
+}
+
+.omra.sombre .cheque-pastille-type.unique {
+  background: var(--accent-soft);
+  color: #b6d199;
+}
+
+.omra.sombre .cheque-pastille-type.shared {
+  background: #332b16;
+  color: #dcb464;
+}
+
+/* Fenêtre de détail d'une opération bancaire. */
+.omra.sombre .cheque-fenetre {
+  background: var(--page);
+  border-color: var(--border-strong);
+}
+
+.omra.sombre .cheque-fenetre-entete {
+  background: var(--surface);
+  border-bottom-color: var(--border);
+}
+
+.omra.sombre .cheque-fenetre-entete p {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-fenetre .cheque-fenetre-fermer {
+  background: var(--surface-haute);
+  color: var(--ink-2);
+}
+
+.omra.sombre .cheque-scene {
+  background: linear-gradient(135deg, #22261f, #1a1e18);
+  border-color: var(--border-strong);
+}
+
+.omra.sombre .cheque-scene-vide {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-info {
+  background: var(--surface-creuse);
+  border-color: var(--border);
+}
+
+.omra.sombre .cheque-info span {
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-info b {
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-fenetre .cheque-action {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .cheque-fenetre .cheque-action.principale {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+.omra.sombre .cheque-fenetre .cheque-action.danger {
+  background: var(--surface-haute);
+  border-color: #6d4741;
+  color: var(--danger);
+}
+
+.omra.sombre .cheque-repartition {
+  border-color: var(--border);
+}
+
+.omra.sombre .cheque-repartition-titre {
+  background: var(--surface-haute);
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-repartition th {
+  background: var(--surface-creuse);
+  color: var(--muted);
+}
+
+.omra.sombre .cheque-repartition td {
+  border-bottom-color: var(--border);
+  color: var(--ink);
+}
+
+.omra.sombre .cheque-annule {
+  color: var(--danger);
+}
+
+/* ------------------------------------------------ Atelier du reçu -------- */
+
+/*
+ * La feuille reste blanche : elle représente un papier physique et part à
+ * l'impression telle quelle. Seul l'environnement passe en sombre.
+ */
+.omra.sombre .recu-atelier {
+  background: #141713;
+}
+
+.omra.sombre .recu-barre-retour button {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .recu-barre-retour button:hover {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .recu-page {
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.6);
+}
+
+/* -------------------------------------------------------- Connexion ------ */
+
+.omra.sombre .omra-login {
+  background: radial-gradient(1100px 500px at 50% -10%, #232b1e, transparent 70%), var(--page);
+}
+
+.omra.sombre .omra-login-card {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 12px 32px -14px rgba(0, 0, 0, 0.7);
+}
+
+.omra.sombre .omra-login-brand-sub,
+.omra.sombre .omra-login-champ span,
+.omra.sombre .omra-login-aide {
+  color: var(--muted);
+}
+
+.omra.sombre .omra-login-filet {
+  background: var(--border);
+}
+
+.omra.sombre .omra-login-erreur {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.omra.sombre .omra-login-bouton {
+  background: #46603a;
+  border-color: #46603a;
+  color: #f2f7ec;
+}
+
+/* ------------------------------------------ Pastilles à fond d'accent ---- */
+
+/*
+ * En clair, `--accent` sert à la fois de fond plein et de couleur de texte.
+ * En sombre il devient clair pour rester lisible sur fond foncé : tout ce qui
+ * s'en servait comme fond doit donc reprendre une teinte sombre explicite,
+ * faute de quoi le texte blanc se pose sur du vert pâle.
+ */
+.omra.sombre .omra-avatar {
+  background: #46603a;
+  color: #f2f7ec;
+  box-shadow:
+    inset 0 -2px 6px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.omra.sombre .omra-logo {
+  box-shadow:
+    inset 0 -2px 6px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ------------------------------------------------- Dossier voyageur ------ */
+
+.omra.sombre .detail-photo {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.omra.sombre .detail-numero {
+  background: rgba(0, 0, 0, 0.26);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.omra.sombre .detail-numero .heure {
+  background: rgba(0, 0, 0, 0.3);
+  color: #e4e7de;
+}
+
+.omra.sombre .detail-finance,
+.omra.sombre .detail-carte,
+.omra.sombre .detail-repli {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .detail-finance-cellule {
+  border-color: var(--border);
+}
+
+.omra.sombre .detail-finance-cellule .etiquette {
+  color: var(--muted);
+}
+
+.omra.sombre .detail-finance-cellule .valeur {
+  color: var(--ink);
+}
+
+.omra.sombre .detail-finance-cellule .valeur.petite {
+  color: var(--ink-2);
+}
+
+.omra.sombre .detail-finance-cellule .valeur.douce {
+  color: var(--muted);
+}
+
+.omra.sombre .detail-finance-cellule .appoint,
+.omra.sombre .detail-finance-cellule.convenu .etiquette,
+.omra.sombre .detail-finance-cellule.paye .etiquette {
+  color: var(--accent);
+}
+
+.omra.sombre .detail-finance-cellule.paye {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .detail-finance-cellule.restant.solde {
+  background: var(--solde-soft);
+}
+
+.omra.sombre .detail-finance-cellule.restant {
+  background: #2f2220;
+}
+
+.omra.sombre .detail-finance-cellule.restant .etiquette,
+.omra.sombre .detail-finance-cellule.restant .valeur {
+  color: var(--danger);
+}
+
+.omra.sombre .detail-finance-cellule.restant.solde .etiquette,
+.omra.sombre .detail-finance-cellule.restant.solde .valeur {
+  color: var(--solde);
+}
+
+.omra.sombre .detail-carte h3,
+.omra.sombre .detail-carte-entete {
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.omra.sombre .detail-ligne-label,
+.omra.sombre .detail-repli-aide,
+.omra.sombre .detail-note {
+  color: var(--muted);
+}
+
+.omra.sombre .detail-ligne-valeur {
+  color: var(--ink);
+}
+
+.omra.sombre .detail-ligne {
+  border-color: var(--border);
+}
+
+.omra.sombre .detail-doc {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+  color: var(--ink-2);
+}
+
+.omra.sombre .detail-doc:hover {
+  background: var(--accent-soft);
+}
+
+.omra.sombre .detail-repli-icone,
+.omra.sombre .detail-repli-compteur {
+  background: #332b16;
+  color: #dcb464;
+}
+
+.omra.sombre .detail-modif,
+.omra.sombre .detail-modif-motif,
+.omra.sombre .detail-modif-changements {
+  background: var(--surface-creuse);
+  border-color: var(--border);
+  color: var(--ink-2);
+}
+
+.omra.sombre .detail-modif-tete {
+  color: var(--muted);
+}
+
+.omra.sombre .detail-changement .ancienne {
+  color: var(--muted);
+}
+
+.omra.sombre .detail-changement .nouvelle {
+  color: var(--accent);
+}
+
+/* ------------------------------------- Carte image de l'instrument ------- */
+
+.omra.sombre .carte-image-instrument {
+  background: var(--surface-creuse);
+  border-color: var(--border);
+}
+
+.omra.sombre .carte-image-instrument .entete strong {
+  color: var(--accent);
+}
+
+.omra.sombre .carte-image-instrument .entete span,
+.omra.sombre .carte-image-instrument .etat {
+  color: var(--muted);
+}
+
+.omra.sombre .carte-image-instrument .etat b {
+  color: var(--ink);
+}
+
+.omra.sombre .carte-image-instrument .apercu {
+  background: var(--surface-haute);
+  border-color: var(--border-strong);
+}
+
+.omra.sombre .carte-image-instrument .ajouter {
+  background: #232a1e;
+  border-color: #55684a;
+  color: var(--accent);
+}
+
+.omra.sombre .instrument-panneau {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.omra.sombre .instrument-entete .titre {
+  color: var(--ink);
+}
+
+.omra.sombre .instrument-entete .mention {
+  color: var(--muted);
+}
+
+.omra.sombre .instrument-sous-titre {
+  background: #332b16;
+  color: #dcb464;
+}
