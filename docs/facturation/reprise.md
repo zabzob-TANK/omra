@@ -244,6 +244,59 @@ Chacun des éléments suivants appartient **obligatoirement** à une saison :
 La numérotation des reçus est séquentielle par saison. Un numéro de reçu
 annulé n'est jamais réutilisé.
 
+#### Cycle de vie (garanti par la base)
+
+Une saison a exactement l'un de trois états : `brouillon`, `active`,
+`archivee`. Ces invariants sont **déjà appliqués par le backend** — rien à
+reconstruire côté Facturation :
+
+- une seule saison `active` à la fois (index unique partiel) ;
+- l'activation archive l'ancienne et active la nouvelle dans une seule
+  transaction (`activate_omra_season`) ; jamais deux actives, jamais zéro ;
+- un seul programme par saison, créé automatiquement ;
+- `has_been_used` verrouille toute suppression d'une saison ayant servi ;
+  seule une saison `brouillon` jamais utilisée est supprimable ;
+- chaque saison a ses **propres** référentiels (hôtels, vols, chambres,
+  rabatteurs, tarifs) ; un hôtel de 2027 n'est pas un hôtel de 2028 ;
+- plafond de réduction général (`max_discount_dh`) **et** particulier par
+  combinaison (`max_discount_override_dh`) ;
+- une saison archivée conserve tout et reste en lecture seule ; elle peut être
+  réactivée (ce qui archive l'active en cours).
+
+La préparation des brouillons, l'activation et la modification des programmes
+sont l'affaire du **module Administration**, pas de la Facturation.
+
+#### Deux règles que la Facturation doit respecter
+
+Ces deux-là ne sont pas garanties par la base — c'est le code de la Facturation
+qui doit les tenir. Le prototype, écrit pour une saison unique, les enfreint.
+
+1. **Les écrans ne mélangent jamais les saisons.** Chaque écran se limite à la
+   saison active. Charger tous les reçus sans filtre saisonnier est un défaut —
+   c'est la cause du bug « paiement sur le mauvais reçu » (deux saisons portant
+   un reçu n°1). L'unicité réelle d'un reçu est **saison + numéro**, jamais le
+   numéro seul.
+2. **Un ancien reçu ne dépend jamais de la saison active du jour.** Un reçu 2027
+   consulté ou modifié en 2028 garde son programme, ses libellés et son plafond
+   de 2027. On lit ses **instantanés figés** (que la base stocke déjà), jamais
+   les référentiels de la saison active.
+
+#### Périmètre retenu — « saison active partout, le reste plus tard »
+
+Pour éviter les grands chantiers, la Facturation implémente **uniquement** :
+
+- le filtrage systématique sur la **saison active** (règle 1 ci-dessus) ;
+- la lecture des instantanés pour les anciens reçus (règle 2).
+
+Sont **explicitement différés**, à n'implémenter que sur demande :
+
+- un sélecteur permettant de feuilleter les saisons archivées à l'écran ;
+- les statistiques par saison (l'écran stats reste un « à venir ») ;
+- toute UI de gestion de saison côté Facturation (c'est l'Administration).
+
+Le reste des règles saisonnières détaillées reste valable comme référence pour
+ce travail futur, mais ne doit pas être construit maintenant.
+
 ### 5.4 Groupe et famille
 
 Le groupe ou la famille est un **simple tag saisonnier**. Ce n'est pas un
