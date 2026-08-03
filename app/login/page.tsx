@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { requireActiveAccount } from '@/lib/admin-guard'
+import { requireAdministrator } from '@/lib/admin-guard'
 
 const errorMessages: Record<string, string> = {
   champs: 'Veuillez renseigner votre identifiant et votre mot de passe.',
@@ -20,17 +20,20 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ error?: string }>
 }) {
-  let destination: '/admin' | '/facturation' | null = null
-
+  // Porte exclusive de l'Administration (séparation étanche Facturation/
+  // Administration) : une seule destination possible, /admin. `redirect()`
+  // lève une exception interne que Next.js seul doit intercepter — jamais le
+  // catch ci-dessous, sous peine de l'avaler silencieusement.
+  let dejaConnecte = false
   try {
-    const account = await requireActiveAccount()
-    destination = account.slot_number === 1 ? '/admin' : '/facturation'
+    await requireAdministrator()
+    dejaConnecte = true
   } catch {
     // The login form remains available to unauthenticated users.
   }
 
-  if (destination) {
-    redirect(destination)
+  if (dejaConnecte) {
+    redirect('/admin')
   }
 
   const { error } = await searchParams

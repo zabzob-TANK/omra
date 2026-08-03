@@ -25,6 +25,7 @@ import {
   ajouterVersement,
   annulerRecu,
   chargerEtat,
+  connecter,
   creerRecu,
   deconnecter,
   enregistrerImpressionFinance,
@@ -54,14 +55,17 @@ async function extraireFichier(
 }
 
 /**
- * Ne devrait jamais être invoquée : l'authentification omra a déjà eu lieu
- * avant que cette interface ne soit montée (`app/facturation/page.tsx`), et
- * `chargerEtat()` porte toujours un utilisateur réel. Renvoie `null` plutôt
- * que de lancer une exception non gérée si l'écran de connexion du prototype
- * s'affichait malgré tout.
+ * Porte propre à la Facturation (séparation étanche Facturation/
+ * Administration) : authentifie directement sur `account_slots`, sans passer
+ * par `/login` (la porte Administration, `admin_accounts`). Aucune
+ * revérification `requireActiveAccount()` ici — il n'y a justement pas
+ * encore de session avant cet appel.
  */
-export async function connecterAction(): Promise<Utilisateur | null> {
-  return null
+export async function connecterAction(
+  identifiant: string,
+  motDePasse: string,
+): Promise<Utilisateur | null> {
+  return connecter(identifiant, motDePasse)
 }
 
 export async function deconnecterAction(): Promise<void> {

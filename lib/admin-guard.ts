@@ -4,6 +4,7 @@ import {
   findActiveAccountByAuthUserId,
   type ActiveAccount,
 } from '@/lib/account-access'
+import { findActiveAdminAccountByAuthUserId } from '@/lib/admin-access'
 import { createClient } from '@/lib/supabase/server'
 
 export class AccountAuthorizationError extends Error {
@@ -37,18 +38,22 @@ export async function requireActiveAccount(): Promise<ActiveAccount> {
   return account
 }
 
-export async function requireAdministrator(): Promise<ActiveAccount> {
-  let account: ActiveAccount
+/**
+ * Identité Administration — `admin_accounts`, une table distincte des 6
+ * emplacements Facturation (`account_slots`). Séparation étanche
+ * Facturation/Administration : le slot 1 (opérateur Facturation avec
+ * privilèges internes élevés) n'ouvre plus `/admin`.
+ */
+export async function requireAdministrator(): Promise<void> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.getUser()
 
-  try {
-    account = await requireActiveAccount()
-  } catch {
+  if (error || !data.user) {
     throw new AdminAuthorizationError()
   }
 
-  if (account.slot_number !== 1) {
+  const compteAdmin = await findActiveAdminAccountByAuthUserId(data.user.id)
+  if (!compteAdmin) {
     throw new AdminAuthorizationError()
   }
-
-  return account
 }

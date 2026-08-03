@@ -5,13 +5,16 @@ import 'server-only'
  * (`account_slots`, `lib/account-access.ts`), jamais sur un mécanisme propre
  * au module.
  *
- * `SessionPort.connecter()` reproduit l'écran de connexion du prototype, mais
- * omra authentifie déjà l'utilisateur avant de monter cette interface
- * (`requireActiveAccount()` dans `app/facturation/page.tsx`) : ce port n'a
- * donc jamais à établir une session lui-même, seulement à en lire l'état.
+ * Séparation étanche Facturation/Administration : la Facturation a
+ * maintenant sa propre porte (`EcranConnexion`, ce `connecter()`), entièrement
+ * indépendante de `/login` (la porte Administration, `admin_accounts`). Les 6
+ * emplacements de `account_slots` — slot 1 inclus, opérateur Facturation avec
+ * privilèges internes élevés — s'authentifient ici, jamais via `/login`.
  */
 
+import type { ActiveAccount } from '@/lib/account-access'
 import { findActiveAccountByAuthUserId } from '@/lib/account-access'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { ROLE_ADMINISTRATEUR } from '../../domain/constants'
 import type { Utilisateur } from '../../domain/types'
@@ -32,14 +35,7 @@ function initialesDepuisLibelle(libelle: string): string {
   return '—'
 }
 
-async function utilisateurDepuisCompteActif(): Promise<Utilisateur | null> {
-  const supabase = await createClient()
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data.user) return null
-
-  const compte = await findActiveAccountByAuthUserId(data.user.id)
-  if (!compte) return null
-
+function utilisateurDepuisCompte(compte: ActiveAccount): Utilisateur {
   return {
     id: compte.auth_user_id,
     // `slot_label` est en français (« Administrateur », « Employé 1 », …),
@@ -52,11 +48,64 @@ async function utilisateurDepuisCompteActif(): Promise<Utilisateur | null> {
   }
 }
 
+async function utilisateurDepuisCompteActif(): Promise<Utilisateur | null> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.getUser()
+  if (error || !data.user) return null
+
+  const compte = await findActiveAccountByAuthUserId(data.user.id)
+  if (!compte) return null
+
+  return utilisateurDepuisCompte(compte)
+}
+
 export const sessionSupabase: SessionPort = {
-  async connecter() {
-    throw new Error(
-      "connecter() n'est pas disponible côté omra : l'authentification passe par /login, avant que ce module ne soit monté. Un appel ici signale un écran de connexion du prototype resté actif après le branchement de l'étape 6.",
-    )
+  /**
+   * Porte propre à la Facturation — reproduit la logique de `login()`
+   * (`app/login/actions.ts`), mais uniquement sur `account_slots` (les 6
+   * emplacements, slot 1 inclus) : jamais sur `admin_accounts`, jamais de
+   * `redirect()` — renvoie `null` sur tout échec, comme l'attend
+   * `EcranConnexion`.
+   */
+  async connecter(identifiant, motDePasse) {
+    const identifiantNormalise = identifiant.trim().toLowerCase()
+    if (!identifiantNormalise || !motDePasse) return null
+
+    const admin = createAdminClient()
+    const { data: slot, error: slotError } = await admin
+      .from('account_slots')
+      .select('auth_user_id')
+      .eq('login', identifiantNormalise)
+      .eq('active', true)
+      .single()
+
+    if (slotError || !slot?.auth_user_id) return null
+
+    const { data: authUser, error: authUserError } =
+      await admin.auth.admin.getUserById(slot.auth_user_id)
+    if (authUserError || !authUser.user?.email) return null
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: authUser.user.email,
+      password: motDePasse,
+    })
+    if (error) return null
+
+    // Revérification autoritative post-connexion — jamais la seule
+    // recherche initiale par `login`, comme `app/login/actions.ts`.
+    const compte = await findActiveAccountByAuthUserId(data.user.id)
+    if (!compte || compte.auth_user_id !== slot.auth_user_id) {
+      await supabase.auth.signOut()
+      return null
+    }
+
+    return utilisateurDepuisCompte(compte)
+  },
+
+  async deconnecter() {
+    const supabase = await createClient()
+    await supabase.auth.signOut()
   },
 
   async utilisateurCourant() {

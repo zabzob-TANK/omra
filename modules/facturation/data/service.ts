@@ -128,6 +128,33 @@ export interface EtatFacturation {
   modeDemonstration: boolean
 }
 
+/**
+ * État affiché avant toute connexion, sur la porte propre à la Facturation
+ * (séparation étanche Facturation/Administration). `chargerEtat()` n'est pas
+ * appelable ici : les RPC exigent déjà une session (`resolve_facturation_actor()`).
+ * `ApplicationFacturation` s'arrête sur `EcranConnexion` dès que
+ * `utilisateur` est `null`, avant de toucher aux autres champs — leurs
+ * valeurs ne sont donc jamais affichées.
+ */
+export function etatAnonyme(): EtatFacturation {
+  return {
+    utilisateur: null,
+    estAdministrateur: false,
+    saison: { id: '', nom: '', reductionMaxCentimes: 0, duree: '', active: false },
+    hotels: [],
+    vols: [],
+    chambres: [],
+    rabatteurs: [],
+    tarifs: [],
+    recus: [],
+    operations: [],
+    imagesOperations: {},
+    portraitsPasseport: {},
+    audit: [],
+    modeDemonstration: modeDemonstration(),
+  }
+}
+
 async function tracer(
   source: SourceDonnees,
   action: string,
@@ -158,11 +185,19 @@ export async function connecter(
   return utilisateur
 }
 
-/** Trace la déconnexion, comme `logout()` du fichier de référence. */
+/**
+ * Trace la déconnexion, comme `logout()` du fichier de référence, puis ferme
+ * réellement la session. Avant la séparation étanche Facturation/
+ * Administration, cette fonction ne faisait que tracer : la fermeture réelle
+ * passait par la route /logout, partagée avec l'Administration. La
+ * Facturation ayant maintenant sa propre porte, c'est ici que la session doit
+ * être invalidée.
+ */
 export async function deconnecter(): Promise<void> {
   const source = sourceDonnees()
   const utilisateur = await source.session.utilisateurCourant()
   await tracer(source, 'خروج', 'قطع الاتصال', utilisateur)
+  await source.session.deconnecter()
 }
 
 /** Charge tout ce dont l'interface a besoin, en une fois. */

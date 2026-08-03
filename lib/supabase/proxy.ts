@@ -1,10 +1,22 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { findActiveAccountByAuthUserId } from '@/lib/account-access'
+import { findActiveAdminAccountByAuthUserId } from '@/lib/admin-access'
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
   let isRedirectResponse = false
+
+  /**
+   * Un redirect doit repartir avec les cookies déjà accumulés sur `response`
+   * (ex. un jeton de session rafraîchi par `getUser()` juste avant) — jamais
+   * une réponse vierge, sous peine de perdre ce rafraîchissement.
+   */
+  function versLogin(): NextResponse {
+    isRedirectResponse = true
+    const cible = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.getAll().forEach((cookie) => cible.cookies.set(cookie))
+    return cible
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,7 +41,6 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const { data, error } = await supabase.auth.getUser()
   const isAdminPath =
     request.nextUrl.pathname === '/admin' ||
     request.nextUrl.pathname.startsWith('/admin/')
@@ -42,38 +53,34 @@ export async function updateSession(request: NextRequest) {
     return response
   }
 
+  // Séparation étanche Facturation/Administration : la Facturation gère
+  // entièrement sa propre session et son propre écran de connexion — le
+  // Proxy ne doit ni la rediriger vers /login, ni la déconnecter. C'est
+  // `app/facturation/page.tsx` qui décide seul de ce qu'il affiche.
+  if (isBillingPath) {
+    return response
+  }
+
+  // À partir d'ici : uniquement /admin* et /login, univers Administration,
+  // identifié par `admin_accounts` — jamais par `account_slots`.
+  const { data, error } = await supabase.auth.getUser()
+
   if (error || !data.user) {
     if (isLoginPath) {
       return response
     }
-
-    isRedirectResponse = true
-    response = NextResponse.redirect(new URL('/login', request.url))
-    await supabase.auth.signOut()
-    return response
+    return versLogin()
   }
 
-  let account = null
+  const compteAdmin = await findActiveAdminAccountByAuthUserId(data.user.id)
 
-  try {
-    account = await findActiveAccountByAuthUserId(data.user.id)
-  } catch {
-    // Protected routes fail closed when account resolution is unavailable.
-  }
-
-  if (!account) {
-    isRedirectResponse = true
-    response = NextResponse.redirect(new URL('/login?error=acces', request.url))
-    await supabase.auth.signOut()
-    return response
-  }
-
-  if (isLoginPath) {
-    return response
-  }
-
-  if (isAdminPath && account.slot_number !== 1) {
-    return NextResponse.redirect(new URL('/facturation', request.url))
+  if (!compteAdmin) {
+    if (isLoginPath) {
+      return response
+    }
+    // Ne jamais déconnecter ici : la session peut être une session
+    // Facturation valide qui vient seulement de taper la mauvaise URL.
+    return versLogin()
   }
 
   return response

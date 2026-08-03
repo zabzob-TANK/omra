@@ -91,6 +91,15 @@ export interface SessionPort {
    * l'authentification existante.
    */
   connecter(identifiant: string, motDePasse: string): Promise<Utilisateur | null>
+  /**
+   * Ferme la session ouverte par `connecter()`.
+   *
+   * Séparation étanche Facturation/Administration : la Facturation ferme
+   * désormais sa propre session elle-même (sans passer par la route /logout,
+   * propre à l'Administration) — ce port doit donc réellement invalider la
+   * session, pas seulement en tracer la fin.
+   */
+  deconnecter(): Promise<void>
   utilisateurCourant(): Promise<Utilisateur | null>
   /** R-39, R-61, R-65 — droits réservés à l'administrateur. */
   estAdministrateur(utilisateur: Utilisateur): boolean

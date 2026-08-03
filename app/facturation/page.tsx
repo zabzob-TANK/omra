@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation'
 import { requireActiveAccount } from '@/lib/admin-guard'
-import { chargerEtat } from '@/modules/facturation/data/service'
+import { chargerEtat, etatAnonyme } from '@/modules/facturation/data/service'
 import { ApplicationFacturation } from '@/modules/facturation/ui/application'
 import {
   acquitterAnomaliesAction,
@@ -25,13 +24,20 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function BillingPage() {
+  // Séparation étanche Facturation/Administration : sans session valide, on
+  // affiche l'écran de connexion propre à la Facturation (EcranConnexion,
+  // rendu par ApplicationFacturation quand `utilisateur` est `null`) —
+  // jamais une redirection vers /login, la porte de l'Administration.
+  // `chargerEtat()` n'est pas appelable ici : ses RPC exigent déjà une
+  // session (`resolve_facturation_actor()`).
+  let connecte = true
   try {
     await requireActiveAccount()
   } catch {
-    redirect('/logout?error=acces')
+    connecte = false
   }
 
-  const etatInitial = await chargerEtat()
+  const etatInitial = connecte ? await chargerEtat() : etatAnonyme()
 
   return (
     <ApplicationFacturation

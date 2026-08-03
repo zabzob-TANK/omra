@@ -196,6 +196,9 @@ export function creerSourceDemonstration(
       connecte = compte.utilisateur
       return copier(connecte)
     },
+    async deconnecter() {
+      connecte = null
+    },
     async utilisateurCourant() {
       return copier(connecte ?? options.utilisateur ?? UTILISATEUR_DEMONSTRATION)
     },

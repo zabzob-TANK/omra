@@ -1,10 +1,16 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { findActiveAccountByAuthUserId } from '@/lib/account-access'
+import { findActiveAdminAccountByAuthUserId } from '@/lib/admin-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
+/**
+ * Porte exclusive de l'Administration (séparation étanche Facturation/
+ * Administration) : n'authentifie que sur `admin_accounts`, jamais sur
+ * `account_slots` (les 6 emplacements Facturation, qui ont leur propre porte
+ * sur `/facturation`). Une seule destination possible : `/admin`.
+ */
 export async function login(formData: FormData) {
   const identifierValue = formData.get('identifier')
   const password = formData.get('password')
@@ -20,24 +26,19 @@ export async function login(formData: FormData) {
 
   const identifier = identifierValue.trim().toLowerCase()
   const admin = createAdminClient()
-  const { data: slot, error: slotError } = await admin
-    .from('account_slots')
-    .select('slot_number, login, auth_user_id')
+  const { data: adminAccount, error: adminAccountError } = await admin
+    .from('admin_accounts')
+    .select('login, auth_user_id')
     .eq('login', identifier)
     .eq('active', true)
     .single()
 
-  if (
-    slotError ||
-    !slot ||
-    !slot.auth_user_id ||
-    slot.login !== identifier
-  ) {
+  if (adminAccountError || !adminAccount?.auth_user_id) {
     redirect('/login?error=identifiants')
   }
 
   const { data: authUser, error: authUserError } =
-    await admin.auth.admin.getUserById(slot.auth_user_id)
+    await admin.auth.admin.getUserById(adminAccount.auth_user_id)
 
   if (authUserError || !authUser.user?.email) {
     redirect('/login?error=identifiants')
@@ -53,18 +54,14 @@ export async function login(formData: FormData) {
     redirect('/login?error=identifiants')
   }
 
-  let account = null
+  // Revérification autoritative post-connexion — jamais la seule recherche
+  // initiale par `login`.
+  const compteAdmin = await findActiveAdminAccountByAuthUserId(data.user.id)
 
-  try {
-    account = await findActiveAccountByAuthUserId(data.user.id)
-  } catch {
-    // Access fails closed when the active slot cannot be resolved server-side.
-  }
-
-  if (!account || account.auth_user_id !== slot.auth_user_id) {
+  if (!compteAdmin || compteAdmin.auth_user_id !== adminAccount.auth_user_id) {
     await supabase.auth.signOut()
     redirect('/login?error=acces')
   }
 
-  redirect(account.slot_number === 1 ? '/admin' : '/facturation')
+  redirect('/admin')
 }

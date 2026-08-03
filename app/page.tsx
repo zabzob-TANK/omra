@@ -1,15 +1,21 @@
 import { redirect } from 'next/navigation'
-import { requireActiveAccount } from '@/lib/admin-guard'
+import { requireAdministrator } from '@/lib/admin-guard'
 
+/**
+ * Séparation étanche Facturation/Administration : une seule vérification,
+ * Administration. Un visiteur anonyme ou une session Facturation est envoyé
+ * vers /facturation (usage quotidien) — l'Administration reste accessible
+ * directement via /login. `redirect()` lève une exception interne que
+ * Next.js seul doit intercepter — jamais le catch ci-dessous.
+ */
 export default async function Home() {
-  let destination: '/admin' | '/facturation' | '/login' = '/login'
-
+  let estAdministration = false
   try {
-    const account = await requireActiveAccount()
-    destination = account.slot_number === 1 ? '/admin' : '/facturation'
+    await requireAdministrator()
+    estAdministration = true
   } catch {
-    // Unauthenticated users are sent to the login page.
+    // Pas une session Administration valide — on continue.
   }
 
-  redirect(destination)
+  redirect(estAdministration ? '/admin' : '/facturation')
 }

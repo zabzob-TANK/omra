@@ -9,7 +9,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   try {
     await requireAdministrator()
   } catch {
-    redirect('/logout?error=acces')
+    // Séparation étanche Facturation/Administration : ne jamais déconnecter
+    // ici (/logout) — la session en cours peut être une session Facturation
+    // parfaitement valide qui vient seulement de taper /admin par erreur.
+    // On refuse l'accès à l'Administration, sans y toucher.
+    redirect('/login')
   }
 
   return (

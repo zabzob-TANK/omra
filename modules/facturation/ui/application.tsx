@@ -455,12 +455,12 @@ export function ApplicationFacturation({
             title={T.navigation.sortie}
             onClick={async () => {
               await actions.deconnecter()
-              // Sortie réelle omra : ferme la session Supabase et revient à
-              // /login (route /logout). Un simple `setUtilisateur(null)`
-              // rouvrirait l'écran de connexion du prototype, jamais branché
-              // sur l'authentification omra (`SessionPort.connecter`, non
-              // disponible côté ce module).
-              window.location.href = '/logout'
+              // Séparation étanche Facturation/Administration : la
+              // déconnexion ferme la session Supabase et revient sur
+              // /facturation lui-même (rechargement complet) — jamais /login
+              // ni /logout, les routes de l'Administration. Sans session,
+              // /facturation affiche à nouveau EcranConnexion.
+              window.location.href = '/facturation'
             }}
           >
             <svg
