@@ -16,8 +16,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files — .env.local et variantes *.local restent ignorés (secrets) ;
+# .env est suivi : configuration non secrète et versionnée (ex. FACTURATION_SOURCE).
 .env*
+!.env
 
 # vercel
 .vercel

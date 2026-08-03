@@ -450,3 +450,65 @@ d'écriture, fait déjà ce travail.
 `pnpm run build` — tous au vert. Aucune route n'est encore branchée sur cet
 adaptateur ; `app/facturation/page.tsx` utilise toujours `BillingDashboard` et
 `demo-data.ts` jusqu'à l'étape 6.
+
+---
+
+## 10. Étape 6 — l'interface réelle branchée sur `/facturation` (2026-08-03)
+
+`app/facturation/page.tsx` rend désormais `ApplicationFacturation`
+(`modules/facturation/ui/application.tsx`), avec `chargerEtat()` comme état
+initial et un nouveau `app/facturation/actions.ts` (Server Actions minces,
+une par méthode d'`ActionsFacturation`, chacune revérifiant
+`requireActiveAccount()` avant de déléguer à `service.ts`, jamais modifié).
+`BillingDashboard` et ses composants (`components/facturation/`),
+`lib/facturation/demo-data.ts`, `read-server.ts`, `reference-server.ts`,
+`workflow-types.ts` et `format.ts` sont supprimés : plus aucune référence.
+
+**Deux modifications ciblées de `application.tsx`** (le reste du fichier
+n'est pas touché) :
+1. `utilisateur` s'initialise depuis `etatInitial.utilisateur` au lieu de
+   `null` — l'authentification omra a déjà eu lieu avant que cette interface
+   ne soit montée (`requireActiveAccount()` dans `page.tsx`), donc l'écran de
+   connexion du prototype ne s'affiche plus jamais côté omra.
+2. Le bouton de sortie navigue vers `/logout` (route réelle omra, ferme la
+   session Supabase) plutôt que d'appeler `setUtilisateur(null)`, qui n'aurait
+   fait que rouvrir l'écran de connexion du prototype — jamais branché sur
+   l'authentification omra (`SessionPort.connecter`, non disponible).
+
+**`FACTURATION_SOURCE=supabase` fixé dans un nouveau fichier `.env`**
+(versionné, non secret — à ne pas confondre avec `.env.local`).
+`.gitignore` excluait `.env*` en bloc ; une exception `!.env` a été ajoutée
+pour que cette valeur soit versionnée et survive au-delà de cette machine,
+sans toucher `.env.local` ni son contenu. `server-only` est ajouté comme
+dépendance directe (déjà utilisée implicitement via le bundler Next.js ;
+nécessaire pour que `vitest`/Node la résolvent).
+
+**Limites assumées, non résolues à cette étape** — écrans accessibles depuis
+la navigation mais dont le résultat dépend de ports encore indisponibles
+(§9, point 8) :
+- **Finance**, **Suivi journalier**, **Paiements** (registre bancaire) :
+  leurs actions échouent silencieusement (`journalFinancier`/`suiviJournalier`/
+  `registreBancaire` lèvent une erreur côté serveur ; le client ne l'affiche
+  pas explicitement, l'écran reste vide) — dépendent du lot « journal
+  financier » (§5, étape 9), hors périmètre.
+- **Passeport** : joindre une image de passeport à un nouveau reçu échoue
+  (`definirImagesPasseport`, hors périmètre du noyau, R-90).
+- **Impression** : le compteur d'impressions n'est pas incrémenté
+  (`incrementerImpressions`, migration `202608020003` non déployée).
+- **Correction du premier versement** : indisponible tant que
+  `corrigerPremierVersement`/étape 8 n'est pas déployée.
+
+Ces limites ne sont pas des faux succès : chaque appel échoue explicitement
+(erreur retournée ou levée), rien n'est simulé. **Statistiques**, **Registre**,
+**nouveau reçu**, **versement**, **annulation**, **modification**
+(identité/contact/programme/note) et l'**écran du reçu imprimable**
+fonctionnent pleinement sur les données réelles.
+
+**Vérifié** : `pnpm exec tsc --noEmit`, `pnpm exec vitest run` (467 tests),
+`pnpm run build` — tous au vert. `curl` non authentifié sur `/facturation`
+confirme la redirection vers `/login` sans erreur serveur. **Non vérifié** :
+un contrôle visuel authentifié dans un navigateur — aucun outil
+d'automatisation navigateur n'était accessible dans cette session
+(profil Playwright de `CLAUDE.md` non exposé ici). À faire avant la
+prochaine session de travail, via la tâche VS Code « Omra Facturation —
+aperçu local ».

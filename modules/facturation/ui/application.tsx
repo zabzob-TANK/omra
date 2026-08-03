@@ -137,7 +137,11 @@ export function ApplicationFacturation({
   comptesEssai: string[]
 }) {
   const [etat, setEtat] = useState(etatInitial)
-  const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(null)
+  // L'authentification omra a déjà eu lieu avant que cette interface ne soit
+  // montée (`requireActiveAccount()` dans `app/facturation/page.tsx`) :
+  // `chargerEtat()` porte donc toujours un utilisateur réel ici, et l'écran
+  // de connexion du prototype (ci-dessous) ne s'affiche plus jamais côté omra.
+  const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(etatInitial.utilisateur)
   const [ecran, setEcran] = useState<Ecran>({ nom: 'registre' })
   const [fenetre, setFenetre] = useState<Fenetre>({ type: 'aucune' })
   // R-85 — un reçu ouvert juste après sa création est l'original ; rouvert
@@ -427,9 +431,12 @@ export function ApplicationFacturation({
             title={T.navigation.sortie}
             onClick={async () => {
               await actions.deconnecter()
-              setUtilisateur(null)
-              setEcran({ nom: 'registre' })
-              setFenetre({ type: 'aucune' })
+              // Sortie réelle omra : ferme la session Supabase et revient à
+              // /login (route /logout). Un simple `setUtilisateur(null)`
+              // rouvrirait l'écran de connexion du prototype, jamais branché
+              // sur l'authentification omra (`SessionPort.connecter`, non
+              // disponible côté ce module).
+              window.location.href = '/logout'
             }}
           >
             <svg
