@@ -796,3 +796,39 @@ migrations à jour appliquées ensemble) :
 `supabase db lint --linked` et `supabase db push --dry-run` revérifiés une
 dernière fois : mêmes trois fichiers, même ordre, rien de nouveau. **Push
 réel exécuté à la suite de cette vérification — voir §15.**
+
+---
+
+## 15. Push réel des trois migrations — exécuté (2026-08-03)
+
+Après relecture complète des trois fichiers (`202608030004`, `202608030005`,
+`202608030006`) contre `reprise.md`, et le correctif du §14, la procédure de
+`CLAUDE.md` §10 a été suivie intégralement :
+
+1. Sauvegarde + empreintes SHA-256 des 8 tables Administration et des
+   utilisateurs Auth (script jetable, jamais committé) : **29 lignes**,
+   conforme à l'état connu.
+2. `supabase db lint --linked --level warning` : l'erreur `season_id is
+   ambiguous` (`sqlState 42702`) toujours présente sur la base **avant**
+   push, confirmant une dernière fois la nécessité du push.
+3. `supabase db push --dry-run` : exactement `202608030004`, `202608030005`,
+   `202608030006`, dans cet ordre.
+4. **`supabase db push` — exécuté.** Les trois migrations sont appliquées
+   (avertissement Docker sur la mise en cache locale du catalogue, sans
+   rapport avec le push distant réel, qui a réussi).
+5. `supabase migration list` : les trois apparaissent désormais `remote`.
+6. `supabase db lint --linked` relancé : l'erreur `season_id` a disparu.
+7. Sauvegarde + empreintes recalculées après le push : **identiques
+   bit à bit** aux empreintes d'avant (mêmes SHA-256 pour les 8 tables et les
+   utilisateurs Auth, toujours 29 lignes). Administration intacte.
+8. **Vérification en conditions réelles**, dans une transaction terminée par
+   `ROLLBACK` (donc sans rien laisser en base), contre les fonctions
+   désormais déployées : `create_complete_facturation_receipt` (le chemin
+   RPC réellement emprunté par l'application) crée un reçu avec numéro 1
+   attribué ; `cancel_billing_receipt` l'annule ensuite sans erreur. Les deux
+   appels réussissent pour la première fois depuis que le bug `season_id` a
+   été introduit plus tôt dans cette session (§11).
+
+**`/facturation` peut désormais créer un reçu réel.** Le bug bloquant décrit
+au §11 est résolu en production. Aucune donnée Administration n'a été
+touchée. Aucun script jetable n'a été committé.
