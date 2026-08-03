@@ -20,18 +20,11 @@ Suivi des impressions (compteur incrémenté avant `window.print()`, R-84,
 (`fusion.md` §6, étape 9), une fois les tables et fonctions manquantes de
 `fusion.md` §5 conçues ensemble.
 
-## `202608020004_correct_first_payment_method.sql`
+## `202608020004_correct_first_payment_method.sql` — repris et déplacé le 2026-08-03
 
-Contient `correct_billing_receipt_first_payment_method`. **Non conforme en
-l'état** (`fusion.md` §4.2) : traite le montant du premier versement comme
-immuable pour tous les auteurs, alors que la règle confirmée
-(`reprise.md` §5.9) réserve cette correction à l'administrateur.
-
-`list_reusable_payment_operations`, qui vivait initialement dans ce même
-fichier, en a déjà été extraite et déployée séparément
-(`202608030003_extract_list_reusable_payment_operations.sql`) : elle n'est
-pas concernée par cette non-conformité.
-
-**Retour prévu** : reprise à l'étape 8 du plan d'exécution (`fusion.md` §6),
-pas avant. Ne pas déplacer ce fichier dans `supabase/migrations/` avant
-cette reprise.
+Reprise à l'étape 8 du plan d'exécution (`fusion.md` §6/§12) : le fichier a
+été déplacé vers `supabase/migrations/202608030006_correct_first_payment_method_admin_amount.sql`,
+conforme désormais à `reprise.md` §5.9 (montant réservé à l'administrateur,
+méthode/instrument ouverts à tout auteur actif). Préparé et testé en
+`BEGIN...ROLLBACK`, **pas encore poussé** — voir `fusion.md` §12 pour l'état
+exact et ce qui reste en attente de validation du commanditaire.

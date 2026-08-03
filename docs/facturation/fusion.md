@@ -613,3 +613,68 @@ mot de passe. C'est la méthode utilisée pour tous les tests `BEGIN...ROLLBACK`
 de cette section — y compris la simulation de session (`account_slots` lu
 directement, `request.jwt.claims` positionné pour que l'appel soit vu comme
 authentifié) prescrite par `CLAUDE.md`.
+
+---
+
+## 12. Étape 8 — correction du premier versement, montant réservé à l'administrateur (2026-08-03)
+
+Reprise de `correct_billing_receipt_first_payment_method` selon §4.2 : le
+fichier a quitté `supabase/migrations-en-attente/` pour
+`supabase/migrations/202608030006_correct_first_payment_method_admin_amount.sql`
+(voir `supabase/migrations-en-attente/README.md`, mis à jour).
+
+**Changement principal** : nouveau paramètre `p_new_amount_dh`, obligatoire
+(toujours transmis par le domaine, qui connaît déjà le montant courant même
+sans correction — `edit-sections.ts`). Un changement de montant est réservé à
+l'administrateur (slot 1) ; la méthode et l'instrument restent ouverts à tout
+auteur actif, comme avant.
+
+**Méthode et montant se corrigent désormais indépendamment.** La version
+précédente ne savait détecter que « rien n'a changé » (méthode identique,
+montant immuable de toute façon) et refusait tout le reste par construction.
+La version reprise distingue `v_method_unchanged` de `v_amount_changed` :
+- les deux inchangés → refusé (`No first payment data changed`), comme avant ;
+- méthode inchangée, montant changé → l'opération déjà utilisée garde son
+  rattachement, son payeur et (si partagée) son montant total verrouillés
+  (§5.8) ; pour un instrument **unique**, `operation_amount_dh` est
+  resynchronisé avec le nouveau montant (invariant déjà appliqué à la
+  création : le montant d'une opération unique égale le paiement) ; pour une
+  opération **partagée**, seul le montant alloué dérivé change, avec
+  confirmation de dépassement si nécessaire (R-32) ;
+- méthode changée (montant changé ou non) : logique de réattribution
+  identique à la version précédente, désormais paramétrée sur le nouveau
+  montant plutôt que sur l'ancien.
+
+Le trop-perçu ou le reste dû résultant d'une correction de montant n'est
+jamais bloqué : §5.11 l'interdit explicitement (même principe déjà appliqué à
+`update_billing_receipt_commercial_data`). L'instantané figé du versement
+(`payment_snapshot_*`, R-14/§5.7) n'est jamais réécrit par cette correction.
+
+`#variable_conflict use_column` ajoutée par précaution, après les deux bugs
+identiques trouvés en préparant l'étape 7 (§11) dans d'autres fonctions
+partageant ce motif (`RETURNS TABLE` dont un nom de colonne coïncide avec une
+colonne réelle référencée sans qualification).
+
+**Vérifié, dans une transaction unique terminée par `ROLLBACK`** (les
+migrations des étapes 7 et 8 appliquées ensemble, aucune n'étant encore
+poussée) :
+1. l'administrateur corrige uniquement le montant (espèces, unique) : réussi,
+   le nouveau montant est bien renvoyé ;
+2. aucun changement (même montant, même méthode) : refusé comme attendu ;
+3. un employé actif — slot 2 basculé `active = true` le temps du test, dans
+   la même transaction annulée, aucun compte employé actif n'existant sur la
+   base au moment du test (état déjà connu, voir `CLAUDE.md`) — tente de
+   corriger le montant : refusé (`Administrator privileges are required`) ;
+4. ce même employé change uniquement la méthode (espèces → chèque unique,
+   montant inchangé) : réussi.
+
+`supabase db lint --linked --level warning` ne signale rien de nouveau (les
+avertissements déjà connus, plus l'erreur `season_id` de l'étape 7 toujours
+présente côté base non corrigée). `supabase db push --dry-run` propose
+exactement les trois fichiers des étapes 7 et 8, dans cet ordre :
+`202608030004`, `202608030005`, `202608030006`.
+
+**Conformément à la règle d'or : préparé, testé, documenté — PAS poussé.**
+Le vrai push distant attend la validation du commanditaire à son retour, pour
+les trois migrations à la fois (elles se suivent et n'ont de sens que
+poussées ensemble, dans cet ordre).

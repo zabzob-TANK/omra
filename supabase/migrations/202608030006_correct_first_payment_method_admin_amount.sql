@@ -1,19 +1,58 @@
--- NE PAS DÉPLOYER EN L'ÉTAT (fusion.md §4.2).
+-- Reprise fusion.md §4.2 / reprise.md §5.9 (étape 8 du plan d'exécution).
 --
--- correct_billing_receipt_first_payment_method traite le montant du premier
--- versement comme immuable pour tous les auteurs. La règle confirmée par le
--- commanditaire (reprise.md §5.9) est différente : l'administrateur (slot 1)
--- peut corriger le montant ; un employé ne corrige que la méthode et
--- l'instrument. Cette fonction doit être reprise avant application, à
--- l'étape 8 du plan d'exécution de fusion.md — pas avant.
+-- Version précédente : le montant du premier versement était traité comme
+-- immuable pour tous les auteurs, quel que soit leur rôle. La règle actée par
+-- le commanditaire est différente : l'administrateur (slot 1) peut corriger
+-- le montant du premier versement ; un employé actif (slots 2 à 6) ne
+-- corrige que la méthode et l'instrument, jamais le montant.
+--
+-- Ajout : p_new_amount_dh (obligatoire — toujours transmis par le domaine,
+-- qui connaît déjà le montant actuel quand rien ne change, voir
+-- `edit-sections.ts`, `preparerModification`). Un changement de montant est
+-- réservé à l'administrateur ; toute autre valeur (égale au montant actuel)
+-- ne déclenche aucune vérification de rôle supplémentaire.
+--
+-- Le montant et la méthode peuvent être corrigés indépendamment ou ensemble :
+-- la fonction distingue maintenant « la méthode change » de « le montant
+-- change », alors que la version précédente ne savait détecter que l'absence
+-- totale de changement (méthode + montant, ce dernier étant alors immuable).
+-- Quand la méthode ne change pas, l'opération déjà utilisée est conservée
+-- telle quelle (§5.8) ; seul le montant alloué qui en dérive (calculé, jamais
+-- stocké séparément) reflète le nouveau montant. Pour un instrument unique,
+-- `operation_amount_dh` est resynchronisé avec le nouveau montant afin de
+-- préserver l'invariant déjà appliqué ailleurs (« le montant d'une opération
+-- unique égale le paiement »). Un dépassement nouvellement créé sur une
+-- opération partagée déjà utilisée exige une confirmation, comme pour tout
+-- autre versement (R-32).
+--
+-- Le trop-perçu résultant d'une baisse du montant, ou l'insuffisance
+-- résultant d'une hausse, ne sont jamais bloqués ici : reprise.md §5.11 est
+-- explicite — le trop-perçu n'est jamais un refus, seulement une anomalie
+-- visible, calculée à la lecture depuis les paiements stockés (même principe
+-- déjà appliqué à la correction commerciale, `update_billing_receipt_commercial_data`).
+--
+-- L'instantané figé du premier versement (`payment_snapshot_*`, R-14/§5.7)
+-- n'est jamais réécrit par cette correction, y compris son
+-- `remaining_after_dh`/`settled_after` : il reste la photographie de ce qui
+-- était vrai au moment du versement d'origine, pas un reflet de l'état
+-- courant (dérivable à tout moment depuis les paiements stockés).
+--
+-- #variable_conflict use_column ajoutée par précaution : cette fonction
+-- déclare aussi RETURNS TABLE(receipt_id, ...) et d'autres noms qui
+-- coïncident avec des colonnes réelles ; voir 202608030004/202608030005 pour
+-- deux bugs identiques déjà trouvés dans d'autres fonctions de ce lot.
 --
 -- list_reusable_payment_operations, qui vivait initialement dans ce fichier,
 -- en a été extraite (202608030003_extract_list_reusable_payment_operations.sql)
--- car elle n'a aucun rapport avec cette non-conformité.
+-- et n'est pas concernée par cette reprise.
+--
+-- NE PAS DÉPLOYER SANS VALIDATION EXPLICITE DU COMMANDITAIRE (voir
+-- fusion.md §12) : préparée et testée en BEGIN...ROLLBACK, jamais poussée.
 
 create or replace function public.correct_billing_receipt_first_payment_method(
   p_receipt_id uuid,
   p_reason text,
+  p_new_amount_dh integer,
   p_payment_mode text,
   p_usage_kind text,
   p_existing_shared_operation_id uuid default null,
@@ -31,6 +70,7 @@ returns table (
   payment_operation_id uuid,
   payment_mode text,
   usage_kind text,
+  previous_payment_amount_dh integer,
   payment_amount_dh integer,
   total_paid_dh bigint,
   receipt_remaining_dh bigint,
@@ -42,6 +82,7 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+#variable_conflict use_column
 declare
   v_actor_slot_number smallint;
   v_actor_auth_user_id uuid;
@@ -53,6 +94,9 @@ declare
   v_agreed_amount_dh integer;
   v_payment_id uuid;
   v_payment_amount_dh integer;
+  v_amount_changed boolean;
+  v_method_unchanged boolean;
+  v_keep_same_operation boolean;
   v_total_paid_dh bigint;
   v_receipt_remaining_dh bigint;
   v_allocation_id uuid;
@@ -143,6 +187,18 @@ begin
     raise exception 'Receipt first payment is missing';
   end if;
 
+  -- §4.2, §5.9 — seul l'administrateur peut corriger le montant. Toute autre
+  -- valeur transmise (y compris la valeur inchangée) ne requiert pas ce rôle.
+  if p_new_amount_dh is null or p_new_amount_dh <= 0 then
+    raise exception 'First payment amount must be positive';
+  end if;
+
+  v_amount_changed := p_new_amount_dh <> v_payment_amount_dh;
+
+  if v_amount_changed and v_actor_slot_number <> 1 then
+    raise exception 'Administrator privileges are required';
+  end if;
+
   select
     allocation.id,
     operation.id,
@@ -174,18 +230,6 @@ begin
   if not found then
     raise exception 'First payment operation is missing';
   end if;
-
-  select
-    coalesce(pg_catalog.sum(payment.amount_dh), 0)::bigint
-  into v_total_paid_dh
-  from public.receipt_payments as payment
-  where payment.receipt_id = p_receipt_id;
-
-  v_receipt_remaining_dh := case
-    when v_agreed_amount_dh::bigint > v_total_paid_dh
-      then v_agreed_amount_dh::bigint - v_total_paid_dh
-    else 0::bigint
-  end;
 
   select coalesce(pg_catalog.sum(payment.amount_dh), 0)::bigint
   into v_previous_allocated_total_dh
@@ -229,11 +273,88 @@ begin
     p_instrument_date is not null or
     p_payer_name is not null;
 
+  -- §4.2 — « la méthode ne change pas » se décide indépendamment du montant :
+  -- reproduit exactement les comparaisons de la version précédente, mais sans
+  -- lever d'exception ici — seulement poser le drapeau.
   if p_existing_shared_operation_id is not null then
-    if p_existing_shared_operation_id = v_previous_operation_id then
-      raise exception 'No first payment method data changed';
-    end if;
+    v_method_unchanged := p_existing_shared_operation_id = v_previous_operation_id;
+  elsif p_payment_mode = 'cash' then
+    v_method_unchanged := v_previous_mode = 'cash' and v_previous_usage = 'unique';
+  else
+    v_method_unchanged :=
+      v_previous_mode = p_payment_mode and
+      v_previous_usage = p_usage_kind and
+      pg_catalog.btrim(coalesce(v_previous_reference, '')) =
+        pg_catalog.btrim(coalesce(p_instrument_reference, '')) and
+      pg_catalog.btrim(coalesce(v_previous_bank, '')) =
+        pg_catalog.btrim(coalesce(p_bank_name, '')) and
+      v_previous_date = p_instrument_date and
+      pg_catalog.btrim(coalesce(v_previous_payer, '')) =
+        pg_catalog.btrim(coalesce(p_payer_name, '')) and
+      (
+        p_usage_kind = 'shared'
+        and v_previous_operation_amount_dh = p_operation_amount_dh
+        or p_usage_kind = 'unique'
+      );
+  end if;
 
+  if v_method_unchanged and not v_amount_changed then
+    raise exception 'No first payment data changed';
+  end if;
+
+  v_keep_same_operation := v_method_unchanged;
+
+  if v_keep_same_operation then
+    -- §5.8 — une opération déjà utilisée garde son rattachement, son payeur
+    -- et (si partagée) son montant total verrouillés : rien n'est recréé ni
+    -- réattribué. Seul le montant du versement peut changer.
+    v_operation_id := v_previous_operation_id;
+    v_operation_mode := v_previous_mode;
+    v_operation_usage := v_previous_usage;
+    v_operation_reference := v_previous_reference;
+    v_operation_bank := v_previous_bank;
+    v_operation_date := v_previous_date;
+    v_operation_payer := v_previous_payer;
+
+    if v_previous_usage = 'unique' then
+      -- Invariant déjà appliqué à la création : le montant d'une opération
+      -- unique égale le paiement. Resynchronisé si le montant a changé.
+      v_operation_amount_dh := p_new_amount_dh;
+      v_allocated_before_dh := v_payment_amount_dh;
+      v_allocated_after_dh := p_new_amount_dh;
+      v_remaining_before_dh := 0;
+      v_remaining_after_dh := 0;
+
+      if v_amount_changed then
+        update public.payment_operations
+        set operation_amount_dh = p_new_amount_dh
+        where id = v_operation_id;
+      end if;
+    else
+      v_operation_amount_dh := v_previous_operation_amount_dh;
+      v_allocated_before_dh := v_previous_allocated_total_dh;
+      v_allocated_after_dh :=
+        v_previous_allocated_total_dh - v_payment_amount_dh + p_new_amount_dh;
+      v_remaining_before_dh :=
+        v_operation_amount_dh::bigint - v_allocated_before_dh;
+      v_remaining_after_dh :=
+        v_operation_amount_dh::bigint - v_allocated_after_dh;
+      v_over_allocation := v_allocated_after_dh > v_operation_amount_dh::bigint;
+
+      if v_over_allocation and not coalesce(p_confirm_over_allocation, false) then
+        raise exception 'Over-allocation confirmation is required';
+      end if;
+
+      if v_over_allocation then
+        update public.payment_operations as operation
+        set
+          over_allocation_confirmed_at = v_action_at,
+          over_allocation_confirmed_by_slot_number = v_actor_slot_number,
+          over_allocation_confirmer_label_snapshot = v_actor_slot_label
+        where operation.id = v_operation_id;
+      end if;
+    end if;
+  elsif p_existing_shared_operation_id is not null then
     if p_payment_mode = 'cash' then
       raise exception 'Cash cannot reuse a payment operation';
     end if;
@@ -290,7 +411,7 @@ begin
     where allocation.payment_operation_id = p_existing_shared_operation_id;
 
     v_operation_id := p_existing_shared_operation_id;
-    v_allocated_after_dh := v_allocated_before_dh + v_payment_amount_dh;
+    v_allocated_after_dh := v_allocated_before_dh + p_new_amount_dh;
     v_remaining_before_dh :=
       v_operation_amount_dh::bigint - v_allocated_before_dh;
     v_remaining_after_dh :=
@@ -326,16 +447,12 @@ begin
       end if;
 
       if p_operation_amount_dh is not null and
-         p_operation_amount_dh <> v_payment_amount_dh then
+         p_operation_amount_dh <> p_new_amount_dh then
         raise exception 'Cash operation amount must equal payment';
       end if;
 
-      if v_previous_mode = 'cash' and v_previous_usage = 'unique' then
-        raise exception 'No first payment method data changed';
-      end if;
-
-      v_operation_amount_dh := v_payment_amount_dh;
-      v_allocated_after_dh := v_payment_amount_dh;
+      v_operation_amount_dh := p_new_amount_dh;
+      v_allocated_after_dh := p_new_amount_dh;
       v_remaining_after_dh := 0;
     else
       if p_instrument_reference is null or
@@ -350,12 +467,12 @@ begin
 
       if p_usage_kind = 'unique' then
         if p_operation_amount_dh is not null and
-           p_operation_amount_dh <> v_payment_amount_dh then
+           p_operation_amount_dh <> p_new_amount_dh then
           raise exception 'Operation amount must equal payment';
         end if;
 
-        v_operation_amount_dh := v_payment_amount_dh;
-        v_allocated_after_dh := v_payment_amount_dh;
+        v_operation_amount_dh := p_new_amount_dh;
+        v_allocated_after_dh := p_new_amount_dh;
         v_remaining_after_dh := 0;
       else
         if p_operation_amount_dh is null or p_operation_amount_dh <= 0 then
@@ -363,30 +480,17 @@ begin
         end if;
 
         v_operation_amount_dh := p_operation_amount_dh;
-        v_allocated_after_dh := v_payment_amount_dh;
+        v_allocated_after_dh := p_new_amount_dh;
         v_remaining_before_dh := v_operation_amount_dh;
         v_remaining_after_dh :=
-          v_operation_amount_dh::bigint - v_payment_amount_dh;
+          v_operation_amount_dh::bigint - p_new_amount_dh;
         v_over_allocation :=
-          v_payment_amount_dh > v_operation_amount_dh;
+          p_new_amount_dh > v_operation_amount_dh;
 
         if v_over_allocation and
            not coalesce(p_confirm_over_allocation, false) then
           raise exception 'Over-allocation confirmation is required';
         end if;
-      end if;
-
-      if v_previous_mode = v_operation_mode and
-         v_previous_usage = v_operation_usage and
-         v_previous_operation_amount_dh = v_operation_amount_dh and
-         pg_catalog.btrim(coalesce(v_previous_reference, '')) =
-           pg_catalog.btrim(p_instrument_reference) and
-         pg_catalog.btrim(coalesce(v_previous_bank, '')) =
-           pg_catalog.btrim(p_bank_name) and
-         v_previous_date = p_instrument_date and
-         pg_catalog.btrim(coalesce(v_previous_payer, '')) =
-           pg_catalog.btrim(p_payer_name) then
-        raise exception 'No first payment method data changed';
       end if;
     end if;
   end if;
@@ -444,7 +548,7 @@ begin
         v_action_at
       );
     end if;
-  elsif v_over_allocation then
+  elsif not v_keep_same_operation and v_over_allocation then
     update public.payment_operations as operation
     set
       over_allocation_confirmed_at = v_action_at,
@@ -453,14 +557,36 @@ begin
     where operation.id = v_operation_id;
   end if;
 
-  update public.payment_allocations as allocation
-  set payment_operation_id = v_operation_id
-  where allocation.id = v_allocation_id
-    and allocation.payment_operation_id = v_previous_operation_id;
+  if not v_keep_same_operation then
+    update public.payment_allocations as allocation
+    set payment_operation_id = v_operation_id
+    where allocation.id = v_allocation_id
+      and allocation.payment_operation_id = v_previous_operation_id;
 
-  if not found then
-    raise exception 'First payment operation changed concurrently';
+    if not found then
+      raise exception 'First payment operation changed concurrently';
+    end if;
   end if;
+
+  if v_amount_changed then
+    update public.receipt_payments
+    set amount_dh = p_new_amount_dh
+    where id = v_payment_id;
+  end if;
+
+  select coalesce(pg_catalog.sum(payment.amount_dh), 0)::bigint
+  into v_total_paid_dh
+  from public.receipt_payments as payment
+  where payment.receipt_id = p_receipt_id;
+
+  -- §5.11 — un trop-perçu ou un reste dû résultant de cette correction n'est
+  -- jamais un refus, seulement une anomalie visible à la lecture (même
+  -- principe que update_billing_receipt_commercial_data).
+  v_receipt_remaining_dh := case
+    when v_agreed_amount_dh::bigint > v_total_paid_dh
+      then v_agreed_amount_dh::bigint - v_total_paid_dh
+    else 0::bigint
+  end;
 
   insert into public.facturation_action_history (
     entity_type,
@@ -489,8 +615,6 @@ begin
       'payment_id', v_payment_id,
       'payment_number', 1,
       'payment_amount_dh', v_payment_amount_dh,
-      'total_paid_dh', v_total_paid_dh,
-      'receipt_remaining_dh', v_receipt_remaining_dh,
       'payment_operation_id', v_previous_operation_id,
       'payment_mode', v_previous_mode,
       'usage_kind', v_previous_usage,
@@ -513,7 +637,10 @@ begin
       'receipt_number', v_receipt_number,
       'payment_id', v_payment_id,
       'payment_number', 1,
-      'payment_amount_dh', v_payment_amount_dh,
+      'payment_amount_dh', p_new_amount_dh,
+      'amount_changed', v_amount_changed,
+      'amount_changed_by_slot_number',
+        case when v_amount_changed then v_actor_slot_number else null end,
       'total_paid_dh', v_total_paid_dh,
       'receipt_remaining_dh', v_receipt_remaining_dh,
       'payment_operation_id', v_operation_id,
@@ -541,130 +668,132 @@ begin
     v_correlation_id
   );
 
-  insert into public.facturation_action_history (
-    entity_type,
-    entity_id,
-    action_type,
-    section_code,
-    reason,
-    before_data,
-    after_data,
-    occurred_at,
-    actor_slot_number,
-    actor_auth_user_id_snapshot,
-    actor_slot_label_snapshot,
-    actor_login_snapshot,
-    correlation_id
-  )
-  values (
-    'payment_operation',
-    v_previous_operation_id,
-    'payment_operation.allocation_reassigned',
-    'first_payment',
-    pg_catalog.btrim(p_reason),
-    pg_catalog.jsonb_build_object(
-      'receipt_id', p_receipt_id,
-      'receipt_payment_id', v_payment_id,
-      'allocated_total_dh', v_previous_allocated_total_dh,
-      'operation_remaining_dh', v_previous_remaining_before_dh
-    ),
-    pg_catalog.jsonb_build_object(
-      'receipt_id', p_receipt_id,
-      'receipt_payment_id', v_payment_id,
-      'replacement_payment_operation_id', v_operation_id,
-      'allocated_total_dh',
-        v_previous_allocated_total_dh - v_payment_amount_dh,
-      'operation_remaining_dh', v_previous_remaining_after_dh
-    ),
-    v_action_at,
-    v_actor_slot_number,
-    v_actor_auth_user_id,
-    v_actor_slot_label,
-    v_actor_login,
-    v_correlation_id
-  );
+  if not v_keep_same_operation then
+    insert into public.facturation_action_history (
+      entity_type,
+      entity_id,
+      action_type,
+      section_code,
+      reason,
+      before_data,
+      after_data,
+      occurred_at,
+      actor_slot_number,
+      actor_auth_user_id_snapshot,
+      actor_slot_label_snapshot,
+      actor_login_snapshot,
+      correlation_id
+    )
+    values (
+      'payment_operation',
+      v_previous_operation_id,
+      'payment_operation.allocation_reassigned',
+      'first_payment',
+      pg_catalog.btrim(p_reason),
+      pg_catalog.jsonb_build_object(
+        'receipt_id', p_receipt_id,
+        'receipt_payment_id', v_payment_id,
+        'allocated_total_dh', v_previous_allocated_total_dh,
+        'operation_remaining_dh', v_previous_remaining_before_dh
+      ),
+      pg_catalog.jsonb_build_object(
+        'receipt_id', p_receipt_id,
+        'receipt_payment_id', v_payment_id,
+        'replacement_payment_operation_id', v_operation_id,
+        'allocated_total_dh',
+          v_previous_allocated_total_dh - v_payment_amount_dh,
+        'operation_remaining_dh', v_previous_remaining_after_dh
+      ),
+      v_action_at,
+      v_actor_slot_number,
+      v_actor_auth_user_id,
+      v_actor_slot_label,
+      v_actor_login,
+      v_correlation_id
+    );
 
-  if v_create_operation then
-    insert into public.facturation_action_history (
-      entity_type,
-      entity_id,
-      action_type,
-      section_code,
-      reason,
-      before_data,
-      after_data,
-      occurred_at,
-      actor_slot_number,
-      actor_auth_user_id_snapshot,
-      actor_slot_label_snapshot,
-      actor_login_snapshot,
-      correlation_id
-    )
-    values (
-      'payment_operation',
-      v_operation_id,
-      'payment_operation.created_by_first_payment_correction',
-      'first_payment',
-      pg_catalog.btrim(p_reason),
-      null,
-      pg_catalog.jsonb_build_object(
-        'receipt_id', p_receipt_id,
-        'receipt_payment_id', v_payment_id,
-        'payment_amount_dh', v_payment_amount_dh,
-        'payment_mode', v_operation_mode,
-        'usage_kind', v_operation_usage,
-        'operation_amount_dh', v_operation_amount_dh,
-        'allocated_total_dh', v_allocated_after_dh,
-        'operation_remaining_dh', v_remaining_after_dh
-      ),
-      v_action_at,
-      v_actor_slot_number,
-      v_actor_auth_user_id,
-      v_actor_slot_label,
-      v_actor_login,
-      v_correlation_id
-    );
-  else
-    insert into public.facturation_action_history (
-      entity_type,
-      entity_id,
-      action_type,
-      section_code,
-      reason,
-      before_data,
-      after_data,
-      occurred_at,
-      actor_slot_number,
-      actor_auth_user_id_snapshot,
-      actor_slot_label_snapshot,
-      actor_login_snapshot,
-      correlation_id
-    )
-    values (
-      'payment_operation',
-      v_operation_id,
-      'payment_operation.reused_by_first_payment_correction',
-      'first_payment',
-      pg_catalog.btrim(p_reason),
-      pg_catalog.jsonb_build_object(
-        'receipt_id', p_receipt_id,
-        'allocated_total_dh', v_allocated_before_dh,
-        'operation_remaining_dh', v_remaining_before_dh
-      ),
-      pg_catalog.jsonb_build_object(
-        'receipt_id', p_receipt_id,
-        'receipt_payment_id', v_payment_id,
-        'payment_amount_dh', v_payment_amount_dh,
-        'allocated_total_dh', v_allocated_after_dh,
-        'operation_remaining_dh', v_remaining_after_dh
-      ),
-      v_action_at,
-      v_actor_slot_number,
-      v_actor_auth_user_id,
-      v_actor_slot_label,
-      v_actor_login,
-      v_correlation_id
-    );
+    if v_create_operation then
+      insert into public.facturation_action_history (
+        entity_type,
+        entity_id,
+        action_type,
+        section_code,
+        reason,
+        before_data,
+        after_data,
+        occurred_at,
+        actor_slot_number,
+        actor_auth_user_id_snapshot,
+        actor_slot_label_snapshot,
+        actor_login_snapshot,
+        correlation_id
+      )
+      values (
+        'payment_operation',
+        v_operation_id,
+        'payment_operation.created_by_first_payment_correction',
+        'first_payment',
+        pg_catalog.btrim(p_reason),
+        null,
+        pg_catalog.jsonb_build_object(
+          'receipt_id', p_receipt_id,
+          'receipt_payment_id', v_payment_id,
+          'payment_amount_dh', p_new_amount_dh,
+          'payment_mode', v_operation_mode,
+          'usage_kind', v_operation_usage,
+          'operation_amount_dh', v_operation_amount_dh,
+          'allocated_total_dh', v_allocated_after_dh,
+          'operation_remaining_dh', v_remaining_after_dh
+        ),
+        v_action_at,
+        v_actor_slot_number,
+        v_actor_auth_user_id,
+        v_actor_slot_label,
+        v_actor_login,
+        v_correlation_id
+      );
+    else
+      insert into public.facturation_action_history (
+        entity_type,
+        entity_id,
+        action_type,
+        section_code,
+        reason,
+        before_data,
+        after_data,
+        occurred_at,
+        actor_slot_number,
+        actor_auth_user_id_snapshot,
+        actor_slot_label_snapshot,
+        actor_login_snapshot,
+        correlation_id
+      )
+      values (
+        'payment_operation',
+        v_operation_id,
+        'payment_operation.reused_by_first_payment_correction',
+        'first_payment',
+        pg_catalog.btrim(p_reason),
+        pg_catalog.jsonb_build_object(
+          'receipt_id', p_receipt_id,
+          'allocated_total_dh', v_allocated_before_dh,
+          'operation_remaining_dh', v_remaining_before_dh
+        ),
+        pg_catalog.jsonb_build_object(
+          'receipt_id', p_receipt_id,
+          'receipt_payment_id', v_payment_id,
+          'payment_amount_dh', p_new_amount_dh,
+          'allocated_total_dh', v_allocated_after_dh,
+          'operation_remaining_dh', v_remaining_after_dh
+        ),
+        v_action_at,
+        v_actor_slot_number,
+        v_actor_auth_user_id,
+        v_actor_slot_label,
+        v_actor_login,
+        v_correlation_id
+      );
+    end if;
   end if;
 
   if v_over_allocation then
@@ -698,7 +827,7 @@ begin
       pg_catalog.jsonb_build_object(
         'receipt_id', p_receipt_id,
         'receipt_payment_id', v_payment_id,
-        'payment_amount_dh', v_payment_amount_dh,
+        'payment_amount_dh', p_new_amount_dh,
         'allocated_total_dh', v_allocated_after_dh,
         'operation_remaining_dh', v_remaining_after_dh,
         'confirmed', true
@@ -721,6 +850,7 @@ begin
     v_operation_mode,
     v_operation_usage,
     v_payment_amount_dh,
+    p_new_amount_dh,
     v_total_paid_dh,
     v_receipt_remaining_dh,
     v_allocated_after_dh,
@@ -732,6 +862,7 @@ $$;
 comment on function public.correct_billing_receipt_first_payment_method(
   uuid,
   text,
+  integer,
   text,
   text,
   uuid,
@@ -742,11 +873,12 @@ comment on function public.correct_billing_receipt_first_payment_method(
   text,
   boolean
 ) is
-  'Atomically corrects only the payment method and operation linked to payment number 1. The payment amount is not accepted as input and never changes. The previous operation and evidence remain stored, and complete before/after snapshots are appended to the Facturation history.';
+  'Corrects the method/operation and, for an administrator only, the amount of payment number 1 (reprise.md §5.9). Method and amount can change independently; an already-used operation keeps its own total amount and payer locked (§5.8) when only the payment amount changes. Overpayment or shortfall resulting from an amount correction is never blocked, only visible at read time (§5.11). The previous operation and evidence remain stored, and complete before/after snapshots are appended to the Facturation history. NOT YET DEPLOYED — awaiting explicit sponsor validation before a real push.';
 
 revoke execute on function public.correct_billing_receipt_first_payment_method(
   uuid,
   text,
+  integer,
   text,
   text,
   uuid,
@@ -761,6 +893,7 @@ revoke execute on function public.correct_billing_receipt_first_payment_method(
 grant execute on function public.correct_billing_receipt_first_payment_method(
   uuid,
   text,
+  integer,
   text,
   text,
   uuid,
@@ -774,5 +907,5 @@ grant execute on function public.correct_billing_receipt_first_payment_method(
 
 -- list_reusable_payment_operations a été extraite dans
 -- 202608030003_extract_list_reusable_payment_operations.sql : elle n'a
--- aucun rapport avec la non-conformité ci-dessus (fusion.md §4.2) et doit
--- pouvoir être déployée sans attendre la reprise de cette fonction.
+-- aucun rapport avec cette reprise et doit pouvoir être déployée
+-- indépendamment.
