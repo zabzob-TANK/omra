@@ -101,7 +101,12 @@ interface Proprietes {
   onRechercheNumero: (valeur: string) => void
   onAfficherAnnules: (valeur: boolean) => void
   onNouveauRecu: () => void
-  onNouveauVersement: (numero?: string) => void
+  /**
+   * reprise.md §5.3 — depuis une ligne, on transmet l'identifiant réel du
+   * reçu (jamais son numéro seul, qui n'est pas unique toutes saisons
+   * confondues). Sans argument : recherche manuelle par numéro (bouton du haut).
+   */
+  onNouveauVersement: (recuId?: string) => void
   onOuvrirDetail: (recu: Recu) => void
   onOuvrirRecu: (recu: Recu) => void
   onAnnuler: (recu: Recu) => void
@@ -365,7 +370,7 @@ export function EcranRegistre({
                             className="omra-row-btn accent"
                             title={T.registre.actionDfp}
                             disabled={versementImpossible}
-                            onClick={() => onNouveauVersement(String(recu.numero))}
+                            onClick={() => onNouveauVersement(recu.id)}
                           >
                             <IconeAction chemins={ICONE_PLUS} />
                           </button>

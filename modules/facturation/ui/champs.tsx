@@ -67,6 +67,8 @@ interface ProprietesSaisie {
    * enregistré ne doit être proposé ni réinjecté dans l'application.
    */
   autoComplete?: string
+  /** Verrouillé — affiché mais non modifiable (ex. reçu ciblé depuis une ligne). */
+  desactive?: boolean
 }
 
 export function Saisie({
@@ -80,6 +82,7 @@ export function Saisie({
   inputMode,
   classe,
   autoComplete,
+  desactive,
 }: ProprietesSaisie) {
   return (
     <input
@@ -92,6 +95,7 @@ export function Saisie({
       inputMode={inputMode}
       autoComplete={autoComplete ?? (type === 'password' ? 'new-password' : undefined)}
       onChange={(evenement) => onChange(evenement.target.value)}
+      disabled={desactive}
     />
   )
 }

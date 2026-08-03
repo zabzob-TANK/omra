@@ -116,6 +116,11 @@ export interface FiltreRecus {
   numero?: string
   /** Prototype : `showCx` — inclure les reçus annulés. */
   inclureAnnules?: boolean
+  /**
+   * reprise.md §5.3 — un écran ne mélange jamais les saisons. Omis, la liste
+   * porte sur toutes les saisons ; fourni, elle se limite à celle-ci.
+   */
+  saisonId?: string
 }
 
 /**
@@ -129,7 +134,13 @@ export type CreationRecu = DonneesCreationRecu
 export interface RecusPort {
   lister(filtre?: FiltreRecus): Promise<Recu[]>
   parId(id: string): Promise<Recu | null>
-  parNumero(numero: number): Promise<Recu | null>
+  /**
+   * reprise.md §5.3 — l'unicité réelle d'un reçu est saison + numéro, jamais
+   * le numéro seul : deux saisons peuvent chacune porter un reçu n°1.
+   * `saisonId` fourni, l'implémentation limite la recherche à cette saison et
+   * refuse (renvoie `null`) plutôt que de deviner en cas d'ambiguïté.
+   */
+  parNumero(numero: number, saisonId?: string): Promise<Recu | null>
   /**
    * R-11 — Réserve et renvoie le prochain numéro de reçu.
    * L'implémentation doit garantir l'unicité même en accès concurrent.

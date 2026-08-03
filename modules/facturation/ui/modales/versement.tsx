@@ -45,7 +45,12 @@ function libelleNature(valeur: string): string {
 interface Proprietes {
   recus: Recu[]
   operations: OperationPartagee[]
-  numeroInitial?: string
+  /**
+   * reprise.md §5.3 — identifiant du reçu, verrouillé quand la fenêtre
+   * s'ouvre depuis une ligne précise du registre. Le numéro seul ne suffit
+   * jamais à désigner un reçu : deux saisons peuvent chacune en porter un n°1.
+   */
+  recuVerrouilleId?: string
   onFermer: () => void
   onEnregistrer: (
     saisie: SaisieVersement,
@@ -60,13 +65,17 @@ interface Proprietes {
 export function ModaleVersement({
   recus,
   operations,
-  numeroInitial = '',
+  recuVerrouilleId,
   onFermer,
   onEnregistrer,
   imagesOperations,
 }: Proprietes) {
+  const recuVerrouille = recuVerrouilleId
+    ? (recus.find((r) => r.id === recuVerrouilleId) ?? null)
+    : null
   const [saisie, setSaisie] = useState<SaisieVersement>({
-    numeroRecu: numeroInitial,
+    numeroRecu: recuVerrouille ? String(recuVerrouille.numero) : '',
+    recuId: recuVerrouilleId,
     montant: '',
     instrument: instrumentVierge(),
   })
@@ -81,9 +90,11 @@ export function ModaleVersement({
   const modifier = (patch: Partial<SaisieVersement>) => setSaisie({ ...saisie, ...patch })
 
   const numero = Number(saisie.numeroRecu)
-  const recu = saisie.numeroRecu.trim()
-    ? (recus.find((r) => r.numero === numero) ?? null)
-    : null
+  const recu = saisie.recuId
+    ? recuVerrouille
+    : saisie.numeroRecu.trim()
+      ? (recus.find((r) => r.numero === numero) ?? null)
+      : null
   const refus = saisie.numeroRecu.trim() ? motifRefusVersement(recu) : null
   const utilisable = Boolean(recu) && !refus
 
@@ -173,13 +184,14 @@ export function ModaleVersement({
       <ListeErreurs erreurs={erreurs} />
 
       <div className="omra-fields">
-        <Champ label={T.versement.numeroRecu} aide={T.versement.aideNumero}>
+        <Champ label={T.versement.numeroRecu} aide={recuVerrouilleId ? undefined : T.versement.aideNumero}>
           <Saisie
             valeur={saisie.numeroRecu}
             onChange={(v) => modifier({ numeroRecu: v.replace(/\D/g, '') })}
             invalide={enErreur(erreurs, 'numeroRecu')}
             placeholder={T.nouveau.gabaritNumeroRecu}
             classe="numero-recu"
+            desactive={Boolean(recuVerrouilleId)}
             mono
             inputMode="numeric"
           />

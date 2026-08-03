@@ -31,6 +31,13 @@ import { depasseLeRestant } from './shared-payment'
 export interface SaisieVersement {
   /** Numéro du reçu, saisi en chiffres. */
   numeroRecu: string
+  /**
+   * reprise.md §5.3 — identifiant réel du reçu, verrouillé quand la fenêtre
+   * s'ouvre depuis une ligne du registre. `numeroRecu` reste renseigné (pour
+   * l'affichage et la validation « obligatoire ») mais la résolution du reçu
+   * se fait par cet identifiant, jamais par le numéro seul, quand il est fourni.
+   */
+  recuId?: string
   /** Montant saisi en dirhams. */
   montant: string
   instrument: SaisieInstrument

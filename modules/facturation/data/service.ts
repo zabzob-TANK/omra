@@ -177,7 +177,8 @@ export async function chargerEtat(): Promise<EtatFacturation> {
     source.referentiels.chambres(),
     source.referentiels.rabatteurs(),
     source.referentiels.tarifs(saison.id),
-    source.recus.lister({ inclureAnnules: true }),
+    // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+    source.recus.lister({ inclureAnnules: true, saisonId: saison.id }),
     source.operationsPartagees.lister(),
     source.audit.lister(200),
   ])
@@ -313,8 +314,17 @@ export async function ajouterVersement(
   const source = sourceDonnees()
   const base = await contexteCommun(source)
 
+  // reprise.md §5.3 — un clic « ajouter un paiement » sur une ligne du registre
+  // transmet et verrouille `recuId` : l'identifiant réel du reçu tranche, le
+  // numéro seul ne suffit pas puisque deux saisons peuvent chacune porter un
+  // reçu n°1. La recherche manuelle par numéro (bouton du haut) reste limitée
+  // à la saison active.
   const numero = Number(saisie.numeroRecu)
-  const recu = Number.isFinite(numero) ? await source.recus.parNumero(numero) : null
+  const recu = saisie.recuId
+    ? await source.recus.parId(saisie.recuId)
+    : Number.isFinite(numero)
+      ? await source.recus.parNumero(numero, base.saison.id)
+      : null
 
   const resultat = preparerVersement(saisie, recu, {
     operations: base.operations,

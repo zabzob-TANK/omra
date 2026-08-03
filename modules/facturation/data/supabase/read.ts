@@ -47,6 +47,8 @@ async function listerLignesRecus(filtre?: FiltreRecus): Promise<BillingReceiptRo
     const resultat = await supabase.rpc('list_billing_receipts', {
       p_search_text: texteRecherche,
       p_lifecycle_status: statutCycleVie,
+      // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+      p_season_id: filtre?.saisonId ?? null,
       p_limit: TAILLE_PAGE,
       p_offset: offset,
     })
@@ -135,12 +137,17 @@ export async function recuParId(id: string): Promise<Recu | null> {
  * Aucune RPC n'accepte un numéro de reçu exact : on passe par la recherche
  * texte de `list_billing_receipts`, filtrée exactement côté client, puis on
  * charge le détail du reçu trouvé.
+ *
+ * reprise.md §5.3 — l'unicité réelle d'un reçu est saison + numéro, jamais le
+ * numéro seul. `saisonId` fourni, la recherche s'y limite ; si plus d'une
+ * correspondance survit malgré tout, on refuse (`null`) plutôt que de deviner
+ * en prenant la première trouvée.
  */
-export async function recuParNumero(numero: number): Promise<Recu | null> {
-  const lignes = await listerLignesRecus({ numero: String(numero) })
-  const ligne = lignes.find((candidate) => candidate.receipt_number === numero)
-  if (!ligne) return null
-  return chargerRecuParId(ligne.receipt_id)
+export async function recuParNumero(numero: number, saisonId?: string): Promise<Recu | null> {
+  const lignes = await listerLignesRecus({ numero: String(numero), saisonId })
+  const correspondances = lignes.filter((candidate) => candidate.receipt_number === numero)
+  if (correspondances.length !== 1) return null
+  return chargerRecuParId(correspondances[0].receipt_id)
 }
 
 /**

@@ -228,6 +228,8 @@ export function creerSourceDemonstration(
       return trouve ? copier(trouve) : null
     },
     async parNumero(numero) {
+      // Démonstration : une seule saison (`SAISON_DEMO`), donc aucune
+      // ambiguïté possible — `saisonId` n'a rien à filtrer ici.
       const trouve = recus.find((r) => r.numero === numero)
       return trouve ? copier(trouve) : null
     },

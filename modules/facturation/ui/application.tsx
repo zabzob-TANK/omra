@@ -84,7 +84,7 @@ type Ecran =
 type Fenetre =
   | { type: 'aucune' }
   | { type: 'nouveau' }
-  | { type: 'versement'; numero?: string }
+  | { type: 'versement'; recuId?: string }
   | { type: 'annulation'; recuId: string }
   | { type: 'modification'; recuId: string }
   | { type: 'detail'; recuId: string }
@@ -500,7 +500,7 @@ export function ApplicationFacturation({
           onRechercheNumero={setRechercheNumero}
           onAfficherAnnules={setAfficherAnnules}
           onNouveauRecu={() => setFenetre({ type: 'nouveau' })}
-          onNouveauVersement={(numero) => setFenetre({ type: 'versement', numero })}
+          onNouveauVersement={(recuId) => setFenetre({ type: 'versement', recuId })}
           onOuvrirDetail={(recu) => setFenetre({ type: 'detail', recuId: recu.id })}
           onOuvrirRecu={(recu) => setEcran({ nom: 'recu', recuId: recu.id })}
           onAnnuler={(recu) => setFenetre({ type: 'annulation', recuId: recu.id })}
@@ -678,7 +678,7 @@ export function ApplicationFacturation({
           recus={etat.recus}
           operations={etat.operations}
           imagesOperations={etat.imagesOperations}
-          numeroInitial={fenetre.numero}
+          recuVerrouilleId={fenetre.recuId}
           onFermer={fermer}
           onEnregistrer={async (saisie, confirme, image) => {
             const resultat = await actions.ajouterVersement(saisie, confirme)
