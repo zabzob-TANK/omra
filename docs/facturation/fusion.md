@@ -276,7 +276,7 @@ au moment de l'écriture, jamais recalculées — et lues telles quelles par
 supprimée de `mappers.ts`.
 
 **2. Migration `202608020004` scindée.** `list_reusable_payment_operations`
-est extraite dans `202608030002_extract_list_reusable_payment_operations.sql`,
+est extraite dans `202608030003_extract_list_reusable_payment_operations.sql`,
 déployable seule. `correct_billing_receipt_first_payment_method` reste dans
 `202608020004`, toujours non conforme à §4.2 (montant immuable pour tous), et
 sa reprise reste prévue à l'étape 8 du plan d'exécution — pas avant.
@@ -302,3 +302,22 @@ posteriori.** Le plafond `min(total payé, convenu)` de §4.1 gouverne les
 **futures** annulations, pas la relecture d'un enregistrement déjà survenu :
 la lecture rapporte ce qui s'est réellement passé, elle ne corrige jamais un
 fait passé.
+
+### Déploiement du 2026-08-03 — migrations de lecture seules
+
+`supabase db push` n'a pas de mode sélectif : il applique dans l'ordre du nom
+de fichier toutes les migrations locales postérieures à la dernière migration
+distante (`202608020002`). `202608020003` et `202608020004` étant numérotées
+avant `202608030001-3` et jamais déployées, elles seraient entrées dans le
+même lot sans intervention — alors que `202608020004` est explicitement non
+conforme (§4.2) et que `202608020003` n'a pas été revue dans ce travail.
+
+Les deux fichiers ont donc été déplacés hors de `supabase/migrations/`, vers
+`supabase/migrations-en-attente/` (non scanné par la CLI), conservés dans le
+dépôt sans être perdus. Ils **ne reviennent pas** dans `supabase/migrations/`
+après ce déploiement : `202608020003` reviendra avec le lot du journal
+financier et de l'impression (étape 9) ; `202608020004` reviendra réécrite à
+l'étape 8. Détail dans `supabase/migrations-en-attente/README.md`.
+
+Seules `202608030001`, `202608030002` et `202608030003` sont déployées à
+cette occasion.
