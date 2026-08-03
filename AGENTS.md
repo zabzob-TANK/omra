@@ -51,3 +51,8 @@
 - `lib/supabase.ts`.
 - La branche de sauvegarde.
 - La branche `integration-administration`.
+
+# Module Facturation
+
+Avant de modifier la facturation, lire docs/facturation/reprise.md.
+Il porte les règles métier confirmées et fait foi.
