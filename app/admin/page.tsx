@@ -5,7 +5,6 @@ import {
   Users,
   CalendarRange,
   ReceiptText,
-  FileText,
   ListChecks,
   ArrowRight,
   Lock,
@@ -37,16 +36,10 @@ const items: Item[] = [
   },
   {
     title: 'Modifier un reçu',
-    description: 'Édition des reçus déjà émis.',
+    description: 'Édition des reçus déjà émis, sans les restrictions de la Facturation.',
     icon: ReceiptText,
     disabled: true,
     badge: 'Bientôt disponible',
-  },
-  {
-    title: 'Accéder à la facturation',
-    description: 'Émission et suivi des factures.',
-    href: '/admin/facturation',
-    icon: FileText,
   },
   {
     title: 'Statistiques / Liste générale',
