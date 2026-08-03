@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Omra Facturation — aperçu local",
+      "type": "editor-browser",
+      "request": "launch",
+      "url": "http://127.0.0.1:3001/facturation",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Omra Facturation — serveur local 3001"
+    }
+  ]
+}

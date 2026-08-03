@@ -1,15 +1,15 @@
 import { redirect } from 'next/navigation'
-import { requireAdministrator } from '@/lib/admin-guard'
+import { requireActiveAccount } from '@/lib/admin-guard'
 
 export default async function Home() {
-  let isAdministrator = false
+  let destination: '/admin' | '/facturation' | '/login' = '/login'
 
   try {
-    await requireAdministrator()
-    isAdministrator = true
+    const account = await requireActiveAccount()
+    destination = account.slot_number === 1 ? '/admin' : '/facturation'
   } catch {
     // Unauthenticated users are sent to the login page.
   }
 
-  redirect(isAdministrator ? '/admin' : '/login')
+  redirect(destination)
 }

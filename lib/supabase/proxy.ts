@@ -1,10 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isTestAdmin } from '@/lib/auth'
-import {
-  createAdminClient,
-  hasServiceRoleKey,
-} from '@/lib/supabase/admin'
+import { findActiveAccountByAuthUserId } from '@/lib/account-access'
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -37,44 +33,48 @@ export async function updateSession(request: NextRequest) {
   const isAdminPath =
     request.nextUrl.pathname === '/admin' ||
     request.nextUrl.pathname.startsWith('/admin/')
+  const isBillingPath =
+    request.nextUrl.pathname === '/facturation' ||
+    request.nextUrl.pathname.startsWith('/facturation/')
+  const isLoginPath = request.nextUrl.pathname === '/login'
 
-  if (!isAdminPath) {
+  if (!isAdminPath && !isBillingPath && !isLoginPath) {
     return response
   }
 
   if (error || !data.user) {
+    if (isLoginPath) {
+      return response
+    }
+
     isRedirectResponse = true
     response = NextResponse.redirect(new URL('/login', request.url))
     await supabase.auth.signOut()
     return response
   }
 
-  if (isTestAdmin(data.user)) {
+  let account = null
+
+  try {
+    account = await findActiveAccountByAuthUserId(data.user.id)
+  } catch {
+    // Protected routes fail closed when account resolution is unavailable.
+  }
+
+  if (!account) {
+    isRedirectResponse = true
+    response = NextResponse.redirect(new URL('/login?error=acces', request.url))
+    await supabase.auth.signOut()
     return response
   }
 
-  let isActiveSlotAdministrator = false
-
-  if (hasServiceRoleKey()) {
-    const admin = createAdminClient()
-    const { data: slot, error: slotError } = await admin
-      .from('account_slots')
-      .select('slot_number')
-      .eq('slot_number', 1)
-      .eq('auth_user_id', data.user.id)
-      .eq('active', true)
-      .maybeSingle()
-
-    isActiveSlotAdministrator = !slotError && Boolean(slot)
-  }
-
-  if (isActiveSlotAdministrator) {
+  if (isLoginPath) {
     return response
   }
 
-  isRedirectResponse = true
-  response = NextResponse.redirect(new URL('/login?error=acces', request.url))
-  await supabase.auth.signOut()
+  if (isAdminPath && account.slot_number !== 1) {
+    return NextResponse.redirect(new URL('/facturation', request.url))
+  }
 
   return response
 }

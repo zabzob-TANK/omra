@@ -25,3 +25,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright mcp — logs, snapshots et captures de session de test
+/.playwright-mcp/
+
+# captures d'écran ad hoc, jamais destinées au dépôt
+/omra-premier-test.png

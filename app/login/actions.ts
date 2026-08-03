@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { isTestAdmin } from '@/lib/auth'
+import { findActiveAccountByAuthUserId } from '@/lib/account-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -19,46 +19,33 @@ export async function login(formData: FormData) {
   }
 
   const identifier = identifierValue.trim().toLowerCase()
-  const fallbackAdminEmail = process.env.OMRA_TEST_ADMIN_EMAIL
-    ?.trim()
-    .toLowerCase()
-  let email: string
-  let expectedAuthUserId: string | null = null
+  const admin = createAdminClient()
+  const { data: slot, error: slotError } = await admin
+    .from('account_slots')
+    .select('slot_number, login, auth_user_id')
+    .eq('login', identifier)
+    .eq('active', true)
+    .single()
 
-  if (fallbackAdminEmail && identifier === fallbackAdminEmail) {
-    email = fallbackAdminEmail
-  } else {
-    const admin = createAdminClient()
-    const { data: slot, error: slotError } = await admin
-      .from('account_slots')
-      .select('login, auth_user_id, active')
-      .eq('slot_number', 1)
-      .single()
+  if (
+    slotError ||
+    !slot ||
+    !slot.auth_user_id ||
+    slot.login !== identifier
+  ) {
+    redirect('/login?error=identifiants')
+  }
 
-    if (
-      slotError ||
-      !slot ||
-      slot.login?.trim().toLowerCase() !== identifier ||
-      !slot.auth_user_id ||
-      !slot.active
-    ) {
-      redirect('/login?error=identifiants')
-    }
+  const { data: authUser, error: authUserError } =
+    await admin.auth.admin.getUserById(slot.auth_user_id)
 
-    const { data: authUser, error: authUserError } =
-      await admin.auth.admin.getUserById(slot.auth_user_id)
-
-    if (authUserError || !authUser.user?.email) {
-      redirect('/login?error=identifiants')
-    }
-
-    email = authUser.user.email
-    expectedAuthUserId = slot.auth_user_id
+  if (authUserError || !authUser.user?.email) {
+    redirect('/login?error=identifiants')
   }
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: authUser.user.email,
     password,
   })
 
@@ -66,14 +53,18 @@ export async function login(formData: FormData) {
     redirect('/login?error=identifiants')
   }
 
-  const isFallbackAdmin = isTestAdmin(data.user)
-  const isSlotAdministrator =
-    expectedAuthUserId !== null && data.user.id === expectedAuthUserId
+  let account = null
 
-  if (!isFallbackAdmin && !isSlotAdministrator) {
+  try {
+    account = await findActiveAccountByAuthUserId(data.user.id)
+  } catch {
+    // Access fails closed when the active slot cannot be resolved server-side.
+  }
+
+  if (!account || account.auth_user_id !== slot.auth_user_id) {
     await supabase.auth.signOut()
     redirect('/login?error=acces')
   }
 
-  redirect('/admin')
+  redirect(account.slot_number === 1 ? '/admin' : '/facturation')
 }
