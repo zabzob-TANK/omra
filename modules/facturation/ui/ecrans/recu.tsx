@@ -22,6 +22,7 @@ import { T } from '../textes'
 import {
   classesAtelier,
   impressionBloquee,
+  MESSAGE_COMPTEUR_IMPRESSION_ECHEC,
   MESSAGE_IMPRESSION_BLOQUEE,
   preparerRecuImprimable,
   sequenceImpression,
@@ -94,7 +95,14 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
     }
     setMessage('')
     // P18 — le compteur doit être écrit avant l'ouverture de la boîte système.
-    await sequenceImpression(onImpression, () => window.print())
+    // Décision actée : un échec du compteur ne bloque jamais l'impression —
+    // `sequenceImpression` imprime dans tous les cas et relance l'erreur
+    // ensuite, qu'on affiche ici sans jamais l'avaler en silence.
+    try {
+      await sequenceImpression(onImpression, () => window.print())
+    } catch {
+      setMessage(MESSAGE_COMPTEUR_IMPRESSION_ECHEC)
+    }
   }
 
   const classes = classesAtelier({ sansFond, reperes })

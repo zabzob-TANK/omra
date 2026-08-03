@@ -147,6 +147,14 @@ export const MESSAGE_IMPRESSION_BLOQUEE =
   'Ce reçu contient plus de six paiements. L’impression est bloquée jusqu’à définition de la règle métier.'
 
 /**
+ * Le compteur d'impression n'a pas pu être enregistré, mais l'impression a
+ * quand même eu lieu (décision actée : ne jamais bloquer l'employé pour un
+ * échec de comptage).
+ */
+export const MESSAGE_COMPTEUR_IMPRESSION_ECHEC =
+  'Le compteur d’impression n’a pas pu être enregistré. Le reçu a été imprimé quand même.'
+
+/**
  * R-85 — Libellé du mode original ou copie.
  *
  * Le fichier de référence affiche « نسخة » pour une copie, complété du numéro
@@ -160,15 +168,26 @@ export function libelleCopie(recu: Recu, original: boolean): string {
 /**
  * P18 — Le compteur d'impression doit être écrit avant l'ouverture de la
  * boîte d'impression du système, jamais après : `enregistrer` est donc
- * attendu avant l'appel à `imprimer`. Si l'enregistrement échoue, `imprimer`
- * n'est pas appelé.
+ * lancé avant l'appel à `imprimer`.
+ *
+ * Décision actée : un échec du compteur ne bloque plus jamais l'impression
+ * elle-même (l'employé doit pouvoir remettre le reçu au client), mais
+ * l'erreur n'est jamais avalée en silence — `imprimer()` s'exécute dans tous
+ * les cas, puis l'erreur éventuelle est relancée pour que l'appelant
+ * l'affiche.
  */
 export async function sequenceImpression(
   enregistrer: () => Promise<void>,
   imprimer: () => void,
 ): Promise<void> {
-  await enregistrer()
+  let erreurEnregistrement: unknown = null
+  try {
+    await enregistrer()
+  } catch (erreur) {
+    erreurEnregistrement = erreur
+  }
   imprimer()
+  if (erreurEnregistrement) throw erreurEnregistrement
 }
 
 /**

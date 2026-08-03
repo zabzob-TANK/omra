@@ -234,11 +234,11 @@ describe('P18 — le compteur d’impression est écrit avant l’ouverture de l
     expect(ordre).toEqual(['enregistrer', 'imprimer'])
   })
 
-  it('n’imprime pas si l’enregistrement échoue', async () => {
+  it('imprime quand même si l’enregistrement échoue, puis relance l’erreur', async () => {
     const imprimer = vi.fn()
     const enregistrer = () => Promise.reject(new Error('échec'))
 
     await expect(sequenceImpression(enregistrer, imprimer)).rejects.toThrow('échec')
-    expect(imprimer).not.toHaveBeenCalled()
+    expect(imprimer).toHaveBeenCalledTimes(1)
   })
 })

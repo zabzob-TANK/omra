@@ -11,14 +11,18 @@ Déplacés le 2026-08-03, avant le déploiement des migrations de lecture
 qui aurait sinon entraîné leur application en même temps sans que ce soit
 voulu.
 
-## `202608020003_create_receipt_print_tracking.sql`
+## `202608020003_create_receipt_print_tracking.sql` — déployée le 2026-08-04
 
 Suivi des impressions (compteur incrémenté avant `window.print()`, R-84,
-`reprise.md` §5.12). N'a pas été revue dans le cadre du travail en cours.
-
-**Retour prévu** : avec le lot du journal financier et de l'impression
-(`fusion.md` §6, étape 9), une fois les tables et fonctions manquantes de
-`fusion.md` §5 conçues ensemble.
+`reprise.md` §5.12). Déplacée vers
+`supabase/migrations/202608040001_create_receipt_print_tracking.sql`, testée
+en `BEGIN...ROLLBACK` puis poussée sans modification de son contenu SQL.
+`incrementerImpressionsSupabase` (`modules/facturation/data/supabase/write.ts`)
+appelle désormais réellement `record_billing_receipt_print`. Le bouton
+« Imprimer » (`modules/facturation/ui/ecrans/recu.tsx`) n'est plus jamais
+bloqué par un échec de ce compteur — l'impression a toujours lieu, l'erreur
+éventuelle est affichée, jamais avalée (`sequenceImpression`,
+`modules/facturation/ui/recu/donnees.ts`).
 
 ## `202608020004_correct_first_payment_method.sql` — repris et déplacé le 2026-08-03
 

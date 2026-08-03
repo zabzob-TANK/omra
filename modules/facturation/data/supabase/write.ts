@@ -354,11 +354,20 @@ export async function corrigerPremierVersementSupabase(): Promise<Recu> {
   )
 }
 
-/** `RecusPort.incrementerImpressions` — indisponible tant que la migration 202608020003 n'est pas déployée. */
-export async function incrementerImpressionsSupabase(): Promise<number> {
-  throw new Error(
-    "Le compteur d'impressions n'est pas encore disponible côté omra : la migration 202608020003 (suivi des impressions) n'est pas déployée.",
-  )
+/**
+ * `RecusPort.incrementerImpressions` — R-84. Enregistre un événement
+ * d'impression via `record_billing_receipt_print` (migration
+ * `202608020003`) et renvoie le nouveau numéro d'impression.
+ */
+export async function incrementerImpressionsSupabase(recuId: string): Promise<number> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('record_billing_receipt_print', {
+    p_receipt_id: recuId,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const ligne = (resultat.data as { print_number: number }[] | null)?.[0]
+  if (!ligne) throw new Error("record_billing_receipt_print n'a renvoyé aucun événement.")
+  return ligne.print_number
 }
 
 /** `RecusPort.definirImagesPasseport` — hors périmètre du noyau omra (CLAUDE.md §8, reprise.md R-90). */
