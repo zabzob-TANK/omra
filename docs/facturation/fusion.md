@@ -750,3 +750,49 @@ explicite du commanditaire.
 `supabase db lint --linked` et `supabase db push --dry-run` (mêmes trois
 fichiers, même ordre) revérifiés après ce correctif, toujours conformes.
 **Toujours pas poussé.**
+
+---
+
+## 14. Décision actée — la correction du premier versement ne peut jamais créer de trop-perçu (2026-08-03)
+
+En réponse au point signalé au §13 (`202608030006` lisait `v_agreed_amount_dh`
+sans jamais l'utiliser pour plafonner `p_new_amount_dh`), le commanditaire
+tranche : **dans la Facturation, la correction du montant du premier
+versement ne peut jamais dépasser le prix du voyage (convenu).** Un vrai
+trop-perçu ne peut venir que d'un chèque ou virement **partagé confirmé**
+(dépassement explicitement confirmé, R-32) — jamais d'une correction du
+premier versement.
+
+**Corrigé dans `202608030006`** : `p_new_amount_dh > v_agreed_amount_dh`
+lève désormais `First payment amount cannot exceed the agreed amount`. Une
+baisse du montant reste possible et peut créer un reste dû, visible à la
+lecture, non bloqué (aucune règle ne l'interdit).
+
+Ce point diffère volontairement de `update_billing_receipt_commercial_data`,
+qui autorise un trop-perçu résultant d'un changement de programme faisant
+baisser le convenu sous un montant déjà encaissé (reprise.md §5.11,
+commentaire P13 de `edit-sections.ts` : « un nouveau convenu sous le montant
+déjà encaissé est autorisé »). Cette fonction-ci ne corrige que le montant
+d'un versement déjà enregistré, pas le prix du voyage lui-même — la
+plafonner au convenu est la lecture retenue de « ne jamais créer de
+trop-perçu par cette correction précise ».
+
+**Observation, non demandée, notée pour mémoire** : `update_billing_receipt_commercial_data`
+reste donc une seconde source légitime de trop-perçu sur un reçu (en plus
+du chèque partagé sur-alloué), déjà déployée et non modifiée par cette
+session — la formulation « un vrai trop-perçu ne peut venir que d'un chèque
+partagé confirmé » décrit l'intention pour la correction du premier
+versement, pas une garantie valable pour l'ensemble du backend. Aucune
+action demandée ni prise sur ce point.
+
+**Vérifié dans une transaction terminée par `ROLLBACK`** (les trois
+migrations à jour appliquées ensemble) :
+1. correction à un montant strictement supérieur au convenu : refusée,
+   message attendu ;
+2. correction à un montant exactement égal au convenu : acceptée ;
+3. correction à un montant inférieur au convenu (reste dû qui en résulte,
+   non bloqué) : acceptée.
+
+`supabase db lint --linked` et `supabase db push --dry-run` revérifiés une
+dernière fois : mêmes trois fichiers, même ordre, rien de nouveau. **Push
+réel exécuté à la suite de cette vérification — voir §15.**

@@ -25,11 +25,21 @@
 -- opération partagée déjà utilisée exige une confirmation, comme pour tout
 -- autre versement (R-32).
 --
--- Le trop-perçu résultant d'une baisse du montant, ou l'insuffisance
--- résultant d'une hausse, ne sont jamais bloqués ici : reprise.md §5.11 est
--- explicite — le trop-perçu n'est jamais un refus, seulement une anomalie
--- visible, calculée à la lecture depuis les paiements stockés (même principe
--- déjà appliqué à la correction commerciale, `update_billing_receipt_commercial_data`).
+-- CORRECTIF 2026-08-03 (avant push) : décision actée par le commanditaire —
+-- cette correction ne peut JAMAIS créer de trop-perçu. `p_new_amount_dh` est
+-- plafonné à `v_agreed_amount_dh` (déjà lu par la fonction) ; au-delà, une
+-- erreur claire est levée. Un vrai trop-perçu ne peut venir que d'un chèque
+-- ou virement partagé confirmé (dépassement explicitement confirmé, R-32),
+-- jamais d'une correction du premier versement. Ce point diffère de
+-- `update_billing_receipt_commercial_data`, qui autorise un trop-perçu
+-- résultant d'un changement de programme (reprise.md §5.11 s'y applique
+-- pleinement) : la présente fonction ne corrige que le montant d'un
+-- versement déjà enregistré, pas le prix du voyage lui-même — le plafonner
+-- au convenu est donc la lecture retenue de « ne jamais créer de trop-perçu
+-- par une correction ». Voir fusion.md §14.
+--
+-- Une baisse du montant peut en revanche créer un reste dû : ce n'est pas
+-- bloqué, seulement visible à la lecture (aucune règle ne l'interdit).
 --
 -- L'instantané figé du premier versement (`payment_snapshot_*`, R-14/§5.7)
 -- n'est jamais réécrit par cette correction, y compris son
@@ -46,8 +56,8 @@
 -- en a été extraite (202608030003_extract_list_reusable_payment_operations.sql)
 -- et n'est pas concernée par cette reprise.
 --
--- NE PAS DÉPLOYER SANS VALIDATION EXPLICITE DU COMMANDITAIRE (voir
--- fusion.md §12) : préparée et testée en BEGIN...ROLLBACK, jamais poussée.
+-- Préparée et testée en BEGIN...ROLLBACK avant push (fusion.md §12, §14),
+-- avec validation explicite du commanditaire sur le plafonnement au convenu.
 
 create or replace function public.correct_billing_receipt_first_payment_method(
   p_receipt_id uuid,
@@ -191,6 +201,15 @@ begin
   -- valeur transmise (y compris la valeur inchangée) ne requiert pas ce rôle.
   if p_new_amount_dh is null or p_new_amount_dh <= 0 then
     raise exception 'First payment amount must be positive';
+  end if;
+
+  -- Décision actée le 2026-08-03 : cette correction ne peut jamais créer de
+  -- trop-perçu. Le premier versement corrigé ne peut jamais dépasser le prix
+  -- du voyage (convenu) — un vrai trop-perçu ne peut venir que d'un chèque ou
+  -- virement partagé confirmé (dépassement explicitement confirmé, R-32),
+  -- jamais d'une correction. Voir fusion.md §14.
+  if p_new_amount_dh > v_agreed_amount_dh then
+    raise exception 'First payment amount cannot exceed the agreed amount';
   end if;
 
   v_amount_changed := p_new_amount_dh <> v_payment_amount_dh;
@@ -579,9 +598,10 @@ begin
   from public.receipt_payments as payment
   where payment.receipt_id = p_receipt_id;
 
-  -- §5.11 — un trop-perçu ou un reste dû résultant de cette correction n'est
-  -- jamais un refus, seulement une anomalie visible à la lecture (même
-  -- principe que update_billing_receipt_commercial_data).
+  -- Un reste dû résultant d'une baisse du montant n'est jamais un refus,
+  -- seulement une anomalie visible à la lecture — mais un trop-perçu ne peut
+  -- plus survenir ici : p_new_amount_dh est plafonné à v_agreed_amount_dh
+  -- plus haut (décision du 2026-08-03, fusion.md §14).
   v_receipt_remaining_dh := case
     when v_agreed_amount_dh::bigint > v_total_paid_dh
       then v_agreed_amount_dh::bigint - v_total_paid_dh
@@ -873,7 +893,7 @@ comment on function public.correct_billing_receipt_first_payment_method(
   text,
   boolean
 ) is
-  'Corrects the method/operation and, for an administrator only, the amount of payment number 1 (reprise.md §5.9). Method and amount can change independently; an already-used operation keeps its own total amount and payer locked (§5.8) when only the payment amount changes. Overpayment or shortfall resulting from an amount correction is never blocked, only visible at read time (§5.11). The previous operation and evidence remain stored, and complete before/after snapshots are appended to the Facturation history. NOT YET DEPLOYED — awaiting explicit sponsor validation before a real push.';
+  'Corrects the method/operation and, for an administrator only, the amount of payment number 1 (reprise.md §5.9). Method and amount can change independently; an already-used operation keeps its own total amount and payer locked (§5.8) when only the payment amount changes. The corrected amount can never exceed the agreed amount — this correction must never create an overpayment; a genuine overpayment can only come from a confirmed shared cheque/transfer over-allocation (R-32), never from this correction. A shortfall resulting from a decrease is not blocked, only visible at read time. The previous operation and evidence remain stored, and complete before/after snapshots are appended to the Facturation history.';
 
 revoke execute on function public.correct_billing_receipt_first_payment_method(
   uuid,
