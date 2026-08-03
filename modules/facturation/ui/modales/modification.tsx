@@ -462,7 +462,11 @@ export function ModaleModification({
                   </>
                 ) : null}
 
-                <p className="omra-hint">{T.modification.noteFirstPayment}</p>
+                <p className="omra-hint">
+                  {estAdministrateur
+                    ? T.modification.noteFirstPaymentAdministrateur
+                    : T.modification.noteFirstPayment}
+                </p>
               </>
             ) : null}
           </div>

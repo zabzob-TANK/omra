@@ -481,6 +481,9 @@ export const T = {
       'بيانات العملية المشتركة تعدّل من سجل المدفوعات والتحويلات، وليس من الوصل.',
     noteFirstPayment:
       'هذا التعديل يخص طريقة وبيانات الدفعة الأولى فقط. مبلغها والدفعات التالية لا تتغير.',
+    /** §5.9 — pour l'administrateur, le montant est corrigeable depuis cette même section. */
+    noteFirstPaymentAdministrateur:
+      'بصفتك مديرًا، يمكنك تصحيح مبلغ الدفعة الأولى أعلاه إضافة إلى طريقتها وبياناتها. الدفعات التالية لا تتغير.',
   },
 
   /** Bande « passeport lié » du formulaire de création. */
