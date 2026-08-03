@@ -75,10 +75,10 @@ bascule vers un jeu de démonstration.
 
 ## 2. La décision structurante
 
-Les deux côtés ont une interface de facturation. Il faut choisir.
+Les deux côtés ont une interface de facturation. Il fallait choisir.
 
-**Recommandation : l'interface du prototype l'emporte, le backend d'`omra`
-l'emporte.**
+**Décision actée par le commanditaire : l'interface du prototype remplace
+`BillingDashboard`, le backend d'`omra` l'emporte.**
 
 Raisons :
 
@@ -95,8 +95,8 @@ Ce qui signifie concrètement : `BillingDashboard` et ses composants sont
 `types.ts`, `read-server.ts`, `reference-server.ts` — sert de base à
 l'adaptateur.
 
-> Décision à confirmer par le commanditaire avant exécution. C'est la seule
-> qui engage vraiment ; tout le reste en découle.
+> Décision actée le 2026-08-03. C'était la seule qui engageait vraiment ;
+> tout le reste en découle.
 
 ---
 
