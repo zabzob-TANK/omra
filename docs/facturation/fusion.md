@@ -699,3 +699,54 @@ exactement les trois fichiers des étapes 7 et 8, dans cet ordre :
 Le vrai push distant attend la validation du commanditaire à son retour, pour
 les trois migrations à la fois (elles se suivent et n'ont de sens que
 poussées ensemble, dans cet ordre).
+
+---
+
+## 13. Correction avant push — le plafond de remboursement ignorait le trop-perçu (2026-08-03)
+
+**Bug trouvé par le commanditaire en relisant `202608030004` avant de valider
+le push**, pas par les tests de cette session : le plafond utilisait
+`v_total_paid_dh` seul (`p_cash_outflow_amount_dh <> 0 and <> v_total_paid_dh`)
+au lieu de `min(total payé, convenu)` (reprise.md §5.10-§5.11). Sur un reçu en
+situation de trop-perçu (exemple donné : convenu 20000, payé 22000), la
+fonction acceptait un remboursement de 22000 — remboursant le trop-perçu, à
+l'exact opposé de la règle, qui l'interdit explicitement. Mes tests de
+l'étape 7 ne portaient que sur des reçus soldés exactement (payé = convenu),
+un angle mort qui ne pouvait pas révéler ce problème.
+
+**Corrigé dans `202608030004`** : nouvelle variable `v_cap := least(v_total_paid_dh,
+v_agreed_amount_dh)` (le convenu était déjà lu par la fonction). La validation
+et le mouvement de caisse (`cash_register_movements`, désormais alimenté par
+`v_cap` directement plutôt que par le paramètre d'entrée, par défense
+supplémentaire) portent sur `v_cap`, jamais sur le total payé brut. Le
+« montant annulé » (`cancelled_amount_dh`, `receipt_cancellations.total_paid_at_cancellation_dh`)
+reste le total réellement payé, non plafonné — CLAUDE.md distingue
+explicitement ce montant de bibliothèque de la sortie de caisse réelle, et
+seule cette dernière est concernée par le plafond.
+
+**Vérifié dans une transaction unique terminée par `ROLLBACK`**, avec un cas
+de trop-perçu réel construit via `correct_billing_receipt_first_payment_method`
+(convenu et payé réels de la grille tarifaire active, écart de 2000 DH) :
+1. rembourser l'intégralité du payé (le trop-perçu inclus) : refusé ;
+2. rembourser exactement le convenu (le plafond correct) : accepté, avec
+   `cash_outflow_amount_dh = convenu` et `cancelled_amount_dh = payé` (les
+   deux valeurs restent distinctes, comme attendu) ;
+3. les trois cas déjà validés à l'étape 7 (partiel refusé, total normal
+   accepté sur un reçu soldé exactement, zéro accepté) : toujours corrects,
+   aucune régression.
+
+**Point signalé, non corrigé (hors périmètre de cette correction)** :
+`202608030006` lit `v_agreed_amount_dh` mais ne l'utilise jamais pour
+plafonner `p_new_amount_dh` — un administrateur peut donc fixer un premier
+versement corrigé strictement supérieur au convenu, créant un trop-perçu sans
+aucune borne. C'est d'ailleurs ce chemin qui a servi à construire le cas de
+test du trop-perçu ci-dessus, faute d'un autre moyen de le produire avec les
+RPC actuelles. Reste à trancher si c'est le comportement voulu (cohérent avec
+le principe général « le trop-perçu n'est jamais un refus, seulement une
+anomalie visible », déjà appliqué à `update_billing_receipt_commercial_data`)
+ou s'il faut y ajouter une borne — décision non prise ici, à la demande
+explicite du commanditaire.
+
+`supabase db lint --linked` et `supabase db push --dry-run` (mêmes trois
+fichiers, même ordre) revérifiés après ce correctif, toujours conformes.
+**Toujours pas poussé.**

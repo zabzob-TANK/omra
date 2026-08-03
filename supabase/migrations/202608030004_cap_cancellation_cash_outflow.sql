@@ -1,12 +1,22 @@
 -- fusion.md §4.1 / reprise.md §5.10-§5.11 : la sortie de caisse d'une
--- annulation doit valoir exactement soit la totalité déjà payée sur le reçu,
--- soit 0 DH. cancel_billing_receipt (202608010010) acceptait jusqu'ici toute
--- valeur intermédiaire fournie par l'appelant (seule bornée par
--- 0 <= p_cash_outflow_amount_dh <= total payé) : une sortie partielle était
--- donc techniquement possible, alors que reprise.md l'interdit explicitement.
--- L'adaptateur d'écriture (fusion.md §9, point 5) applique déjà ce plafond
--- côté application ; cette migration le rend impossible à contourner même par
--- un appel RPC direct.
+-- annulation doit valoir exactement soit `min(total payé, convenu)`, soit
+-- 0 DH — jamais le trop-perçu (exemple reprise.md : convenu 20000, payé
+-- 22000, remboursement 20000 au maximum, jamais 22000). cancel_billing_receipt
+-- (202608010010) acceptait jusqu'ici toute valeur intermédiaire fournie par
+-- l'appelant (seule bornée par 0 <= p_cash_outflow_amount_dh <= total payé) :
+-- une sortie partielle était donc techniquement possible, ET une sortie
+-- égale au total payé aurait à tort remboursé le trop-perçu sur un reçu en
+-- situation de trop-perçu. L'adaptateur d'écriture (fusion.md §9, point 5)
+-- applique déjà ce plafond correctement côté application (`Math.min`) ;
+-- cette migration le rend impossible à contourner même par un appel RPC
+-- direct, en calculant lui aussi `v_cap := least(total payé, convenu)`.
+--
+-- CORRECTIF 2026-08-03 (relecture avant push) : la première version de
+-- cette migration plafonnait par erreur sur `v_total_paid_dh` seul, sans le
+-- borner par `v_agreed_amount_dh` (déjà lu par ailleurs dans la fonction) —
+-- ce qui aurait remboursé l'intégralité du trop-perçu sur un reçu où le
+-- total payé dépasse le convenu, à l'exact opposé de la règle. Corrigé par
+-- l'introduction de `v_cap`, calculé une fois `v_total_paid_dh` connu.
 --
 -- RÉGRESSION, pas un bug d'origine (même histoire que 202608030005, voir son
 -- en-tête pour le détail complet). En écrivant cette migration à partir du
@@ -69,6 +79,7 @@ declare
   v_payment_count integer;
   v_total_paid_sum_dh bigint;
   v_total_paid_dh integer;
+  v_cap integer;
   v_restitution_route text;
   v_cancellation_id uuid;
   v_cancelled_at timestamptz := pg_catalog.transaction_timestamp();
@@ -163,10 +174,15 @@ begin
 
   v_total_paid_dh := v_total_paid_sum_dh::integer;
 
-  -- fusion.md §4.1 — plafond binaire : jamais de sortie partielle.
-  if p_cash_outflow_amount_dh <> 0 and p_cash_outflow_amount_dh <> v_total_paid_dh then
+  -- reprise.md §5.10-§5.11 — le trop-perçu n'est jamais restitué : le
+  -- plafond est le total payé, mais jamais plus que le convenu.
+  v_cap := least(v_total_paid_dh, v_agreed_amount_dh);
+
+  -- fusion.md §4.1 — plafond binaire : jamais de sortie partielle, et
+  -- jamais plus que v_cap (donc jamais le trop-perçu).
+  if p_cash_outflow_amount_dh <> 0 and p_cash_outflow_amount_dh <> v_cap then
     raise exception
-      'Cash outflow amount must be exactly zero or the full total paid';
+      'Cash outflow amount must be exactly zero or the capped total paid (min of total paid and agreed amount)';
   end if;
 
   v_restitution_route := case
@@ -210,8 +226,11 @@ begin
   end if;
 
   -- Ce mouvement enregistre la sortie de caisse réelle, désormais toujours
-  -- égale au total payé lorsqu'elle est positive (plus jamais partielle). Une
-  -- sortie nulle n'a pas de ligne de mouvement.
+  -- égale à v_cap (= min(total payé, convenu), jamais le trop-perçu) lorsqu'elle
+  -- est positive. Une sortie nulle n'a pas de ligne de mouvement. `v_cap` est
+  -- utilisé directement plutôt que `p_cash_outflow_amount_dh` par défense
+  -- supplémentaire : la validation ci-dessus garantit déjà leur égalité dans
+  -- ce cas, mais le mouvement de caisse ne doit jamais pouvoir s'en écarter.
   if p_cash_outflow_amount_dh > 0 then
     insert into public.cash_register_movements (
       cancellation_id,
@@ -227,7 +246,7 @@ begin
     values (
       v_cancellation_id,
       'cancellation_refund_outflow',
-      -p_cash_outflow_amount_dh,
+      -v_cap,
       v_cancelled_at,
       v_actor_slot_number,
       v_actor_auth_user_id,
@@ -308,4 +327,4 @@ end;
 $$;
 
 comment on function public.cancel_billing_receipt(uuid, text, integer) is
-  'Cancels one active receipt atomically without deleting or changing its payments, allocations, payment operations, instrument details, seasonal number or counter. The cancelled amount is calculated from stored receipt payments; the client supplies only the actual cash-register outflow, which must be exactly zero or the full total paid (reprise.md §5.10-§5.11) — no partial outflow is accepted. Actor fields come only from resolve_facturation_actor(). Stable history action: billing_receipt.cancelled. Fixed 2026-08-03: #variable_conflict use_column (plus an explicit qualification on the lifecycle_status WHERE check) resolves an ambiguity against the RETURNS TABLE lifecycle_status output column that made every call fail.';
+  'Cancels one active receipt atomically without deleting or changing its payments, allocations, payment operations, instrument details, seasonal number or counter. The cancelled amount is calculated from stored receipt payments; the client supplies only the actual cash-register outflow, which must be exactly zero or min(total paid, agreed amount) (reprise.md §5.10-§5.11) — an overpayment is never refunded, and no partial outflow is accepted either. Actor fields come only from resolve_facturation_actor(). Stable history action: billing_receipt.cancelled. Fixed 2026-08-03: #variable_conflict use_column (plus an explicit qualification on the lifecycle_status WHERE check) resolves an ambiguity against the RETURNS TABLE lifecycle_status output column that made every call fail. Fixed again 2026-08-03: the cap is min(total paid, agreed amount), not total paid alone — an overpaid receipt no longer refunds its overpayment.';
