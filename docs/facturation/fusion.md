@@ -504,6 +504,12 @@ Ces limites ne sont pas des faux succès : chaque appel échoue explicitement
 (identité/contact/programme/note) et l'**écran du reçu imprimable**
 fonctionnent pleinement sur les données réelles.
 
+⚠️ **Correction du 2026-08-03, postérieure à cette étape** : « nouveau reçu »
+et « versement » ne pouvaient en réalité **jamais** aboutir avant le correctif
+décrit au §11 — un bug déjà présent dans le backend déployé, découvert en
+testant l'étape 7. Voir §11 : la portée de ce paragraphe n'était donc exacte
+qu'après ce correctif, pas au moment où cette étape a été commitée.
+
 **Vérifié** : `pnpm exec tsc --noEmit`, `pnpm exec vitest run` (467 tests),
 `pnpm run build` — tous au vert. `curl` non authentifié sur `/facturation`
 confirme la redirection vers `/login` sans erreur serveur. **Non vérifié** :
@@ -512,3 +518,98 @@ d'automatisation navigateur n'était accessible dans cette session
 (profil Playwright de `CLAUDE.md` non exposé ici). À faire avant la
 prochaine session de travail, via la tâche VS Code « Omra Facturation —
 aperçu local ».
+
+---
+
+## 11. Étape 7 — plafond du remboursement, et une découverte critique (2026-08-03)
+
+**Objectif initial** : `supabase/migrations/202608030004_cap_cancellation_cash_outflow.sql`
+resserre `cancel_billing_receipt` (§4.1) — la sortie de caisse doit valoir
+exactement `0` ou le total payé, jamais une valeur intermédiaire. La
+validation existante (`0 <= sortie <= total payé`) acceptait techniquement un
+montant partiel ; l'adaptateur d'écriture (§9, point 5) l'évitait déjà côté
+application, cette migration l'empêche aussi par un appel RPC direct.
+
+**Découverte en testant cette migration en `BEGIN...ROLLBACK` contre la base
+liée (`supabase db query --linked --file`, seule méthode transactionnelle
+accessible dans cet environnement — voir la note technique en fin de
+section)** : `create_billing_receipt_with_first_payment` — donc aussi
+`create_complete_facturation_receipt`, qui la compose — échouait
+**systématiquement**, à chaque appel, avec `column reference "season_id" is
+ambiguous`. Cette fonction déclare `RETURNS TABLE(..., season_id uuid, ...)`,
+créant un paramètre de sortie implicite `season_id` visible dans tout son
+corps ; deux endroits le référencent sans le qualifier (la cible `ON CONFLICT
+(season_id)` et la clause `WHERE season_id = v_season_id` de la mise à jour du
+compteur). PL/pgSQL refuse de deviner lequel — colonne de table ou paramètre
+de sortie — et lève une erreur plutôt que de choisir.
+
+**Ce bug existe depuis la création initiale de la fonction (`202608010008`,
+déployée bien avant cette session) et n'avait jamais été exercé.** Concrètement :
+**aucune création de reçu réelle n'a jamais pu aboutir sur la base liée**,
+avant ce correctif — y compris pendant les tests précédents de cette session
+(§8, «*tests correction paiement n°1 réussis avec rollback*» portait sur
+`correct_billing_receipt_first_payment_method`, jamais sur la création). Le
+même test a révélé un second cas identique dans `cancel_billing_receipt`
+(`RETURNS TABLE(..., lifecycle_status text, ...)`, clause `WHERE ... and
+lifecycle_status = 'active'` non qualifiée) — déployée depuis `202608010010`,
+elle aussi jamais exercée.
+
+**Correctifs, dans deux migrations séparées, prêtes mais non poussées :**
+- `202608030005_fix_ambiguous_season_id_receipt_counter_update.sql` — corrige
+  `create_billing_receipt_with_first_payment` seule.
+- `202608030004_cap_cancellation_cash_outflow.sql` — porte à la fois le
+  plafond de remboursement (objectif initial) et la correction de
+  `cancel_billing_receipt`, puisque les deux touchent la même fonction.
+
+Les deux ajoutent `#variable_conflict use_column` en tête du corps (la
+directive PL/pgSQL qui fait toujours gagner la colonne de table sur un
+paramètre de sortie de même nom en cas d'ambiguïté — aucune des deux fonctions
+ne lit ni n'écrit ses paramètres de sortie autrement que via ses variables
+`v_*` explicites, donc ce choix ne change aucun comportement voulu), plus une
+qualification explicite de la clause `WHERE` concernée par sécurité
+supplémentaire. `ON CONFLICT (...)` n'acceptant pas de nom qualifié par la
+table dans sa cible (erreur de syntaxe), la directive est la seule correction
+possible pour ce cas précis.
+
+**Une recherche du même motif dans les 3 autres fonctions financières
+d'écriture** (`create_facturation_traveler_registration`,
+`create_complete_facturation_receipt`, `add_billing_receipt_payment`, via
+`pg_get_functiondef` sur la base liée) **n'a rien trouvé de comparable.**
+Cette recherche n'est pas exhaustive sur les 25 fonctions ; l'étape d'audit
+lecture seule (§6, tableau) devra vérifier spécifiquement ce motif sur le
+reste, en plus de son objet initial.
+
+**Vérifié, dans une seule transaction terminée par `ROLLBACK`** (les deux
+migrations appliquées ensemble, sans rien laisser en base) :
+1. création d'une inscription et d'un reçu réels via les RPC (identité simulée
+   par un compte actif réel et `request.jwt.claims`, comme documenté dans
+   `CLAUDE.md` — jamais affichée) : réussie, la fonction corrigée fonctionne ;
+2. annulation avec une sortie partielle (`convenu - 1`) : refusée avec le
+   message attendu ;
+3. annulation avec une sortie égale au total payé : acceptée ;
+4. annulation avec une sortie nulle, sur un second reçu : acceptée.
+
+`supabase db lint --linked --level warning` (contre la base **non corrigée**,
+donc avant que ces migrations ne soient poussées) confirme indépendamment le
+premier bug : `{"function":"public.create_billing_receipt_with_first_payment",
+"issues":[{"level":"error",... "column reference \"season_id\" is
+ambiguous", ..., "sqlState":"42702"}]}` — une erreur de niveau `error`, pas
+seulement un avertissement. Les avertissements restants (fonctions `STABLE`
+appelant une expression volatile, variables non lues) sont ceux déjà connus,
+sans rapport avec ce travail.
+
+`supabase db push --dry-run` ne propose que ces deux fichiers.
+
+**Conformément à la règle d'or : préparé, testé, documenté — PAS poussé.**
+Le vrai push distant attend la validation du commanditaire à son retour.
+
+**Note technique — méthode de test transactionnelle.** `supabase/.temp/pooler-url`
+ne contient aucun mot de passe (seuls hôte, port, utilisateur et base y
+figurent) : une connexion directe via `pg` échoue avec `SASL:
+SCRAM-SERVER-FIRST-MESSAGE: client password must be a string`. La CLI expose
+en revanche `supabase db query --linked [--file …]`, qui exécute du SQL
+arbitraire contre la base liée via l'API de gestion, sans jamais manipuler de
+mot de passe. C'est la méthode utilisée pour tous les tests `BEGIN...ROLLBACK`
+de cette section — y compris la simulation de session (`account_slots` lu
+directement, `request.jwt.claims` positionné pour que l'appel soit vu comme
+authentifié) prescrite par `CLAUDE.md`.
