@@ -1,43 +1,47 @@
--- Bug bloquant découvert en testant la migration précédente (202608030004)
--- en BEGIN...ROLLBACK contre la base liée : tout appel réel à
--- create_billing_receipt_with_first_payment (donc aussi
--- create_complete_facturation_receipt, qui la compose) échouait
+-- RÉGRESSION, pas un bug d'origine — corrige une erreur introduite PAR CETTE
+-- SESSION, découverte en testant 202608030004 en BEGIN...ROLLBACK contre la
+-- base liée : tout appel réel à create_billing_receipt_with_first_payment
+-- (donc aussi create_complete_facturation_receipt, qui la compose) échouait
 -- systématiquement avec « column reference "season_id" is ambiguous ».
 --
--- Cause : la fonction déclare RETURNS TABLE(..., season_id uuid, ...), ce qui
--- crée un paramètre de sortie implicite nommé season_id, visible dans tout le
--- corps de la fonction. Deux endroits le référencent sans le qualifier :
+-- Cette même ambiguïté (RETURNS TABLE(..., season_id uuid, ...) crée un
+-- paramètre de sortie implicite qui entre en conflit avec la colonne
+-- `billing_receipt_counters.season_id` référencée sans qualification) avait
+-- déjà été identifiée et corrigée AVANT cette session, par
+-- `202608010017_fix_receipt_counter_season_ambiguity.sql` — qui qualifiait la
+-- clause WHERE et utilisait `on conflict on constraint
+-- billing_receipt_counters_pkey do nothing` pour contourner la cible `ON
+-- CONFLICT (season_id)` (qui n'accepte pas de nom qualifié par la table).
 --
---   insert into public.billing_receipt_counters (season_id, ...)
---   values (v_season_id, ...)
---   on conflict (season_id) do nothing;      -- cible de conflit ambiguë
+-- `202608030001_add_receipt_payment_instant_snapshot.sql` (cette session,
+-- étape 5 lecture) a fait un `create or replace function` sur cette même
+-- fonction en partant du corps de la migration **d'origine**
+-- (`202608010008`) pour y ajouter les colonnes d'instantané, sans vérifier
+-- qu'une correction ultérieure (`202608010017`) existait déjà — regressant
+-- ainsi silencieusement ce correctif déjà déployé. Cette migration corrige
+-- de nouveau exactement le même point, en réappliquant le style de
+-- 202608010017 (qualification explicite de la clause WHERE, `on conflict on
+-- constraint billing_receipt_counters_pkey`), plus `#variable_conflict
+-- use_column` en tête du corps par défense supplémentaire — la fonction ne
+-- lit ni n'écrit jamais ses paramètres de sortie autrement que par ses
+-- variables `v_*` explicites, donc ce choix ne change aucun comportement
+-- voulu.
 --
---   update public.billing_receipt_counters
---   set next_number = v_receipt_number + 1
---   where season_id = v_season_id;           -- clause WHERE ambiguë
+-- Leçon pour la suite : avant tout `create or replace function` sur une
+-- fonction existante, vérifier d'abord son état réellement déployé
+-- (`pg_get_functiondef` sur la base liée) plutôt que de partir du fichier de
+-- la migration qui l'a créée à l'origine — d'autres migrations peuvent
+-- l'avoir corrigée depuis. Voir fusion.md §11 pour le détail complet et sa
+-- portée sur l'audit lecture seule (AUDIT-BACKEND.md).
 --
--- PL/pgSQL ne peut pas décider si `season_id` désigne la colonne de la table
--- ou le paramètre de sortie : il refuse plutôt que de deviner. La cible
--- `ON CONFLICT (...)` n'acceptant pas de nom qualifié par la table (erreur de
--- syntaxe), une qualification manuelle ne peut pas régler ce second cas : la
--- correction retenue est la directive PL/pgSQL `#variable_conflict use_column`,
--- posée en tête du corps de la fonction, qui fait toujours gagner la colonne
--- de table sur le paramètre de sortie en cas d'ambiguïté — la fonction ne lit
--- ni n'écrit jamais ces paramètres de sortie autrement que par ses variables
--- `v_*` explicites, donc ce choix ne change aucun comportement voulu. La
--- clause WHERE reste aussi qualifiée explicitement (double sécurité, sans
--- dépendre uniquement de la directive).
---
--- Ce bug existe depuis la création initiale de la fonction (202608010008) ;
--- il n'avait jamais été exercé jusqu'à ce test — tout appel réel à cette RPC
--- échouait donc silencieusement en production jusqu'ici. Aucune autre
--- fonction financière ne présente ce motif (vérifié par inspection de
--- create_facturation_traveler_registration, create_complete_facturation_receipt,
--- add_billing_receipt_payment et cancel_billing_receipt via
--- pg_get_functiondef sur la base liée).
+-- Aucune autre fonction financière ne présente ce motif non corrigé
+-- (vérifié par inspection de create_facturation_traveler_registration,
+-- create_complete_facturation_receipt et add_billing_receipt_payment via
+-- pg_get_functiondef sur la base liée). cancel_billing_receipt a subi la
+-- même régression, réparée par 202608030004 (voir son en-tête).
 --
 -- Signature, table de retour, logique métier et privilèges inchangés —
--- GRANT/REVOKE déjà posés par 202608010008 restent valables.
+-- GRANT/REVOKE déjà posés par 202608010008/202608010017 restent valables.
 create or replace function public.create_billing_receipt_with_first_payment(
   p_registration_id uuid,
   p_first_payment_amount_dh integer,
@@ -297,7 +301,10 @@ begin
     v_action_at,
     v_action_at
   )
-  on conflict (season_id) do nothing;
+  -- PostgreSQL conflict targets cannot use a qualified column name; the
+  -- named primary-key constraint unambiguously targets
+  -- billing_receipt_counters.season_id (même correction que 202608010017).
+  on conflict on constraint billing_receipt_counters_pkey do nothing;
 
   select counter.next_number
   into strict v_receipt_number

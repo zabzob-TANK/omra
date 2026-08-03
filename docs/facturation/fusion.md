@@ -543,41 +543,62 @@ corps ; deux endroits le référencent sans le qualifier (la cible `ON CONFLICT
 compteur). PL/pgSQL refuse de deviner lequel — colonne de table ou paramètre
 de sortie — et lève une erreur plutôt que de choisir.
 
-**Ce bug existe depuis la création initiale de la fonction (`202608010008`,
-déployée bien avant cette session) et n'avait jamais été exercé.** Concrètement :
-**aucune création de reçu réelle n'a jamais pu aboutir sur la base liée**,
-avant ce correctif — y compris pendant les tests précédents de cette session
-(§8, «*tests correction paiement n°1 réussis avec rollback*» portait sur
-`correct_billing_receipt_first_payment_method`, jamais sur la création). Le
-même test a révélé un second cas identique dans `cancel_billing_receipt`
-(`RETURNS TABLE(..., lifecycle_status text, ...)`, clause `WHERE ... and
-lifecycle_status = 'active'` non qualifiée) — déployée depuis `202608010010`,
-elle aussi jamais exercée.
+**Correction du 2026-08-03 sur cette même section : ce n'était pas un bug
+d'origine jamais détecté, mais une RÉGRESSION introduite par cette session
+elle-même.** Cette même ambiguïté avait déjà été identifiée et corrigée
+**avant** cette session par deux migrations déjà déployées :
+`202608010016_fix_billing_function_ambiguities.sql` (qualifie la clause
+`WHERE` de `cancel_billing_receipt`) et
+`202608010017_fix_receipt_counter_season_ambiguity.sql` (qualifie la clause
+`WHERE` de `create_billing_receipt_with_first_payment` et remplace `ON
+CONFLICT (season_id)` par `ON CONFLICT ON CONSTRAINT
+billing_receipt_counters_pkey`, qui n'a pas ce problème de qualification).
+
+En écrivant `202608030001_add_receipt_payment_instant_snapshot.sql` (§8,
+étape 5 lecture) pour ajouter les colonnes d'instantané à
+`create_billing_receipt_with_first_payment`, j'ai fait un `create or replace
+function` en partant du corps de la migration **de création d'origine**
+(`202608010008`) sans vérifier au préalable l'état réellement déployé — ce
+qui a silencieusement **annulé** le correctif `202608010017`. Le même geste,
+pour la même raison, a annulé le correctif `202608010016` en écrivant
+`202608030004` à partir de `202608010010`. Ces deux régressions n'avaient
+encore jamais été exercées avant ce test — **aucune création de reçu réelle
+n'a donc pu aboutir sur la base liée pendant l'intervalle où ces deux
+migrations sont restées déployées seules**, du déploiement de
+`202608030001`/`202608030002`/`202608030003` (§8) jusqu'à ce correctif, plus
+tard dans la même session.
+
+**Leçon retenue et appliquée pour la suite du travail** : avant tout `create
+or replace function` sur une fonction existante, vérifier son état réellement
+déployé (`pg_get_functiondef(...)` via `supabase db query --linked`) plutôt
+que de partir du fichier de la migration qui l'a créée à l'origine — d'autres
+migrations peuvent l'avoir corrigée depuis.
 
 **Correctifs, dans deux migrations séparées, prêtes mais non poussées :**
-- `202608030005_fix_ambiguous_season_id_receipt_counter_update.sql` — corrige
-  `create_billing_receipt_with_first_payment` seule.
+- `202608030005_fix_ambiguous_season_id_receipt_counter_update.sql` — rétablit
+  la correction de `202608010017` sur `create_billing_receipt_with_first_payment`.
 - `202608030004_cap_cancellation_cash_outflow.sql` — porte à la fois le
-  plafond de remboursement (objectif initial) et la correction de
-  `cancel_billing_receipt`, puisque les deux touchent la même fonction.
+  plafond de remboursement (objectif initial) et le rétablissement de la
+  correction de `202608010016` sur `cancel_billing_receipt`, puisque les deux
+  touchent la même fonction.
 
-Les deux ajoutent `#variable_conflict use_column` en tête du corps (la
-directive PL/pgSQL qui fait toujours gagner la colonne de table sur un
-paramètre de sortie de même nom en cas d'ambiguïté — aucune des deux fonctions
-ne lit ni n'écrit ses paramètres de sortie autrement que via ses variables
-`v_*` explicites, donc ce choix ne change aucun comportement voulu), plus une
-qualification explicite de la clause `WHERE` concernée par sécurité
-supplémentaire. `ON CONFLICT (...)` n'acceptant pas de nom qualifié par la
-table dans sa cible (erreur de syntaxe), la directive est la seule correction
-possible pour ce cas précis.
+Les deux réappliquent le style de 202608010016/202608010017 (qualification
+explicite de la clause `WHERE`, `ON CONFLICT ON CONSTRAINT
+billing_receipt_counters_pkey`), et ajoutent en plus `#variable_conflict
+use_column` en tête du corps par défense supplémentaire (la directive
+PL/pgSQL qui fait toujours gagner la colonne de table sur un paramètre de
+sortie de même nom en cas d'ambiguïté — aucune des deux fonctions ne lit ni
+n'écrit ses paramètres de sortie autrement que via ses variables `v_*`
+explicites, donc ce choix ne change aucun comportement voulu).
 
 **Une recherche du même motif dans les 3 autres fonctions financières
 d'écriture** (`create_facturation_traveler_registration`,
 `create_complete_facturation_receipt`, `add_billing_receipt_payment`, via
-`pg_get_functiondef` sur la base liée) **n'a rien trouvé de comparable.**
-Cette recherche n'est pas exhaustive sur les 25 fonctions ; l'étape d'audit
-lecture seule (§6, tableau) devra vérifier spécifiquement ce motif sur le
-reste, en plus de son objet initial.
+`pg_get_functiondef` sur la base liée) **n'a rien trouvé de comparable** — ces
+trois fonctions n'ont jamais été retouchées par cette session. Cette
+recherche n'est pas exhaustive sur les 25 fonctions ; l'étape d'audit lecture
+seule (§6, tableau) devra vérifier spécifiquement ce motif sur le reste, en
+plus de son objet initial — voir `AUDIT-BACKEND.md`.
 
 **Vérifié, dans une seule transaction terminée par `ROLLBACK`** (les deux
 migrations appliquées ensemble, sans rien laisser en base) :

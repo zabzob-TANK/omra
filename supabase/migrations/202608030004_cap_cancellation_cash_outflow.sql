@@ -8,25 +8,32 @@
 -- côté application ; cette migration le rend impossible à contourner même par
 -- un appel RPC direct.
 --
--- En testant cette migration en BEGIN...ROLLBACK contre la base liée, un
--- second bug bloquant du même type que celui corrigé par 202608030005 est
--- apparu ici : cette fonction déclare aussi RETURNS TABLE(..., lifecycle_status
--- text, ...), et
+-- RÉGRESSION, pas un bug d'origine (même histoire que 202608030005, voir son
+-- en-tête pour le détail complet). En écrivant cette migration à partir du
+-- corps de la migration de création d'origine (202608010010), sans vérifier
+-- l'état réellement déployé, une ambiguïté déjà corrigée avant cette session
+-- par `202608010016_fix_billing_function_ambiguities.sql` a été réintroduite
+-- silencieusement : cette fonction déclare aussi RETURNS TABLE(...,
+-- lifecycle_status text, ...), et
 --
 --   update public.billing_receipts
 --   set lifecycle_status = 'cancelled'
 --   where id = p_receipt_id
 --     and lifecycle_status = 'active';    -- clause WHERE ambiguë
 --
--- référence `lifecycle_status` sans le qualifier dans la clause WHERE. Même
--- correction : `#variable_conflict use_column` en tête du corps, plus une
--- qualification explicite de cette clause par sécurité. Existe depuis
--- 202608010010, jamais exercé jusqu'à ce test — toute annulation réelle
--- échouait donc silencieusement en production jusqu'ici.
+-- référence `lifecycle_status` sans le qualifier. 202608010016 corrigeait
+-- déjà ce point via `update public.billing_receipts as receipt ... where
+-- receipt.id = p_receipt_id and receipt.lifecycle_status = 'active'`. Cette
+-- migration réapplique la même qualification, plus `#variable_conflict
+-- use_column` en tête du corps par défense supplémentaire — la fonction ne
+-- lit ni n'écrit jamais ses paramètres de sortie autrement que par ses
+-- variables `v_*` explicites, donc ce choix ne change aucun comportement
+-- voulu. Découvert en testant cette migration en BEGIN...ROLLBACK contre la
+-- base liée, avant tout push réel.
 --
 -- Signature, table de retour et privilèges inchangés : seule la validation de
 -- p_cash_outflow_amount_dh se resserre. GRANT/REVOKE déjà posés par
--- 202608010010 restent donc valables sans être répétés ici.
+-- 202608010010/202608010016 restent donc valables sans être répétés ici.
 create or replace function public.cancel_billing_receipt(
   p_receipt_id uuid,
   p_reason text,
