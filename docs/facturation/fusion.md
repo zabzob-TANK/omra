@@ -213,6 +213,34 @@ fonctions. C'est le principal travail neuf de la fusion.
 
 ---
 
+## 5 bis. Accès Administration — décision actée, définitive
+
+L'accès à l'Administration se fait par un **login séparé**, en dehors des six
+emplacements de compte (`account_slots`) qui servent la Facturation. Ce n'est
+pas un septième emplacement, ni un rôle porté par un slot existant : c'est un
+espace d'authentification distinct, propre au commanditaire seul, conforme à
+`reprise.md` §6 (« sa propre URL et son propre couple identifiant / mot de
+passe. Les comptes de la Facturation n'y accèdent pas »).
+
+Conséquence pour `SessionPort` (`ports.ts`) : `estAdministrateur()` continue
+de porter les autorisations **internes à la Facturation** réservées au slot 1
+(R-39 suppression d'image, R-61 impression hors fenêtre, R-65 levée
+d'anomalie) — ceci ne change pas. Mais l'accès à l'écran d'Administration
+lui-même ne doit **jamais** être déduit d'un `slot_number = 1` côté
+Facturation : il dépend exclusivement de sa propre authentification, gérée
+ailleurs. Aucune fusion des deux mécanismes n'est envisagée.
+
+**Toutes les restrictions de sécurité déjà en place restent actives, aucune
+n'est retirée** : RLS sur les tables financières, révocation d'exécution pour
+`anon`/`public`, `SECURITY DEFINER` + `search_path = ''` sur les fonctions
+sensibles, résolution de l'identité exclusivement via
+`resolve_facturation_actor()`, aucune clé `service_role` côté navigateur.
+Cette décision sur l'accès Administration ne desserre aucune de ces règles ;
+elle clarifie seulement que la Facturation et l'Administration ne partagent
+pas de porte d'entrée.
+
+---
+
 ## 6. Plan d'exécution
 
 L'ordre compte : chaque étape doit laisser le projet en état de marche.
