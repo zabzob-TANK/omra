@@ -49,6 +49,7 @@ import {
   MESSAGE_IMAGE_SUPPRIMEE,
   libellesInstrument,
 } from '../domain/rules/cheque-register'
+import { EcranAVenir } from './ecrans/a-venir'
 import { EcranConnexion } from './ecrans/connexion'
 import { EcranFinance } from './ecrans/finance'
 import { EcranPaiements } from './ecrans/paiements'
@@ -153,6 +154,10 @@ export function ApplicationFacturation({
   const [selectionJournees, setSelectionJournees] = useState<string[]>([])
   const [afficherJourneesVides, setAfficherJourneesVides] = useState(true)
   const [registre, setRegistre] = useState<RegistreBancaire | null>(null)
+  // reprise.md §5 — Finance, Paiements et Suivi journalier dépendent tous de
+  // mouvementsCaisse, non branché côté omra (lot dédié). Vrai dès que l'un des
+  // trois chargements échoue : affiche un « à venir » propre au lieu de planter.
+  const [financeIndisponible, setFinanceIndisponible] = useState(false)
   const [filtresRegistre, setFiltresRegistre] = useState<Partial<FiltresRegistre>>({})
   const [periodeFinance, setPeriodeFinance] = useState<PeriodeFinance>({ filtre: 'day' })
   const [notification, setNotification] = useState<{ texte: string; erreur: boolean } | null>(null)
@@ -190,11 +195,20 @@ export function ApplicationFacturation({
   const aujourdhui = cleJour(new Date())
   const hier = decalerCleJour(aujourdhui, -1)
 
+  // reprise.md §5 — journalFinancier, suiviJournalier et registreBancaire
+  // dépendent tous de mouvementsCaisse (renvoyé à un lot dédié, non branché
+  // côté omra). Sans ce rattrapage, l'erreur qu'ils lèvent traverse la Server
+  // Action jusqu'à l'écran d'erreur de Next.js et fait planter toute la page.
   const chargerJournal = useCallback(
     async (periode: PeriodeFinance) => {
       const resolue = periode.filtre === 'day' && !periode.jour ? { ...periode, jour: aujourdhui } : periode
       setPeriodeFinance(resolue)
-      setJournal(await actions.journalFinancier(resolue))
+      try {
+        setJournal(await actions.journalFinancier(resolue))
+        setFinanceIndisponible(false)
+      } catch {
+        setFinanceIndisponible(true)
+      }
     },
     [actions, aujourdhui],
   )
@@ -205,14 +219,24 @@ export function ApplicationFacturation({
       selection?: readonly string[]
       afficherVides?: boolean
     }) => {
-      setSuivi(await actions.suiviJournalier(options))
+      try {
+        setSuivi(await actions.suiviJournalier(options))
+        setFinanceIndisponible(false)
+      } catch {
+        setFinanceIndisponible(true)
+      }
     },
     [actions],
   )
 
   const chargerRegistre = useCallback(
     async (filtres: Partial<FiltresRegistre>, cle: string | null = null) => {
-      setRegistre(await actions.registreBancaire(filtres, cle))
+      try {
+        setRegistre(await actions.registreBancaire(filtres, cle))
+        setFinanceIndisponible(false)
+      } catch {
+        setFinanceIndisponible(true)
+      }
     },
     [actions],
   )
@@ -510,7 +534,18 @@ export function ApplicationFacturation({
 
       {ecran.nom === 'statistiques' ? <EcranStatistiques /> : null}
 
-      {ecran.nom === 'finance' && journal ? (
+      {ecran.nom === 'finance' && financeIndisponible ? (
+        <>
+          <SousNavFinance active="finance" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre={T.navigation.finance}
+            note="اليومية المالية غير متاحة بعد على omra؛ العمل عليها مؤجل إلى دفعة عمل مخصصة."
+            etiquette="قيد الإنجاز"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'finance' && !financeIndisponible && journal ? (
         <EcranFinance
           journal={journal}
           aujourdhui={aujourdhui}
@@ -543,7 +578,20 @@ export function ApplicationFacturation({
         />
       ) : null}
 
-      {ecran.nom === 'suivi' && suivi ? (
+      {ecran.nom === 'suivi' && financeIndisponible ? (
+        <>
+          <SousNavFinance active="suivi" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre={T.finance.sousNav.suiviJournalier}
+            note="Cet écran n'est pas encore relié à la base réelle ; il sera activé dans un lot de travail dédié."
+            etiquette="Bientôt disponible"
+            dir="ltr"
+            lang="fr"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'suivi' && !financeIndisponible && suivi ? (
         <>
           <SousNavFinance
             active="suivi"
@@ -619,7 +667,20 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
-      {ecran.nom === 'paiements' && registre ? (
+      {ecran.nom === 'paiements' && financeIndisponible ? (
+        <>
+          <SousNavFinance active="paiements" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre={T.finance.sousNav.paiements}
+            note="Cet écran n'est pas encore relié à la base réelle ; il sera activé dans un lot de travail dédié."
+            etiquette="Bientôt disponible"
+            dir="ltr"
+            lang="fr"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'paiements' && !financeIndisponible && registre ? (
         <>
           <SousNavFinance
             active="paiements"
