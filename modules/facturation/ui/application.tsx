@@ -154,9 +154,10 @@ export function ApplicationFacturation({
   const [selectionJournees, setSelectionJournees] = useState<string[]>([])
   const [afficherJourneesVides, setAfficherJourneesVides] = useState(true)
   const [registre, setRegistre] = useState<RegistreBancaire | null>(null)
-  // reprise.md §5 — Finance, Paiements et Suivi journalier dépendent tous de
-  // mouvementsCaisse, non branché côté omra (lot dédié). Vrai dès que l'un des
-  // trois chargements échoue : affiche un « à venir » propre au lieu de planter.
+  // Filet de sécurité générique pour Finance, Paiements et Suivi journalier :
+  // vrai dès que l'un des trois chargements échoue (panne réseau, etc.),
+  // affiche un « à venir » propre au lieu de laisser planter toute la page.
+  // Les trois lisent désormais des données réelles (lot Finance 4a/4c).
   const [financeIndisponible, setFinanceIndisponible] = useState(false)
   const [filtresRegistre, setFiltresRegistre] = useState<Partial<FiltresRegistre>>({})
   const [periodeFinance, setPeriodeFinance] = useState<PeriodeFinance>({ filtre: 'day' })
@@ -195,10 +196,9 @@ export function ApplicationFacturation({
   const aujourdhui = cleJour(new Date())
   const hier = decalerCleJour(aujourdhui, -1)
 
-  // reprise.md §5 — journalFinancier, suiviJournalier et registreBancaire
-  // dépendent tous de mouvementsCaisse (renvoyé à un lot dédié, non branché
-  // côté omra). Sans ce rattrapage, l'erreur qu'ils lèvent traverse la Server
-  // Action jusqu'à l'écran d'erreur de Next.js et fait planter toute la page.
+  // Sans ce rattrapage, une erreur inattendue de journalFinancier,
+  // suiviJournalier ou registreBancaire traverserait la Server Action jusqu'à
+  // l'écran d'erreur de Next.js et ferait planter toute la page.
   const chargerJournal = useCallback(
     async (periode: PeriodeFinance) => {
       const resolue = periode.filtre === 'day' && !periode.jour ? { ...periode, jour: aujourdhui } : periode
