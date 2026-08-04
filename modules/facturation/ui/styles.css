@@ -1862,9 +1862,9 @@ input[type='number'] {
 }
 
 .recu-encadre .ligne {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 4px 0;
   font-size: 13px;
@@ -1875,6 +1875,7 @@ input[type='number'] {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+  text-align: center;
 }
 
 .recu-encadre .ligne.totale {
@@ -1902,6 +1903,37 @@ input[type='number'] {
 
 .recu-encadre.totaux .ligne.totale b.solde {
   color: var(--solde);
+}
+
+/*
+ * Champs de la dfp obligatoire (montant + méthode) : même vert que l'encadré
+ * de calcul juste au-dessus, pour que la saisie et le résultat se lisent
+ * comme un seul ensemble. Mêmes valeurs que `.recu-encadre.totaux`, jamais de
+ * nouvelle couleur. `:not(.invalide)` laisse le rouge d'erreur l'emporter.
+ */
+.champ-encaissement .omra-input:not(.invalide) {
+  background: var(--accent-soft);
+  border-color: #cddac2;
+}
+
+/*
+ * Centrage des valeurs numériques techniques : montants et dates portés par
+ * `.mono` + `dir="ltr"` (le marquage déjà posé par `attributsDirection`), et
+ * les champs de saisie correspondants (montant, date, numéro de reçu — tous
+ * `inputMode="numeric"`). Exclut volontairement le téléphone (`inputMode`
+ * "tel"), les références de chèque/virement (aucun `inputMode`) et les
+ * numéros de ligne (aucun `dir="ltr"`) : ceux-ci ne portent pas ce marquage.
+ */
+.mono[dir='ltr']:not(input) {
+  text-align: center;
+}
+
+input.mono[inputmode='numeric'] {
+  text-align: center;
+}
+
+.valeur.numero {
+  text-align: center;
 }
 
 @media (max-width: 760px) {
@@ -2848,9 +2880,9 @@ input[type='number'] {
 }
 
 .versement-resume-ligne {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 3px 0;
   font-size: 12.5px;
@@ -2861,6 +2893,7 @@ input[type='number'] {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+  text-align: center;
 }
 
 .versement-resume-ligne.finale {

@@ -348,7 +348,7 @@ export function ModaleVersement({
           </div>
 
           {/* Montant et mode de paiement sur une même rangée. */}
-          <div className="omra-fields duo" style={{ marginTop: 14 }}>
+          <div className="omra-fields duo champ-encaissement" style={{ marginTop: 14 }}>
             <Champ label={T.versement.montant}>
               <Saisie
                 valeur={saisie.montant}
