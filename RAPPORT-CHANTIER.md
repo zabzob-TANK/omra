@@ -103,12 +103,15 @@ allocations soient de la saison active (plus strict). Le commentaire en
 tête de la migration détaille le choix et l'alternative. **Ne pas déployer
 sans confirmation.**
 
-⚠️ Le code TypeScript préparé (appel de la RPC avec `p_season_id`) est
-**incompatible avec la base actuellement déployée** tant que la migration
-`202608040005` n'est pas poussée — normal et voulu : ce sont deux moitiés
-d'un même changement, à déployer ensemble, jamais séparément. Ne pas
-fusionner `chantier-local` dans une branche déployée sans pousser la
-migration en même temps que le code.
+⚠️ **Mise à jour** : le premier commit envoyait `p_season_id` à la vraie
+RPC, ce qui a effectivement cassé tout chargement de `/facturation` en
+mode réel (« Could not find the function ... in the schema cache »),
+constaté en testant en conditions réelles. **Corrigé** :
+`listerOperationsPartageesReutilisables` (`modules/facturation/data/supabase/read.ts`)
+accepte toujours `saisonId` mais ne le transmet plus à la RPC tant que la
+migration `202608040005` n'est pas déployée — une seule ligne à rétablir
+au moment du déploiement (commentaire laissé dans le code à cet effet).
+Revérifié : le mode réel fonctionne à nouveau normalement.
 
 ### 2. Divergence de langue signalée, non corrigée (décision à confirmer)
 
