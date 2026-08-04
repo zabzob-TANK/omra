@@ -18,7 +18,8 @@ import type {
   LecteurPasseportPort,
   MouvementsCaissePort,
 } from '../ports'
-import { listerMouvementsCaisseReel } from './read'
+import { chargerAcquittementAnomalieReel, listerMouvementsCaisseReel } from './read'
+import { acquitterAnomaliesSupabase } from './write'
 
 function indisponible(nom: string): never {
   throw new Error(
@@ -48,12 +49,11 @@ export const mouvementsCaisseSupabase: MouvementsCaissePort = {
 }
 
 /**
- * Lot Finance, étapes 4b (acquittement) et 4c (impression du journal) —
- * tables non encore créées côté omra. En attendant, ces lectures renvoient
- * une valeur vide correcte (aucune impression, aucun acquittement n'existe
- * réellement) plutôt que de lever une erreur qui bloquerait tout l'écran
- * Finance/Suivi : ce n'est pas un faux succès, c'est l'état réel du système
- * avant que 4b/4c ne soient construits.
+ * Lot Finance, étape 4c (impression du journal) — table non encore créée
+ * côté omra. En attendant, cette lecture renvoie une valeur vide correcte
+ * (aucune impression du journal n'existe réellement) plutôt que de lever une
+ * erreur qui bloquerait tout l'écran Finance/Suivi : ce n'est pas un faux
+ * succès, c'est l'état réel du système avant que 4c ne soit construit.
  */
 export const impressionsFinanceSupabase: ImpressionsFinancePort = {
   async listerParJour() {
@@ -64,12 +64,20 @@ export const impressionsFinanceSupabase: ImpressionsFinancePort = {
   },
 }
 
+/**
+ * Lot Finance, étape 4b (fusion.md §5) : lecture et acquittement réels,
+ * réservés à l'administrateur (`facturation_anomaly_acknowledgements`,
+ * 202608040003). `saisonId` est requis pour l'écriture — `service.ts` le
+ * fournit toujours (reprise.md §5.3, saison active résolue en amont).
+ */
 export const acquittementsAnomalieSupabase: AcquittementsAnomaliePort = {
-  async parJour() {
-    return null
+  async parJour(jour, saisonId) {
+    if (!saisonId) return null
+    return chargerAcquittementAnomalieReel(saisonId, jour)
   },
-  async acquitter() {
-    return indisponible('acquittementsAnomalie.acquitter')
+  async acquitter(acquittement, saisonId) {
+    if (!saisonId) throw new Error('Saison requise pour acquitter une anomalie.')
+    await acquitterAnomaliesSupabase(acquittement, saisonId)
   },
 }
 

@@ -23,13 +23,14 @@ import type {
   BillingReceiptDetail,
   BillingReceiptRow,
   CashRegisterRefundMovement,
+  FinanceAnomalyAcknowledgement,
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
 import { cleJourDepuisDateFr } from '../../domain/dates'
 import { dhVersCentimes } from './dh'
-import { isoVersDateFr, isoVersHeure } from './dates'
+import { isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
 import type { FiltreRecus } from '../ports'
-import type { MouvementCaisse, OperationPartagee, Recu } from '../../domain/types'
+import type { AcquittementAnomalie, MouvementCaisse, OperationPartagee, Recu } from '../../domain/types'
 import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 
 const TAILLE_PAGE = 200
@@ -204,6 +205,33 @@ export async function listerMouvementsCaisseReel(saisonId: string | null): Promi
       employe: ligne.created_by_slot_label_snapshot,
     }
   })
+}
+
+/**
+ * `AcquittementsAnomaliePort.parJour` — Lot Finance, étape 4b (fusion.md §5).
+ * Lecture de `get_billing_finance_anomaly_acknowledgement`, nouvelle table
+ * `facturation_anomaly_acknowledgements` (202608040003).
+ */
+export async function chargerAcquittementAnomalieReel(
+  saisonId: string,
+  jour: string,
+): Promise<AcquittementAnomalie | null> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('get_billing_finance_anomaly_acknowledgement', {
+    p_season_id: saisonId,
+    p_day: jour,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const ligne = (resultat.data as FinanceAnomalyAcknowledgement[] | null)?.[0]
+  if (!ligne) return null
+  return {
+    // `day_key` (colonne `date` Postgres) est déjà au format `aaaa-mm-jj` : c'est
+    // exactement le format `CleJour` attendu par le domaine, aucune conversion.
+    jour: ligne.day_key,
+    mouvementIds: ligne.movement_ids,
+    acquitteLe: isoVersHorodatage(ligne.acknowledged_at),
+    acquittePar: ligne.acknowledged_by_slot_label_snapshot,
+  }
 }
 
 /**

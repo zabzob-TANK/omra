@@ -37,7 +37,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { cleJourDepuisDateFr } from '../../domain/dates'
 import { natureNormalisee, type NaturePaiement } from '../../domain/payment-method'
-import type { Modification, Recu, ReferenceFichier, Versement } from '../../domain/types'
+import type { AcquittementAnomalie, Modification, Recu, ReferenceFichier, Versement } from '../../domain/types'
 import type { CreationRecu } from '../ports'
 import { modePaiementDepuisNature } from './codes'
 import { centimesVersDh } from './dh'
@@ -432,4 +432,23 @@ export async function definirImageOperationSupabase(
   image: ReferenceFichier | null,
 ): Promise<void> {
   await appliquerImageOperation(operationId, image)
+}
+
+/**
+ * `AcquittementsAnomaliePort.acquitter` — Lot Finance, étape 4b (fusion.md
+ * §5). Réservé à l'administrateur : `acknowledge_billing_finance_anomalies`
+ * appelle `require_facturation_admin()` et lève une erreur claire pour tout
+ * autre appelant, jamais un faux succès.
+ */
+export async function acquitterAnomaliesSupabase(
+  acquittement: AcquittementAnomalie,
+  saisonId: string,
+): Promise<void> {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('acknowledge_billing_finance_anomalies', {
+    p_season_id: saisonId,
+    p_day: acquittement.jour,
+    p_movement_ids: acquittement.mouvementIds,
+  })
+  if (error) throw new Error(messageErreur(error))
 }

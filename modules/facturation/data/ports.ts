@@ -248,9 +248,10 @@ export interface ImpressionsFinancePort {
 }
 
 export interface AcquittementsAnomaliePort {
-  parJour(jour: CleJour): Promise<AcquittementAnomalie | null>
+  /** `saisonId` — reprise.md §5.3, optionnel pour l'adaptateur de démonstration. */
+  parJour(jour: CleJour, saisonId?: string): Promise<AcquittementAnomalie | null>
   /** R-65 — Acquittement cumulatif, réservé à l'administrateur. */
-  acquitter(acquittement: AcquittementAnomalie): Promise<void>
+  acquitter(acquittement: AcquittementAnomalie, saisonId?: string): Promise<void>
 }
 
 export interface JournalAuditPort {

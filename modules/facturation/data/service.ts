@@ -649,7 +649,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
       ...tous.filter((m) => m.jour === jourSelectionne).map((m) => m.id),
       ...mouvementsCaisse.filter((m) => m.jour === jourSelectionne).map((m) => m.id),
     ].sort()
-    const acquittement = await source.acquittementsAnomalie.parJour(jourSelectionne)
+    const acquittement = await source.acquittementsAnomalie.parJour(jourSelectionne, saison.id)
     anomalies = anomaliesEnAttente(anomaliesCandidates(impressions, idsDuJour), acquittement)
   }
 
@@ -664,7 +664,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
       ...tous.filter((m) => m.jour === veille).map((m) => m.id),
       ...mouvementsCaisse.filter((m) => m.jour === veille).map((m) => m.id),
     ].sort()
-    const acquittementVeille = await source.acquittementsAnomalie.parJour(veille)
+    const acquittementVeille = await source.acquittementsAnomalie.parJour(veille, saison.id)
     etatDeLaVeille = etatVeille(
       anomaliesEnAttente(anomaliesCandidates(impressionsVeille, idsVeille), acquittementVeille),
     )
@@ -879,18 +879,23 @@ export async function acquitterAnomalies(jour: string): Promise<Resultat<null>> 
   const journal = await journalFinancier({ filtre: 'day', jour })
   if (!journal.anomaliesEnAttente.length) return ok(null)
 
+  // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+  const saison = await source.referentiels.saisonActive()
   const maintenant = source.horloge.maintenant()
-  const precedent = await source.acquittementsAnomalie.parJour(jour)
+  const precedent = await source.acquittementsAnomalie.parJour(jour, saison.id)
   const tous = [
     ...new Set([...(precedent?.mouvementIds ?? []), ...journal.anomaliesEnAttente].map(String)),
   ].sort()
 
-  await source.acquittementsAnomalie.acquitter({
-    jour,
-    mouvementIds: tous,
-    acquitteLe: horodatage(maintenant),
-    acquittePar: utilisateur?.nom ?? '—',
-  })
+  await source.acquittementsAnomalie.acquitter(
+    {
+      jour,
+      mouvementIds: tous,
+      acquitteLe: horodatage(maintenant),
+      acquittePar: utilisateur?.nom ?? '—',
+    },
+    saison.id,
+  )
 
   await tracer(
     source,
@@ -986,7 +991,7 @@ export async function suiviJournalier(
       ...tousMouvements.filter((m) => m.jour === cle).map((m) => m.id),
       ...mouvementsCaisse.filter((m) => m.jour === cle).map((m) => m.id),
     ].sort()
-    const acquittement = await source.acquittementsAnomalie.parJour(cle)
+    const acquittement = await source.acquittementsAnomalie.parJour(cle, saison.id)
     anomaliesParJour.set(
       cle,
       anomaliesEnAttente(anomaliesCandidates(impressions, ids), acquittement).length,
