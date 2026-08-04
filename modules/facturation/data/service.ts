@@ -528,6 +528,7 @@ export async function annulerRecu(
 export async function modifierRecu(
   recuId: string,
   saisie: SaisieModification,
+  depassementConfirme = false,
 ): Promise<Resultat<null>> {
   const source = sourceDonnees()
   let base: Awaited<ReturnType<typeof contexteCommun>>
@@ -551,6 +552,9 @@ export async function modifierRecu(
     nouvelIdOperation: () => source.identifiants.nouvelId('SOP'),
     horodatage: base.horodatage,
     employe: base.employe,
+    operations: base.operations,
+    recus: base.recus,
+    depassementConfirme,
   })
   if (resultat.statut !== 'ok') return resultat
 

@@ -99,9 +99,13 @@ export async function annulerRecuAction(recuId: string, saisie: SaisieAnnulation
   return annulerRecu(recuId, saisie)
 }
 
-export async function modifierRecuAction(recuId: string, saisie: SaisieModification): Promise<Resultat<null>> {
+export async function modifierRecuAction(
+  recuId: string,
+  saisie: SaisieModification,
+  confirme = false,
+): Promise<Resultat<null>> {
   await requireActiveAccount()
-  return modifierRecu(recuId, saisie)
+  return modifierRecu(recuId, saisie, confirme)
 }
 
 export async function enregistrerImpressionAction(recuId: string): Promise<Resultat<null>> {

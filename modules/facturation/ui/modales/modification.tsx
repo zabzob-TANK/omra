@@ -26,6 +26,7 @@ import { construireGrille, montantConvenu } from '../../domain/rules/tarif'
 import type { Recu, SectionModifiable, Tarif } from '../../domain/types'
 import { CaseACocher, Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
 import { Dialogue } from '../dialogue'
+import { ModaleDepassement } from './depassement'
 import { Montant } from '../bidi'
 import { T } from '../textes'
 
@@ -50,7 +51,7 @@ interface Proprietes {
   /** §5.9 — seul un administrateur peut corriger le montant du 1er versement. */
   estAdministrateur: boolean
   onFermer: () => void
-  onEnregistrer: (saisie: SaisieModification) => Promise<Resultat<null>>
+  onEnregistrer: (saisie: SaisieModification, confirme: boolean) => Promise<Resultat<null>>
 }
 
 function saisieInitiale(recu: Recu): SaisieModification {
@@ -90,6 +91,9 @@ export function ModaleModification({
   const [saisie, setSaisie] = useState<SaisieModification>(saisieInitiale(recu))
   const [erreurs, setErreurs] = useState<ErreurValidation[]>([])
   const [envoi, setEnvoi] = useState(false)
+  const [depassement, setDepassement] = useState<{ montant: number; disponible: number } | null>(
+    null,
+  )
 
   const modifier = (patch: Partial<SaisieModification>) => setSaisie({ ...saisie, ...patch })
   const section = saisie.section
@@ -103,15 +107,35 @@ export function ModaleModification({
   const reductionCentimes = dirhamsSaisisEnCentimes(saisie.reduction)
   const convenu = tarif === null ? null : montantConvenu(tarif, reductionCentimes)
 
-  const soumettre = async () => {
+  const soumettre = async (confirme: boolean) => {
     setEnvoi(true)
-    const resultat = await onEnregistrer(saisie)
+    const resultat = await onEnregistrer(saisie, confirme)
     setEnvoi(false)
     if (resultat.statut === 'erreurs') {
       setErreurs(resultat.erreurs)
+      setDepassement(null)
+      return
+    }
+    if (resultat.statut === 'confirmation-requise') {
+      setErreurs([])
+      setDepassement({
+        montant: resultat.montantCentimes,
+        disponible: resultat.disponibleCentimes,
+      })
       return
     }
     onFermer()
+  }
+
+  if (depassement) {
+    return (
+      <ModaleDepassement
+        montantCentimes={depassement.montant}
+        disponibleCentimes={depassement.disponible}
+        onRetour={() => setDepassement(null)}
+        onConfirmer={() => soumettre(true)}
+      />
+    )
   }
 
   return (
@@ -151,7 +175,7 @@ export function ModaleModification({
             {T.versement.annuler}
           </button>
           {section ? (
-            <button className="omra-btn primary" onClick={soumettre} disabled={envoi}>
+            <button className="omra-btn primary" onClick={() => soumettre(false)} disabled={envoi}>
               {T.modification.enregistrer}
             </button>
           ) : null}

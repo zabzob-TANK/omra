@@ -43,10 +43,12 @@ import type {
   AcquittementAnomalie,
   ImpressionFinance,
   Modification,
+  OperationPartagee,
   Recu,
   ReferenceFichier,
   Versement,
 } from '../../domain/types'
+import type { CorrectionPremierVersement } from '../../domain/rules/edit-sections'
 import type { CreationRecu } from '../ports'
 import { SectionIndisponibleError } from '../ports'
 import { modePaiementDepuisNature } from './codes'
@@ -68,10 +70,30 @@ type ParametresInstrument = {
 }
 
 /**
- * Résout les paramètres d'instrument communs à `create_complete_facturation_receipt`
- * et `add_billing_receipt_payment` à partir d'un `Versement` du domaine.
+ * Champs d'instrument communs à `Versement` et `CorrectionPremierVersement` :
+ * les deux formes que `resoudreParametresInstrument` accepte.
  */
-function resoudreParametresInstrument(versement: Versement, nomPayeurParDefaut: string): ParametresInstrument {
+type InstrumentSource = Pick<
+  Versement,
+  | 'nature'
+  | 'portee'
+  | 'operationPartageeId'
+  | 'referenceInstrument'
+  | 'dateInstrument'
+  | 'banque'
+  | 'payeur'
+  | 'montantOperationCentimes'
+>
+
+/**
+ * Résout les paramètres d'instrument communs à `create_complete_facturation_receipt`,
+ * `add_billing_receipt_payment` et `correct_billing_receipt_first_payment_method`
+ * à partir d'un `Versement` ou d'une `CorrectionPremierVersement` du domaine.
+ */
+function resoudreParametresInstrument(
+  versement: InstrumentSource,
+  nomPayeurParDefaut: string,
+): ParametresInstrument {
   // `Versement.nature` est typé `NaturePaiement | string` pour tolérer des
   // graphies libres côté démonstration ; une valeur réelle, elle, est
   // toujours l'une des trois constantes exactes. `natureNormalisee()`
@@ -359,11 +381,55 @@ export async function appliquerModificationSupabase(
   return recu
 }
 
-/** `RecusPort.corrigerPremierVersement` — indisponible tant que fusion.md §4.2/étape 8 n'est pas déployée. */
-export async function corrigerPremierVersementSupabase(): Promise<Recu> {
-  throw new Error(
-    "La correction du premier versement n'est pas encore disponible côté omra : correct_billing_receipt_first_payment_method (migration 202608020004) n'est pas déployée en l'état — elle attend sa reprise selon fusion.md §4.2 (étape 8), puis un vrai push validé par le commanditaire.",
-  )
+/**
+ * `RecusPort.corrigerPremierVersement` — reprise fusion.md §4.2 / étape 8.
+ *
+ * `correct_billing_receipt_first_payment_method` (migration 202608030006,
+ * déployée) remplace `202608020004` évoquée dans une version antérieure de ce
+ * commentaire : elle plafonne déjà la correction au montant convenu et
+ * réserve le changement de montant à l'administrateur côté base, en plus du
+ * contrôle déjà fait par le domaine (`preparerModification`, §5.9).
+ *
+ * `nouvelleOperation` n'est jamais créée séparément ici : comme pour
+ * `creerRecuSupabase`/`ajouterVersementSupabase`, c'est la RPC elle-même qui
+ * crée l'opération quand `p_existing_shared_operation_id` est absent —
+ * `resoudreParametresInstrument` le détermine à partir de `estIdentifiantReel`.
+ */
+export async function corrigerPremierVersementSupabase(
+  recuId: string,
+  versement: CorrectionPremierVersement,
+  _nouvelleOperation: OperationPartagee | null,
+  modification: Modification,
+): Promise<Recu> {
+  const detail = await chargerDetailRecuBrut(recuId)
+  if (!detail) throw new Error('Reçu introuvable pour la correction du premier versement.')
+
+  const nomClient = `${detail.registration.first_name_snapshot} ${detail.registration.last_name_snapshot}`
+  const instrument = resoudreParametresInstrument(versement, nomClient)
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('correct_billing_receipt_first_payment_method', {
+    p_receipt_id: recuId,
+    p_reason: modification.motif,
+    p_new_amount_dh: centimesVersDh(versement.montantCentimes),
+    p_payment_mode: instrument.p_payment_mode,
+    p_usage_kind: instrument.p_usage_kind,
+    p_existing_shared_operation_id: instrument.p_existing_shared_operation_id,
+    p_operation_amount_dh: instrument.p_operation_amount_dh,
+    p_instrument_reference: instrument.p_instrument_reference,
+    p_bank_name: instrument.p_bank_name,
+    p_instrument_date: instrument.p_instrument_date,
+    p_payer_name: instrument.p_payer_name,
+    // Le domaine a déjà obtenu la confirmation avant d'appeler ce port
+    // (R-32, preparerModification → confirmation-requise), comme pour
+    // creerRecuSupabase/ajouterVersementSupabase ci-dessus.
+    p_confirm_over_allocation: true,
+  })
+  if (error) throw new Error(messageErreur(error))
+
+  const recu = await recuParId(recuId)
+  if (!recu) throw new Error('Reçu introuvable après correction du premier versement.')
+  return recu
 }
 
 /**

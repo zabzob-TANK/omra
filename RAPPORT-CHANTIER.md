@@ -124,30 +124,70 @@ générique `erreur-inattendue` (« تعذر حفظ التعديل. تحقق م�
 Revérifié : la fenêtre « Identité » affiche maintenant ce message et reste
 utilisable dans ce scénario.
 
-### 0quater. Correction du montant du premier versement : jamais branchée malgré la migration déployée (trouvé, pas corrigé — à valider avant de s'y lancer)
+### 0quater. Correction du montant du premier versement : jamais branchée malgré la migration déployée (corrigé)
 
-Découverte plus importante en creusant la section « Groupe » ci-dessus :
+Découverte en creusant la section « Groupe » ci-dessus :
 `corrigerPremierVersementSupabase()` (`modules/facturation/data/supabase/write.ts`)
-lève encore inconditionnellement une erreur renvoyant à la migration
+levait encore inconditionnellement une erreur renvoyant à la migration
 `202608020004` — décrite dans `CLAUDE.md` comme non conforme et devant être
 reprise. Or une **nouvelle** migration, `202608030006_correct_first_payment_method_admin_amount.sql`,
 implémente déjà la règle actée le 2026-08-03 (administrateur peut corriger
 le montant, plafonné au convenu, jamais de trop-perçu créé par cette voie)
-et **est déjà déployée** (confirmée dans `pnpm exec supabase migration list`).
-Autrement dit : la décision métier est prise, testée, déployée côté base —
-mais le code client n'a jamais été raccordé à la nouvelle RPC
-`correct_billing_receipt_first_payment_method`. Résultat concret :
-aujourd'hui, **aucun administrateur ne peut corriger le montant du premier
-versement**, malgré la fonctionnalité prête côté base.
+et **était déjà déployée** (confirmée dans `pnpm exec supabase migration list`).
+Autrement dit : la décision métier était prise, testée, déployée côté base —
+mais le code client n'avait jamais été raccordé à la RPC
+`correct_billing_receipt_first_payment_method`. Résultat concret avant
+correction : aucun administrateur ne pouvait corriger le montant du premier
+versement, malgré la fonctionnalité prête côté base.
 
-Le travail de raccordement est significatif (pas une simple correction) :
-la préparation domaine existe déjà et est testée (`CorrectionPremierVersement`,
-`premierVersementCorrige` dans `modules/facturation/domain/rules/edit-sections.ts`),
-il s'agit de traduire cet objet déjà calculé vers les paramètres de la RPC
-(mode de paiement, portée unique/partagée, opération existante ou nouvelle,
-confirmation de dépassement). **Non fait cette session** — je préfère vous
-le signaler avant de m'y lancer, vu qu'il s'agit d'argent et d'un chemin
-actuellement complètement bloqué plutôt que d'un simple affichage.
+**Corrigé, avec votre accord explicite pour s'y lancer.** Le raccordement
+touchait plusieurs fichiers :
+- `modules/facturation/data/supabase/write.ts` — `corrigerPremierVersementSupabase()`
+  appelle maintenant la vraie RPC, en réutilisant `resoudreParametresInstrument()`
+  (déjà utilisée par `creerRecuSupabase`/`ajouterVersementSupabase`, élargie
+  pour accepter `CorrectionPremierVersement` en plus de `Versement`).
+- `modules/facturation/domain/rules/edit-sections.ts` — **R-32 ajouté** : la
+  correction n'existait pas encore pour cette section : corriger le montant
+  d'un versement déjà rattaché à une opération partagée, ou créer une
+  opération neuve trop petite pour le montant qu'elle porte, exige
+  maintenant une confirmation explicite de dépassement (comme pour un
+  nouveau reçu ou un ajout de paiement), au lieu d'un dépassement silencieux
+  jamais audité. `ContexteModification` reçoit `operations`/`recus` pour ce
+  calcul, et `depassementConfirme`.
+- `modules/facturation/data/service.ts`, `app/facturation/actions.ts` —
+  `modifierRecu()`/`modifierRecuAction()` acceptent et propagent cette
+  confirmation.
+- `modules/facturation/ui/modales/modification.tsx`,
+  `modules/facturation/ui/application.tsx` — la fenêtre affiche maintenant
+  la même boîte de confirmation de dépassement que les autres écrans
+  (`ModaleDepassement`) au lieu de ne rien prévoir pour ce cas ; un bug
+  latent au passage (`onClick={soumettre}` transmettait l'événement de clic
+  comme paramètre de confirmation) est corrigé du même geste.
+- Trois nouveaux tests dans `edit-sections.test.ts` couvrant le
+  dépassement (opération neuve trop petite, opération déjà partagée
+  dépassée, confirmation explicite qui laisse passer).
+
+**Vérifié en conditions réelles**, sur la vraie base locale (données
+considérées jetables pour l'instant, comme convenu) :
+- correction du montant d'un versement unique (chèque, 33 800 → 30 000 DH) :
+  total payé, reste dû et statut du reçu se mettent à jour correctement ;
+- passage d'un versement unique (chèque) à une opération partagée neuve
+  avec un montant d'opération volontairement insuffisant (2 000 DH pour un
+  versement de 5 000 DH) : la boîte de confirmation de dépassement
+  s'affiche avec les bons chiffres, et la confirmation explicite enregistre
+  correctement l'opération avec le dépassement conservé (vérifié en
+  rouvrant le détail du reçu : opération à 2 000 DH portant un versement de
+  5 000 DH, dépassement conservé tel quel, pas de trop-perçu masqué).
+
+**Note non corrigée, signalée pour décision** : le sous-titre du bouton de
+section « طريقة الدفعة الأولى » dans la fenêtre de modification affiche
+encore « الطريقة وبيانات الشيك أو التحويل، دون تغيير المبلغ » (« la méthode
+et les données du chèque ou virement, sans changer le montant ») — repris
+mot pour mot du fichier de référence, où c'était vrai (le prototype n'a
+jamais eu cette fonctionnalité). Ce n'est plus tout à fait exact pour un
+administrateur omra maintenant que la correction fonctionne. Comme pour le
+libellé français/arabe signalé plus haut, je n'ai rien changé ici sans
+votre décision explicite.
 
 ### 1. Mélange de saisons confirmé — RPC des opérations partagées réutilisables (déjà en production)
 
@@ -319,7 +359,24 @@ Testés en interactif en mode démonstration (`http://127.0.0.1:3001/facturation
 - `modules/facturation/domain/rules/errors.ts` — nouveau code d'erreur
   `section-indisponible` et son message (item 0ter).
 - `modules/facturation/data/supabase/write.ts` — la section « group » lève
-  `SectionIndisponibleError` au lieu d'une `Error` générique (item 0ter).
+  `SectionIndisponibleError` au lieu d'une `Error` générique (item 0ter) ;
+  `corrigerPremierVersementSupabase()` appelle réellement
+  `correct_billing_receipt_first_payment_method` (item 0quater) ;
+  `resoudreParametresInstrument` élargie à `CorrectionPremierVersement`.
+- `modules/facturation/domain/rules/edit-sections.ts` — R-32 (confirmation
+  de dépassement) ajouté à la section « premier versement » ; nouveaux
+  champs `operations`/`recus`/`depassementConfirme` sur `ContexteModification`
+  (item 0quater).
+- `modules/facturation/domain/rules/edit-sections.test.ts` — trois
+  nouveaux tests de dépassement, un montant de test corrigé (item 0quater).
+- `modules/facturation/domain/rules/errors.ts` — nouveau code
+  `erreur-inattendue` (filet de sécurité général, voir plus haut).
+- `modules/facturation/ui/modales/modification.tsx` — gestion de
+  `confirmation-requise` via `ModaleDepassement`, correction au passage
+  d'un bug latent (`onClick={soumettre}` sans fonction fléchée transmettait
+  l'événement de clic comme paramètre de confirmation).
+- `app/facturation/actions.ts` — `modifierRecuAction` accepte et propage la
+  confirmation de dépassement.
 
 ## Rien n'est parti en ligne
 

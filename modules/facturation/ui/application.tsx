@@ -107,7 +107,11 @@ export interface ActionsFacturation {
     confirme: boolean,
   ) => Promise<Resultat<{ recuId: string }>>
   annulerRecu: (recuId: string, saisie: SaisieAnnulation) => Promise<Resultat<null>>
-  modifierRecu: (recuId: string, saisie: SaisieModification) => Promise<Resultat<null>>
+  modifierRecu: (
+    recuId: string,
+    saisie: SaisieModification,
+    confirme: boolean,
+  ) => Promise<Resultat<null>>
   enregistrerImpression: (recuId: string) => Promise<Resultat<null>>
   journalFinancier: (periode: PeriodeFinance) => Promise<JournalFinancier>
   enregistrerImpressionFinance: (jour: string) => Promise<Resultat<{ numeroImpression: number }>>
@@ -865,8 +869,8 @@ export function ApplicationFacturation({
                 }}
                 estAdministrateur={estAdministrateur}
                 onFermer={fermer}
-                onEnregistrer={async (saisie) => {
-                  const resultat = await actions.modifierRecu(recu.id, saisie)
+                onEnregistrer={async (saisie, confirme) => {
+                  const resultat = await actions.modifierRecu(recu.id, saisie, confirme)
                   if (resultat.statut === 'ok') {
                     await rafraichir()
                     notifier('تم حفظ التعديل مع الاحتفاظ بالتاريخ الكامل.')

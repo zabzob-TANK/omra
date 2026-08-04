@@ -11,7 +11,7 @@ import {
   versementModifiable,
   type SaisieModification,
 } from './edit-sections'
-import { TARIFS_TEST, unRecu, unVersement } from './fixtures'
+import { TARIFS_TEST, unRecu, uneOperation, unVersement } from './fixtures'
 import type { ChangementChamp } from '../types'
 
 const CONTEXTE = {
@@ -21,6 +21,8 @@ const CONTEXTE = {
   nouvelIdOperation: () => 'SOP-test',
   horodatage: '03/08/2026 10:00',
   employe: 'موظف',
+  operations: [],
+  recus: [],
 }
 
 const recu = unRecu({
@@ -255,7 +257,11 @@ describe('R-53 — section premier versement', () => {
         banque: 'بنك الشعبي',
         operationPartagee: true,
         payeur: 'محمد',
-        montantOperation: '5000',
+        // R-32 — au moins égal au premier versement (10 000 DH, fixture
+        // `recu` ci-dessus) : une opération neuve plus petite que le
+        // versement qu'elle porte exigerait une confirmation de dépassement,
+        // hors du propos de ce test (voir le test dédié plus bas).
+        montantOperation: '15000',
       }),
       recu,
       CONTEXTE,
@@ -266,7 +272,112 @@ describe('R-53 — section premier versement', () => {
     expect(versement.portee).toBe('shared')
     expect(nouvelleOperation).not.toBeNull()
     expect(versement.operationPartageeId).toBe(nouvelleOperation?.id)
-    expect(nouvelleOperation?.montantTotalCentimes).toBe(500000)
+    expect(nouvelleOperation?.montantTotalCentimes).toBe(1500000)
+  })
+
+  it('R-32 — une opération neuve plus petite que le versement exige une confirmation', () => {
+    const resultat = preparerModification(
+      saisie({
+        section: 'firstPayment',
+        nature: 'شيك',
+        reference: '112233',
+        dateInstrument: '02/07/2026',
+        banque: 'بنك الشعبي',
+        operationPartagee: true,
+        payeur: 'محمد',
+        // Plus petit que le versement (10 000 DH, fixture `recu`).
+        montantOperation: '5000',
+      }),
+      recu,
+      CONTEXTE,
+    )
+    expect(resultat.statut).toBe('confirmation-requise')
+    if (resultat.statut !== 'confirmation-requise') return
+    expect(resultat.montantCentimes).toBe(1000000)
+    expect(resultat.disponibleCentimes).toBe(500000)
+  })
+
+  it('R-32 — la confirmation explicite laisse passer le même dépassement', () => {
+    const resultat = preparerModification(
+      saisie({
+        section: 'firstPayment',
+        nature: 'شيك',
+        reference: '112233',
+        dateInstrument: '02/07/2026',
+        banque: 'بنك الشعبي',
+        operationPartagee: true,
+        payeur: 'محمد',
+        montantOperation: '5000',
+      }),
+      recu,
+      { ...CONTEXTE, depassementConfirme: true },
+    )
+    expect(resultat.statut).toBe('ok')
+  })
+
+  it('R-32 — corriger le montant d’un versement déjà rattaché à une opération partagée peut la dépasser', () => {
+    const operation = uneOperation({ id: 'SOP-partage', montantTotalCentimes: 1200000 })
+    const recuPartage = unRecu({
+      versements: [
+        unVersement({
+          montantCentimes: 1000000,
+          nature: 'تحويل بنكي',
+          portee: 'shared',
+          operationPartageeId: operation.id,
+          referenceInstrument: operation.reference,
+          dateInstrument: operation.dateInstrument,
+          banque: operation.banque,
+          payeur: operation.payeur,
+          montantOperationCentimes: operation.montantTotalCentimes,
+        }),
+      ],
+    })
+    const contexteAvecOperation = {
+      ...CONTEXTE,
+      estAdministrateur: true,
+      operations: [operation],
+      recus: [recuPartage],
+    }
+
+    // Disponible avant correction : 1 200 000 - 1 000 000 (déjà alloué) = 200 000.
+    // Porter le versement à 1 300 000 dépasserait ce disponible ajusté
+    // (200 000 + 1 000 000 déjà occupé par ce même versement = 1 200 000).
+    const resultat = preparerModification(
+      saisie({
+        section: 'firstPayment',
+        nature: 'تحويل بنكي',
+        reference: operation.reference,
+        dateInstrument: operation.dateInstrument,
+        banque: operation.banque,
+        operationPartagee: true,
+        payeur: operation.payeur,
+        montantOperation: '12000',
+        montant: '13000',
+      }),
+      recuPartage,
+      contexteAvecOperation,
+    )
+    expect(resultat.statut).toBe('confirmation-requise')
+    if (resultat.statut !== 'confirmation-requise') return
+    expect(resultat.montantCentimes).toBe(1300000)
+    expect(resultat.disponibleCentimes).toBe(1200000)
+
+    const confirme = preparerModification(
+      saisie({
+        section: 'firstPayment',
+        nature: 'تحويل بنكي',
+        reference: operation.reference,
+        dateInstrument: operation.dateInstrument,
+        banque: operation.banque,
+        operationPartagee: true,
+        payeur: operation.payeur,
+        montantOperation: '12000',
+        montant: '13000',
+      }),
+      recuPartage,
+      { ...contexteAvecOperation, depassementConfirme: true },
+    )
+    expect(confirme.statut).toBe('ok')
   })
 
   it('exige les champs de l’instrument pour un chèque', () => {

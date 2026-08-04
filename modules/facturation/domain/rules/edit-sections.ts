@@ -13,6 +13,7 @@ import { dateFrValide } from '../dates'
 import { chiffresTelephone } from '../format'
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../money'
 import { natureNormalisee } from '../payment-method'
+import { depasseLeRestant, etatOperation } from './shared-payment'
 import type {
   ChangementChamp,
   OperationPartagee,
@@ -163,6 +164,15 @@ export interface ContexteModification {
   horodatage: string
   /** Employé à l'origine de la correction. */
   employe: string
+  /**
+   * R-32 — nécessaires pour calculer le disponible d'une opération partagée
+   * déjà utilisée, quand la correction du premier versement en change le
+   * montant alloué.
+   */
+  operations: readonly OperationPartagee[]
+  recus: readonly Recu[]
+  /** R-32 — confirmation explicite d'un dépassement d'opération partagée. */
+  depassementConfirme?: boolean
 }
 
 /**
@@ -413,6 +423,30 @@ export function preparerModification(
       }
 
       const portee: PorteeVersement = resteParage ? 'shared' : 'unique'
+
+      // R-32 — un dépassement doit être confirmé explicitement. Pour une
+      // opération déjà partagée et conservée, le montant déjà alloué inclut
+      // encore l'ancien montant de ce même versement : le disponible pour le
+      // nouveau montant est donc le restant actuel plus ce que ce versement y
+      // occupait déjà (il ne s'ajoute pas, il le remplace).
+      if (resteParage) {
+        const disponibleCentimes = dejaPartage
+          ? (() => {
+              const operation = contexte.operations.find((o) => o.id === operationPartageeId)
+              const restant = operation ? etatOperation(operation, contexte.recus).restantCentimes : 0
+              return restant + premier.montantCentimes
+            })()
+          : montantOperationCentimes
+
+        if (depasseLeRestant(montantCentimes, disponibleCentimes) && !contexte.depassementConfirme) {
+          return {
+            statut: 'confirmation-requise',
+            motif: 'depassement-operation-partagee',
+            montantCentimes,
+            disponibleCentimes,
+          }
+        }
+      }
 
       premierVersementCorrige = {
         versement: {
