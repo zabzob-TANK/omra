@@ -48,6 +48,7 @@ import type {
   Versement,
 } from '../../domain/types'
 import type { CreationRecu } from '../ports'
+import { SectionIndisponibleError } from '../ports'
 import { modePaiementDepuisNature } from './codes'
 import { centimesVersDh } from './dh'
 import { estIdentifiantReel } from './ids'
@@ -343,8 +344,10 @@ export async function appliquerModificationSupabase(
       // inscription entre dossiers réels (existant ou technique isolé) ; le
       // domaine attend un simple changement de libellé texte libre. Les deux
       // ne coïncident pas encore : reprise nécessaire avant de brancher cette
-      // section, pas une décision à improviser ici.
-      throw new Error(
+      // section, pas une décision à improviser ici. `SectionIndisponibleError`
+      // (et non une `Error` générique) pour que modifierRecu() la reconnaisse
+      // et renvoie un message propre au lieu de bloquer la fenêtre.
+      throw new SectionIndisponibleError(
         "La modification du groupe n'est pas encore disponible côté omra : le modèle de dossier réel (update_billing_receipt_dossier) ne correspond pas encore au tag libre du prototype (fusion.md §5.4, non résolu).",
       )
     default:

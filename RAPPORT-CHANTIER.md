@@ -2,9 +2,12 @@
 
 Branche : `chantier-local` (créée à partir de `integration-facturation`).
 Portée : code local uniquement. Aucun déploiement (`vercel --prod`), aucune
-migration appliquée à la base distante, aucune donnée de test écrite dans
-la vraie base. Tous les tests interactifs ont été faits en mode
-démonstration (`FACTURATION_SOURCE=demo`), sur un serveur local séparé.
+migration appliquée à la base distante. Premiers tests interactifs faits en
+mode démonstration (`FACTURATION_SOURCE=demo`) ; à partir du 2026-08-04, le
+commanditaire a explicitement autorisé les tests contre la vraie base
+locale (`http://127.0.0.1:3001/facturation`, backend Supabase réel), les
+données actuelles étant considérées comme jetables jusqu'à nouvel ordre —
+voir décisions ci-dessous.
 
 ## Contexte important découvert en cours de route
 
@@ -28,6 +31,12 @@ rapport tient compte de cet état réel, pas de l'ancien état documenté.
   dans la langue, rien ne change tant que je n'ai pas décidé ». Aucune
   modification faite ni prévue sur ce point sans nouvelle décision
   explicite.
+- **Données actuelles = jetables** : consigne reçue le 2026-08-04 : « on
+  reste toujours dans les tests [...] considère tout ça comme éphémère,
+  changeable et non utilisable » jusqu'à ce que le commanditaire annonce le
+  déploiement final. Sur cette base, plusieurs actions réelles (paiement,
+  reçu, modification) ont été faites directement sur la vraie base locale
+  pour vérifier des correctifs — détaillé item par item ci-dessous.
 
 ## Bugs trouvés
 
@@ -53,6 +62,76 @@ ajout de paiement réussi, à l'identique du chemin déjà existant pour un
 nouveau reçu. Revérifié en interactif en mode démonstration : le
 paiement s'enregistre, le montant payé se met à jour, et l'écran du reçu
 s'ouvre directement, comme demandé.
+
+Retesté ensuite en vrai mode (base réelle locale, décision du commanditaire
+d'utiliser les données actuelles comme jetables) : un vrai paiement de
+100 DH ajouté sur un vrai reçu (n°1, احمد العالي) confirme le même
+comportement contre la vraie base.
+
+### 0bis. Le correctif de mélange de saisons cassait tout accès en vrai mode (corrigé)
+
+Découvert en testant contre la vraie base : `/facturation` plantait
+systématiquement (« Could not find the function
+public.list_reusable_payment_operations(p_payment_mode, p_season_id) in
+the schema cache »). Cause : le correctif de l'item 1 ci-dessous envoie un
+nouveau paramètre `p_season_id` à cette RPC, mais la migration qui l'ajoute
+côté base (`202608040005`) n'est pas déployée — seul le code client avait
+changé. **Corrigé** : `listerOperationsPartageesReutilisables`
+(`modules/facturation/data/supabase/read.ts`) accepte toujours `saisonId`
+mais ne le transmet plus à la RPC tant que la migration n'est pas
+déployée — une seule ligne à rétablir au moment du déploiement (commentaire
+laissé dans le code). Revérifié : le vrai mode fonctionne à nouveau.
+
+### 0ter. Modification de la section « Groupe / famille » : fenêtre bloquée sans aucun message (corrigé)
+
+Trouvé en testant la modification d'un reçu réel (n°11) : cocher
+« ينتمي إلى مجموعة / عائلة », remplir un code et enregistrer faisait
+planter la fenêtre de modification — tous les boutons (« حفظ التعديل »,
+« إلغاء », retour de section) devenaient grisés et inutilisables, sans
+aucun message d'erreur affiché. Seul le journal serveur montrait la vraie
+cause : la modification du groupe n'est délibérément pas encore branchée
+côté omra (écart de modèle non résolu, `fusion.md §5.4` — le modèle réel
+de dossier ne correspond pas encore au tag libre du prototype), et
+`appliquerModification` lève une exception brute au lieu de renvoyer un
+résultat d'erreur normal. **La décision de ne pas brancher cette section
+reste inchangée** (ce n'est pas une décision à improviser) — seul le
+**comportement en cas d'échec** est corrigé :
+- nouvelle erreur dédiée `SectionIndisponibleError` (`modules/facturation/data/ports.ts`),
+  levée à la place d'une `Error` générique pour ce cas précis ;
+- `modifierRecu()` (`modules/facturation/data/service.ts`) l'attrape et
+  renvoie un `Resultat` d'erreur normal, comme elle le fait déjà pour
+  « aucune saison active » ;
+- nouveau code d'erreur `section-indisponible`
+  (`modules/facturation/domain/rules/errors.ts`) avec un message clair :
+  « هذا القسم غير متاح حاليًا. جرّب قسمًا آخر أو راجع المدير. »
+
+Revérifié en conditions réelles : la fenêtre affiche maintenant le message
+et redevient utilisable (boutons réactivés) au lieu de rester bloquée.
+
+### 0quater. Correction du montant du premier versement : jamais branchée malgré la migration déployée (trouvé, pas corrigé — à valider avant de s'y lancer)
+
+Découverte plus importante en creusant la section « Groupe » ci-dessus :
+`corrigerPremierVersementSupabase()` (`modules/facturation/data/supabase/write.ts`)
+lève encore inconditionnellement une erreur renvoyant à la migration
+`202608020004` — décrite dans `CLAUDE.md` comme non conforme et devant être
+reprise. Or une **nouvelle** migration, `202608030006_correct_first_payment_method_admin_amount.sql`,
+implémente déjà la règle actée le 2026-08-03 (administrateur peut corriger
+le montant, plafonné au convenu, jamais de trop-perçu créé par cette voie)
+et **est déjà déployée** (confirmée dans `pnpm exec supabase migration list`).
+Autrement dit : la décision métier est prise, testée, déployée côté base —
+mais le code client n'a jamais été raccordé à la nouvelle RPC
+`correct_billing_receipt_first_payment_method`. Résultat concret :
+aujourd'hui, **aucun administrateur ne peut corriger le montant du premier
+versement**, malgré la fonctionnalité prête côté base.
+
+Le travail de raccordement est significatif (pas une simple correction) :
+la préparation domaine existe déjà et est testée (`CorrectionPremierVersement`,
+`premierVersementCorrige` dans `modules/facturation/domain/rules/edit-sections.ts`),
+il s'agit de traduire cet objet déjà calculé vers les paramètres de la RPC
+(mode de paiement, portée unique/partagée, opération existante ou nouvelle,
+confirmation de dépassement). **Non fait cette session** — je préfère vous
+le signaler avant de m'y lancer, vu qu'il s'agit d'argent et d'un chemin
+actuellement complètement bloqué plutôt que d'un simple affichage.
 
 ### 1. Mélange de saisons confirmé — RPC des opérations partagées réutilisables (déjà en production)
 
@@ -211,12 +290,20 @@ Testés en interactif en mode démonstration (`http://127.0.0.1:3001/facturation
 - `modules/facturation/data/ports.ts` — `OperationsPartageesPort.lister`
   accepte un `saisonId` optionnel.
 - `modules/facturation/data/supabase/read.ts` — `listerOperationsPartageesReutilisables`
-  transmet `p_season_id` à la RPC (nécessite la migration ci-dessous).
+  accepte `saisonId` mais ne le transmet **pas encore** à la RPC (item
+  0bis : évite de casser le vrai mode tant que la migration n'est pas
+  déployée — une ligne à rétablir au déploiement).
 - `modules/facturation/data/supabase/clients-operations.ts` — branche le
   `saisonId` reçu vers la fonction de lecture.
 - `supabase/migrations/202608040005_scope_reusable_payment_operations_by_season.sql`
   — **nouvelle migration, non appliquée**, testée en `BEGIN...ROLLBACK`
   contre la vraie base (voir section 1).
+- `modules/facturation/data/ports.ts` — nouvelle erreur `SectionIndisponibleError`
+  (item 0ter).
+- `modules/facturation/domain/rules/errors.ts` — nouveau code d'erreur
+  `section-indisponible` et son message (item 0ter).
+- `modules/facturation/data/supabase/write.ts` — la section « group » lève
+  `SectionIndisponibleError` au lieu d'une `Error` générique (item 0ter).
 
 ## Rien n'est parti en ligne
 

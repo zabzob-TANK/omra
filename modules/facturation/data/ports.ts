@@ -68,6 +68,15 @@ import type {
  */
 export class SaisonIndisponibleError extends Error {}
 
+/**
+ * Signale qu'une section de modification n'est pas encore reliée côté
+ * omra (écart de modèle non résolu, ex. groupe/dossier — fusion.md §5.4),
+ * pas une panne. `service.ts::modifierRecu()` la reconnaît pour renvoyer
+ * un `Resultat` d'erreur normal au lieu de laisser l'appel rejeter sans
+ * retour, ce qui bloquait la fenêtre de modification sans aucun message.
+ */
+export class SectionIndisponibleError extends Error {}
+
 export interface ReferentielsPort {
   /** Saison courante. Fournit `reductionMaxCentimes`, utilisé par R-06. */
   saisonActive(): Promise<Saison>

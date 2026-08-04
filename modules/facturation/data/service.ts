@@ -102,7 +102,7 @@ import type {
   Vol,
 } from '../domain/types'
 import { modeDemonstration, sourceDonnees } from './index'
-import { FormatImageNonAccepteError, SaisonIndisponibleError } from './ports'
+import { FormatImageNonAccepteError, SaisonIndisponibleError, SectionIndisponibleError } from './ports'
 import type { SourceDonnees } from './ports'
 
 /** Instantané complet servi à l'interface. */
@@ -547,15 +547,20 @@ export async function modifierRecu(
 
   // P01 — le premier versement se corrige par sa propre méthode de port,
   // `champsModifies` ne pouvant pas exprimer une mutation de versement.
-  if (premierVersementCorrige) {
-    await source.recus.corrigerPremierVersement(
-      recuId,
-      premierVersementCorrige.versement,
-      premierVersementCorrige.nouvelleOperation,
-      modification,
-    )
-  } else {
-    await source.recus.appliquerModification(recuId, champsModifies, modification)
+  try {
+    if (premierVersementCorrige) {
+      await source.recus.corrigerPremierVersement(
+        recuId,
+        premierVersementCorrige.versement,
+        premierVersementCorrige.nouvelleOperation,
+        modification,
+      )
+    } else {
+      await source.recus.appliquerModification(recuId, champsModifies, modification)
+    }
+  } catch (erreurSection) {
+    if (!(erreurSection instanceof SectionIndisponibleError)) throw erreurSection
+    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'section-indisponible' }] }
   }
 
   const resume = changements

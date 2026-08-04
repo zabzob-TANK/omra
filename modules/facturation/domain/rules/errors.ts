@@ -14,6 +14,7 @@ import { centimesEnTexteDevise } from '../money'
 export type CodeErreur =
   // Disponibilité générale
   | 'saison-indisponible'
+  | 'section-indisponible'
   // Identité et contact
   | 'prenom-obligatoire'
   | 'nom-obligatoire'
@@ -125,6 +126,7 @@ export function ok<T>(valeur: T): Resultat<T> {
 export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) => string> = {
   'saison-indisponible': () =>
     'لا توجد موسم نشط. يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة.',
+  'section-indisponible': () => 'هذا القسم غير متاح حاليًا. جرّب قسمًا آخر أو راجع المدير.',
   'prenom-obligatoire': () => 'الاسم إجباري.',
   'nom-obligatoire': () => 'النسب إجباري.',
   'telephone-obligatoire': () => 'رقم الهاتف إجباري.',
