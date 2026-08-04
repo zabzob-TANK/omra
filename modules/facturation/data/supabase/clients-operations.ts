@@ -39,7 +39,7 @@ export const clientsSupabase: ClientsPort = {
 }
 
 export const operationsPartageesSupabase: OperationsPartageesPort = {
-  lister: () => listerOperationsPartageesReutilisables(),
+  lister: (saisonId) => listerOperationsPartageesReutilisables(null, saisonId ?? null),
   async parId(id: string) {
     const toutes = await listerOperationsPartageesReutilisables()
     return toutes.find((operation) => operation.id === id) ?? null

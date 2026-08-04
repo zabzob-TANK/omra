@@ -170,13 +170,19 @@ export async function recuParNumero(numero: number, saisonId?: string): Promise<
  * partagées possibles, puisque l'espèce ne peut être que `unique` (règle
  * métier). Voir `mappers.ts` pour les champs non disponibles depuis cette RPC
  * (créateur, statut archivé, image).
+ *
+ * `p_season_id` exige la migration 202608040005 (préparée, non déployée —
+ * voir RAPPORT-CHANTIER.md). Tant qu'elle n'est pas poussée, cet appel
+ * échoue contre la base réelle : ne pas déployer ce fichier seul.
  */
 export async function listerOperationsPartageesReutilisables(
   mode: 'cheque' | 'transfer' | null = null,
+  saisonId: string | null = null,
 ): Promise<OperationPartagee[]> {
   const supabase = await createClient()
   const resultat = await supabase.rpc('list_reusable_payment_operations', {
     p_payment_mode: mode,
+    p_season_id: saisonId,
   })
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const lignes = (resultat.data ?? []) as ReusablePaymentOperation[]

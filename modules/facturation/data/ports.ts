@@ -229,7 +229,12 @@ export interface ClientsPort {
 }
 
 export interface OperationsPartageesPort {
-  lister(): Promise<OperationPartagee[]>
+  /**
+   * `saisonId` limite la liste aux opérations sans allocation encore (donc
+   * sans saison propre) ou ayant au moins une allocation dans cette saison
+   * (reprise.md §5.3). Omis : comportement historique, non filtré.
+   */
+  lister(saisonId?: string): Promise<OperationPartagee[]>
   parId(id: string): Promise<OperationPartagee | null>
   creer(operation: OperationPartagee): Promise<OperationPartagee>
   /**

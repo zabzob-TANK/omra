@@ -251,7 +251,7 @@ export async function chargerEtat(): Promise<EtatFacturation> {
     source.referentiels.tarifs(saison.id),
     // reprise.md §5.3 — un écran ne mélange jamais les saisons.
     source.recus.lister({ inclureAnnules: true, saisonId: saison.id }),
-    source.operationsPartagees.lister(),
+    source.operationsPartagees.lister(saison.id),
     source.audit.lister(200),
   ])
 
@@ -304,8 +304,9 @@ async function contexteCommun(source: SourceDonnees) {
     utilisateur,
     saison,
     tarifs: await source.referentiels.tarifs(saison.id),
-    operations: await source.operationsPartagees.lister(),
-    recus: await source.recus.lister({ inclureAnnules: true }),
+    // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+    operations: await source.operationsPartagees.lister(saison.id),
+    recus: await source.recus.lister({ inclureAnnules: true, saisonId: saison.id }),
     horodatage: horodatage(maintenant),
     date: dateDuJour(maintenant),
     heure: heureCourante(maintenant),
@@ -690,7 +691,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
-  const operations = await source.operationsPartagees.lister()
+  const operations = await source.operationsPartagees.lister(saison.id)
 
   const tous = collecterMouvements(recus)
   const retenus = trierMouvements(tous.filter((m) => dansLaPeriode(m.jour, periode, maintenant)))
@@ -1038,7 +1039,7 @@ export async function suiviJournalier(
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const saison = await source.referentiels.saisonActive()
   const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
-  const operations = await source.operationsPartagees.lister()
+  const operations = await source.operationsPartagees.lister(saison.id)
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
 
   // Les anomalies restantes sont précalculées : le domaine n'attend qu'une
@@ -1217,7 +1218,7 @@ async function operationsBancaires(source: SourceDonnees): Promise<OperationBanc
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const saison = await source.referentiels.saisonActive()
   const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
-  const operations = await source.operationsPartagees.lister()
+  const operations = await source.operationsPartagees.lister(saison.id)
   return collecterOperationsBancaires(recus, operations)
 }
 
