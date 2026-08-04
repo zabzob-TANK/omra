@@ -22,10 +22,14 @@ import type {
   BillingAnomaly,
   BillingReceiptDetail,
   BillingReceiptRow,
+  CashRegisterRefundMovement,
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
+import { cleJourDepuisDateFr } from '../../domain/dates'
+import { dhVersCentimes } from './dh'
+import { isoVersDateFr, isoVersHeure } from './dates'
 import type { FiltreRecus } from '../ports'
-import type { OperationPartagee, Recu } from '../../domain/types'
+import type { MouvementCaisse, OperationPartagee, Recu } from '../../domain/types'
 import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 
 const TAILLE_PAGE = 200
@@ -169,6 +173,37 @@ export async function listerOperationsPartageesReutilisables(
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const lignes = (resultat.data ?? []) as ReusablePaymentOperation[]
   return lignes.map(mapReusableOperationToOperationPartagee)
+}
+
+/**
+ * `MouvementsCaissePort.listerParJour`/`.lister` — Lot Finance, étape 4a
+ * (fusion.md §5). `cash_register_movements` existe déjà (annulation avec
+ * remboursement espèces, `cancel_billing_receipt`) ; `list_cash_register_refund_movements`
+ * (202608040002) se contente de l'exposer en lecture, jointe au reçu et au
+ * voyageur. `p_season_id` respecte reprise.md §5.3 — un écran ne mélange
+ * jamais les saisons.
+ */
+export async function listerMouvementsCaisseReel(saisonId: string | null): Promise<MouvementCaisse[]> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('list_cash_register_refund_movements', {
+    p_season_id: saisonId,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const lignes = (resultat.data ?? []) as CashRegisterRefundMovement[]
+  return lignes.map((ligne) => {
+    const date = isoVersDateFr(ligne.occurred_at)
+    return {
+      id: ligne.movement_id,
+      type: 'refund_cash',
+      jour: cleJourDepuisDateFr(date),
+      date,
+      heure: isoVersHeure(ligne.occurred_at),
+      montantCentimes: dhVersCentimes(ligne.amount_dh),
+      recuNumero: ligne.receipt_number,
+      client: `${ligne.traveler_first_name_snapshot} ${ligne.traveler_last_name_snapshot}`.trim(),
+      employe: ligne.created_by_slot_label_snapshot,
+    }
+  })
 }
 
 /**

@@ -229,9 +229,15 @@ export interface OperationsPartageesPort {
 }
 
 export interface MouvementsCaissePort {
-  /** R-48 — Sorties réelles de caisse espèces. */
-  listerParJour(jour: CleJour): Promise<MouvementCaisse[]>
-  lister(): Promise<MouvementCaisse[]>
+  /**
+   * R-48 — Sorties réelles de caisse espèces.
+   *
+   * `saisonId` — reprise.md §5.3 : un écran ne mélange jamais les saisons.
+   * Optionnel pour ne pas casser l'adaptateur de démonstration, mono-saison
+   * par construction.
+   */
+  listerParJour(jour: CleJour, saisonId?: string): Promise<MouvementCaisse[]>
+  lister(saisonId?: string): Promise<MouvementCaisse[]>
   creer(mouvement: MouvementCaisse): Promise<MouvementCaisse>
 }
 

@@ -170,6 +170,18 @@ export type ReusablePaymentOperation = {
   has_active_supporting_image: boolean
 }
 
+/** Ligne brute de `list_cash_register_refund_movements` — une sortie de caisse réelle liée à une annulation. */
+export type CashRegisterRefundMovement = {
+  movement_id: string
+  receipt_id: string
+  receipt_number: number
+  traveler_first_name_snapshot: string
+  traveler_last_name_snapshot: string
+  amount_dh: number
+  occurred_at: string
+  created_by_slot_label_snapshot: string
+}
+
 export type BillingReceiptDetail = {
   receipt: {
     id: string

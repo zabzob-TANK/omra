@@ -623,9 +623,11 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
   const maintenant = source.horloge.maintenant()
   const utilisateur = await source.session.utilisateurCourant()
   const estAdministrateur = utilisateur ? source.session.estAdministrateur(utilisateur) : false
+  const saison = await source.referentiels.saisonActive()
 
-  const recus = await source.recus.lister({ inclureAnnules: true })
-  const mouvementsCaisse = await source.mouvementsCaisse.lister()
+  // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
   const operations = await source.operationsPartagees.lister()
 
   const tous = collecterMouvements(recus)
@@ -827,8 +829,10 @@ export async function enregistrerImpressionFinance(
     }
   }
 
-  const recus = await source.recus.lister({ inclureAnnules: true })
-  const mouvementsCaisse = await source.mouvementsCaisse.lister()
+  // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+  const saison = await source.referentiels.saisonActive()
+  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
   const impressions = await source.impressionsFinance.listerParJour(jour)
 
   const mouvementIds = [
@@ -961,9 +965,11 @@ export async function suiviJournalier(
   const mois = moisValide(options.mois, maintenant)
   const afficherVides = options.afficherVides !== false
 
-  const recus = await source.recus.lister({ inclureAnnules: true })
+  // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+  const saison = await source.referentiels.saisonActive()
+  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
   const operations = await source.operationsPartagees.lister()
-  const mouvementsCaisse = await source.mouvementsCaisse.lister()
+  const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
 
   // Les anomalies restantes sont précalculées : le domaine n'attend qu'une
   // lecture synchrone.
@@ -1138,7 +1144,9 @@ export interface RegistreBancaire {
 }
 
 async function operationsBancaires(source: SourceDonnees): Promise<OperationBancaire[]> {
-  const recus = await source.recus.lister({ inclureAnnules: true })
+  // reprise.md §5.3 — un écran ne mélange jamais les saisons.
+  const saison = await source.referentiels.saisonActive()
+  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
   const operations = await source.operationsPartagees.lister()
   return collecterOperationsBancaires(recus, operations)
 }
