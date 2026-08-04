@@ -117,7 +117,15 @@ function mapVersement(
     portee,
     operationPartageeId: portee === 'shared' ? operation.id : '',
     payeur: instrument?.payer_name ?? '',
-    montantOperationCentimes: dhVersCentimes(operation.operation_amount_dh),
+    // Prototype (`v.colAmt`) et `instrumentUnique()` du domaine : 0 pour un
+    // instrument unique, jamais le montant réel de l'opération sous-jacente.
+    // `collecterOperationsBancaires` (cheque-register.ts) reproduit la
+    // détection « partagée » exacte du prototype, qui suppose ce contrat —
+    // le violer faisait passer tout chèque/virement unique pour « Partagé »
+    // dans l'écran Chèques et virements dès que l'opération avait un montant
+    // réel non nul (systématique côté omra, chaque paiement ayant sa propre
+    // opération). Voir RAPPORT-CHANTIER.md.
+    montantOperationCentimes: portee === 'shared' ? dhVersCentimes(operation.operation_amount_dh) : 0,
     // R-38 — l'image d'un versement partagé appartient à l'opération, jamais
     // au versement : ce champ reste `null` dans ce cas.
     image: portee === 'unique' && operation.supporting_image

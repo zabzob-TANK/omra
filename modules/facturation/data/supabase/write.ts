@@ -404,8 +404,20 @@ export async function corrigerPremierVersementSupabase(
   const detail = await chargerDetailRecuBrut(recuId)
   if (!detail) throw new Error('Reçu introuvable pour la correction du premier versement.')
 
-  const nomClient = `${detail.registration.first_name_snapshot} ${detail.registration.last_name_snapshot}`
-  const instrument = resoudreParametresInstrument(versement, nomClient)
+  // Le payeur par défaut d'un instrument unique doit rester stable : repris
+  // de l'opération déjà enregistrée, jamais recalculé depuis l'identité
+  // courante du client. Sinon, renommer le client entre deux corrections
+  // fait paraître « la méthode a changé » à la RPC (qui compare le payeur
+  // transmis à celui déjà stocké) et crée une opération neuve, orpheline de
+  // son justificatif — confirmé en conditions réelles (RAPPORT-CHANTIER.md).
+  const premierPaiement = detail.payments.find((p) => p.payment_number === 1)
+  const operationActuelle = premierPaiement
+    ? detail.operations.find((o) => o.id === premierPaiement.payment_operation_id)
+    : undefined
+  const nomPayeurParDefaut =
+    operationActuelle?.instrument?.payer_name ||
+    `${detail.registration.first_name_snapshot} ${detail.registration.last_name_snapshot}`
+  const instrument = resoudreParametresInstrument(versement, nomPayeurParDefaut)
 
   const supabase = await createClient()
   const { error } = await supabase.rpc('correct_billing_receipt_first_payment_method', {

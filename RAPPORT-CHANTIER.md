@@ -40,6 +40,64 @@ rapport tient compte de cet état réel, pas de l'ancien état documenté.
 
 ## Bugs trouvés
 
+### -2. Corriger le montant d'un chèque/virement unique après avoir renommé le client dupliquait l'opération et perdait le lien vers l'image (corrigé)
+
+Trouvé en creusant pourquoi l'image d'un chèque, ajoutée à la création du
+reçu test n°11, avait disparu de l'affichage après une simple correction de
+montant. Enchaînement exact reproduit : création du reçu (chèque unique +
+image) → correction de l'identité du client → correction du montant du
+premier versement (rien d'autre changé). Vérifié en lecture seule sur la
+vraie base : cette dernière étape avait silencieusement créé une **toute
+nouvelle** opération de paiement au lieu de corriger celle en place —
+l'ancienne opération et son image restent intactes (aucune suppression
+silencieuse, ce point de la règle était respecté), mais orphelines.
+
+**Cause** : un chèque/virement « unique » n'a pas de payeur au sens métier,
+mais la RPC exige quand même ce champ techniquement ; le code comble ce
+vide avec le **nom actuel du client**. Ce nom est recalculé à chaque
+correction. La RPC compare ce nom au payeur déjà stocké pour décider si
+« la méthode a changé » ; comme le client avait été renommé entre-temps, la
+comparaison échouait à tort et déclenchait la création d'une opération
+neuve.
+
+**Corrigé** — `modules/facturation/data/supabase/write.ts`,
+`corrigerPremierVersementSupabase()` : le payeur par défaut est maintenant
+repris de l'opération déjà enregistrée sur le premier versement, jamais
+recalculé depuis l'identité courante du client.
+
+**Revérifié en conditions réelles**, deux fois de suite (renommer le
+client puis corriger le montant) : l'opération reste désormais la même
+(vérifié par son identifiant dans l'historique), le montant se met à jour
+correctement, et le payeur stocké reste stable — comme l'exige la règle
+« une opération déjà utilisée garde son payeur verrouillé ».
+
+### -1.5. Écran « Chèques et virements » : tout chèque/virement unique s'affichait comme « Partagé » (corrigé)
+
+Trouvé en vérifiant le bug ci-dessus : l'écran Finance → Paiements affichait
+« Type : Partagé » pour le chèque du reçu 11, alors que la vraie base disait
+bien « unique » — un bug d'affichage distinct, sans lien avec la
+duplication d'opération.
+
+**Cause** : `collecterOperationsBancaires` (`cheque-register.ts`) reproduit
+fidèlement la détection du fichier de référence, qui suppose qu'un montant
+d'opération non nul (`colAmt`) ne peut arriver que pour une opération
+partagée — vrai dans le prototype, où ce champ vaut `0` pour un instrument
+unique. Mais le mappeur Supabase (`mappers.ts`, lu depuis la vraie base)
+renvoyait le montant réel de l'opération dans tous les cas, y compris pour
+un instrument unique (où ce montant est toujours positif, puisqu'il égale
+le paiement) — cassant le contrat implicite dont dépend le fichier de
+référence. Concrètement : **toute** opération unique de la vraie base
+tombait dans ce piège, pas seulement celle du reçu test.
+
+**Corrigé** — `modules/facturation/data/supabase/mappers.ts`,
+`mapVersement()` : ce montant vaut désormais `0` pour un instrument unique,
+comme le veut le contrat du domaine (`instrumentUnique()`) et le fichier de
+référence.
+
+**Revérifié en conditions réelles** : le chèque du reçu 11 affiche
+maintenant « Unique », une opération réellement partagée à côté continue
+d'afficher « Partagé » correctement.
+
 ### -1. Un trop-perçu se faisait passer pour un reçu soldé, sans aucune trace visible (corrigé)
 
 Trouvé en testant volontairement un scénario d'anomalie : changer le
@@ -381,6 +439,11 @@ Testés en interactif en mode démonstration (`http://127.0.0.1:3001/facturation
 
 ## Fichiers modifiés sur `chantier-local`
 
+- `modules/facturation/data/supabase/write.ts` — `corrigerPremierVersementSupabase()`
+  reprend le payeur déjà stocké au lieu du nom courant du client (item -2).
+- `modules/facturation/data/supabase/mappers.ts` — `mapVersement()` renvoie
+  `montantOperationCentimes: 0` pour un instrument unique, comme le domaine
+  et le fichier de référence (item -1.5).
 - `modules/facturation/domain/rules/receipt.ts` — `statutAffiche`/`symboleSituation`
   comparent le restant strictement à zéro (item -1, trop-perçu visible).
 - `modules/facturation/domain/rules/payment.ts` — `motifRefusVersement`
