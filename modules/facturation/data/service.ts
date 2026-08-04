@@ -420,7 +420,19 @@ export async function annulerRecu(
 
   const { donnees, mouvementCaisse } = resultat.valeur
   await source.recus.annuler(recuId, donnees)
-  if (mouvementCaisse) await source.mouvementsCaisse.creer(mouvementCaisse)
+  // La sortie de caisse réelle est déjà actée par `cancel_billing_receipt`
+  // (RPC omra, `cash_register_movements`) au moment de l'appel précédent.
+  // `mouvementsCaisse.creer` alimente uniquement le journal financier du
+  // prototype (Finance/Suivi, fusion.md §5 — lot non câblé côté omra) : son
+  // indisponibilité ne doit jamais annuler ou faire échouer une annulation de
+  // reçu déjà actée en base.
+  if (mouvementCaisse) {
+    try {
+      await source.mouvementsCaisse.creer(mouvementCaisse)
+    } catch {
+      // Intentionnellement ignoré — voir commentaire ci-dessus.
+    }
+  }
 
   await tracer(
     source,
