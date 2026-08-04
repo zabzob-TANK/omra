@@ -108,6 +108,22 @@ reste inchangée** (ce n'est pas une décision à improviser) — seul le
 Revérifié en conditions réelles : la fenêtre affiche maintenant le message
 et redevient utilisable (boutons réactivés) au lieu de rester bloquée.
 
+**Filet de sécurité généralisé.** En creusant ce cas, le même défaut
+(exception non attrapée → fenêtre bloquée sans message) existait pour
+**toute** erreur inattendue lors de l'écriture, pas seulement celle du
+groupe, et pas seulement dans `modifierRecu()` : `creerRecu()`,
+`ajouterVersement()` et `annulerRecu()` (`modules/facturation/data/service.ts`)
+appelaient elles aussi leur RPC d'écriture sans filet. Un test réel l'a
+confirmé : rouvrir « Identité » sur un reçu et enregistrer sans changement
+réel a déclenché « Error: No personal data changed » côté RPC, avec le
+même blocage de fenêtre. Les quatre fonctions attrapent maintenant toute
+erreur inattendue à ce point précis, la journalisent côté serveur
+(`console.error`) pour le diagnostic, et renvoient un nouveau code
+générique `erreur-inattendue` (« تعذر حفظ التعديل. تحقق من أنك غيّرت شيئًا
+فعلاً ثم أعد المحاولة. ») au lieu de laisser l'exception remonter brute.
+Revérifié : la fenêtre « Identité » affiche maintenant ce message et reste
+utilisable dans ce scénario.
+
 ### 0quater. Correction du montant du premier versement : jamais branchée malgré la migration déployée (trouvé, pas corrigé — à valider avant de s'y lancer)
 
 Découverte plus importante en creusant la section « Groupe » ci-dessus :

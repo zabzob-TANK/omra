@@ -358,22 +358,31 @@ export async function creerRecu(
 
   const { donnees: donneesValidees, nouvelleOperation } = resultat.valeur as ResultatCreation
   const donnees = { ...donneesValidees, numero }
-  if (nouvelleOperation) await source.operationsPartagees.creer(nouvelleOperation)
 
-  // R-13 — le client est créé et rattaché au reçu.
-  await source.clients.creer({
-    id: clientId,
-    nom: donnees.nom,
-    prenom: donnees.prenom,
-    photoUrl: '',
-    passeport: donnees.passeport,
-    creeLe: base.horodatage,
-    creePar: base.employe,
-    recuIds: [],
-  })
+  let recu: Recu
+  try {
+    if (nouvelleOperation) await source.operationsPartagees.creer(nouvelleOperation)
 
-  const recu = await source.recus.creer(donnees)
-  await source.clients.rattacherRecu(clientId, recu.id)
+    // R-13 — le client est créé et rattaché au reçu.
+    await source.clients.creer({
+      id: clientId,
+      nom: donnees.nom,
+      prenom: donnees.prenom,
+      photoUrl: '',
+      passeport: donnees.passeport,
+      creeLe: base.horodatage,
+      creePar: base.employe,
+      recuIds: [],
+    })
+
+    recu = await source.recus.creer(donnees)
+    await source.clients.rattacherRecu(clientId, recu.id)
+  } catch (erreurEcriture) {
+    // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
+    // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
+    console.error('creerRecu — échec inattendu de l’écriture :', erreurEcriture)
+    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'erreur-inattendue' }] }
+  }
 
   await tracer(
     source,
@@ -426,10 +435,16 @@ export async function ajouterVersement(
   if (resultat.statut !== 'ok') return resultat
 
   const { versement, nouvelleOperation } = resultat.valeur
-  if (nouvelleOperation) await source.operationsPartagees.creer(nouvelleOperation)
-
   const cible = recu as Recu
-  await source.recus.ajouterVersement(cible.id, versement)
+  try {
+    if (nouvelleOperation) await source.operationsPartagees.creer(nouvelleOperation)
+    await source.recus.ajouterVersement(cible.id, versement)
+  } catch (erreurEcriture) {
+    // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
+    // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
+    console.error('ajouterVersement — échec inattendu de l’écriture :', erreurEcriture)
+    return { statut: 'erreurs', erreurs: [{ champ: 'montant', code: 'erreur-inattendue' }] }
+  }
 
   await tracer(
     source,
@@ -476,7 +491,14 @@ export async function annulerRecu(
   if (resultat.statut !== 'ok') return resultat
 
   const { donnees, mouvementCaisse } = resultat.valeur
-  await source.recus.annuler(recuId, donnees)
+  try {
+    await source.recus.annuler(recuId, donnees)
+  } catch (erreurEcriture) {
+    // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
+    // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
+    console.error('annulerRecu — échec inattendu de l’écriture :', erreurEcriture)
+    return { statut: 'erreurs', erreurs: [{ champ: 'motif', code: 'erreur-inattendue' }] }
+  }
   // La sortie de caisse réelle est déjà actée par `cancel_billing_receipt`
   // (RPC omra, `cash_register_movements`) au moment de l'appel précédent.
   // `mouvementsCaisse.creer` alimente uniquement le journal financier du
@@ -559,8 +581,16 @@ export async function modifierRecu(
       await source.recus.appliquerModification(recuId, champsModifies, modification)
     }
   } catch (erreurSection) {
-    if (!(erreurSection instanceof SectionIndisponibleError)) throw erreurSection
-    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'section-indisponible' }] }
+    if (erreurSection instanceof SectionIndisponibleError) {
+      return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'section-indisponible' }] }
+    }
+    // Filet de sécurité : une RPC peut refuser une écriture pour une raison
+    // qui n'est pas (encore) reconnue ici — ex. aucune donnée réellement
+    // changée. Sans ce filet, la fenêtre de modification restait bloquée
+    // sans aucun message (voir RAPPORT-CHANTIER.md). L'erreur réelle reste
+    // journalisée côté serveur pour le diagnostic.
+    console.error('modifierRecu — échec inattendu de l’écriture :', erreurSection)
+    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'erreur-inattendue' }] }
   }
 
   const resume = changements

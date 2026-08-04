@@ -15,6 +15,7 @@ export type CodeErreur =
   // Disponibilité générale
   | 'saison-indisponible'
   | 'section-indisponible'
+  | 'erreur-inattendue'
   // Identité et contact
   | 'prenom-obligatoire'
   | 'nom-obligatoire'
@@ -127,6 +128,7 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
   'saison-indisponible': () =>
     'لا توجد موسم نشط. يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة.',
   'section-indisponible': () => 'هذا القسم غير متاح حاليًا. جرّب قسمًا آخر أو راجع المدير.',
+  'erreur-inattendue': () => 'تعذر حفظ التعديل. تحقق من أنك غيّرت شيئًا فعلاً ثم أعد المحاولة.',
   'prenom-obligatoire': () => 'الاسم إجباري.',
   'nom-obligatoire': () => 'النسب إجباري.',
   'telephone-obligatoire': () => 'رقم الهاتف إجباري.',
