@@ -17,7 +17,42 @@ appliquées à distance — un vrai push a eu lieu avant le début de ce
 chantier (cohérent avec le commit `2fb1bfb docs: push réel exécuté`). Ce
 rapport tient compte de cet état réel, pas de l'ancien état documenté.
 
+## Décisions du commanditaire (reçues en cours de chantier)
+
+- **Mélange de saisons (item 1 ci-dessous)** : confirmé — une opération doit
+  rester dans sa saison. Ne change rien à la prudence de déploiement : la
+  migration reste préparée et testée, **non appliquée**, tant que le test
+  du site en ligne est en cours.
+- **Libellé français/arabe (item 2 ci-dessous)** : **explicitement laissé
+  tel quel**. Consigne reçue : « ce qui est en français reste en français
+  dans la langue, rien ne change tant que je n'ai pas décidé ». Aucune
+  modification faite ni prévue sur ce point sans nouvelle décision
+  explicite.
+
 ## Bugs trouvés
+
+### 0. Après « ajouter un paiement », l'appli ne rouvrait pas le reçu (corrigé)
+
+Signalé par le commanditaire : après avoir enregistré un paiement
+(« إضافة دفعة ») sur un reçu existant, l'application restait sur le
+registre au lieu d'ouvrir directement le reçu — alors que la création d'un
+nouveau reçu, elle, ouvre bien le reçu après enregistrement.
+
+Vérifié contre le fichier de référence : `savePay()` (le gestionnaire de
+paiement du prototype) fait exactement
+`this.setState({modal:null,curRecu:r.id,curOriginal:true,screen:'recu'})`
+après un enregistrement réussi — donc l'écran de reçu s'ouvre bien après
+un paiement dans l'original. Le port (`modules/facturation/ui/application.tsx`,
+gestionnaire `onEnregistrer` de `ModaleVersement`) avait le rafraîchissement
+et la notification, mais **pas** la navigation vers l'écran du reçu — un
+oubli de portage, pas une divergence voulue.
+
+**Corrigé** sur `chantier-local` (`application.tsx:808-827`) : ajout de
+`setRecuOriginal(...)` + `setEcran({ nom: 'recu', recuId: ... })` après un
+ajout de paiement réussi, à l'identique du chemin déjà existant pour un
+nouveau reçu. Revérifié en interactif en mode démonstration : le
+paiement s'enregistre, le montant payé se met à jour, et l'écran du reçu
+s'ouvre directement, comme demandé.
 
 ### 1. Mélange de saisons confirmé — RPC des opérations partagées réutilisables (déjà en production)
 
@@ -165,6 +200,8 @@ Testés en interactif en mode démonstration (`http://127.0.0.1:3001/facturation
 
 ## Fichiers modifiés sur `chantier-local`
 
+- `modules/facturation/ui/application.tsx` — navigation vers l'écran du
+  reçu après un ajout de paiement réussi (item 0 ci-dessus).
 - `modules/facturation/data/service.ts` — `contexteCommun()` et 3 autres
   appels : `recus.lister()`/`operationsPartagees.lister()` scopés à la
   saison active partout, sans exception.

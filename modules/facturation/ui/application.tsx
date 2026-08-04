@@ -819,6 +819,9 @@ export function ApplicationFacturation({
                   ? `تم — الوصل ${cible?.numero ?? ''} مسدد بالكامل`
                   : `تم تسجيل الدفعة — الباقي ${centimesEnTexteDevise(reste)}`,
               )
+              // Fichier de référence, savePay() : screen:'recu' après l'enregistrement.
+              setRecuOriginal(resultat.valeur.recuId)
+              setEcran({ nom: 'recu', recuId: resultat.valeur.recuId })
             }
             return resultat
           }}
