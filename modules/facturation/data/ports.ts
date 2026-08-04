@@ -242,9 +242,10 @@ export interface MouvementsCaissePort {
 }
 
 export interface ImpressionsFinancePort {
-  listerParJour(jour: CleJour): Promise<ImpressionFinance[]>
+  /** `saisonId` — reprise.md §5.3, optionnel pour l'adaptateur de démonstration. */
+  listerParJour(jour: CleJour, saisonId?: string): Promise<ImpressionFinance[]>
   /** R-62 — Enregistre la photographie des mouvements imprimés. */
-  creer(impression: ImpressionFinance): Promise<ImpressionFinance>
+  creer(impression: ImpressionFinance, saisonId?: string): Promise<ImpressionFinance>
 }
 
 export interface AcquittementsAnomaliePort {

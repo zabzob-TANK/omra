@@ -35,9 +35,18 @@ import 'server-only'
  */
 
 import { createClient } from '@/lib/supabase/server'
+import type { FinancePrintEvent } from '@/lib/facturation/types'
 import { cleJourDepuisDateFr } from '../../domain/dates'
 import { natureNormalisee, type NaturePaiement } from '../../domain/payment-method'
-import type { AcquittementAnomalie, Modification, Recu, ReferenceFichier, Versement } from '../../domain/types'
+import { isoVersHorodatage } from './dates'
+import type {
+  AcquittementAnomalie,
+  ImpressionFinance,
+  Modification,
+  Recu,
+  ReferenceFichier,
+  Versement,
+} from '../../domain/types'
 import type { CreationRecu } from '../ports'
 import { modePaiementDepuisNature } from './codes'
 import { centimesVersDh } from './dh'
@@ -451,4 +460,34 @@ export async function acquitterAnomaliesSupabase(
     p_movement_ids: acquittement.mouvementIds,
   })
   if (error) throw new Error(messageErreur(error))
+}
+
+/**
+ * `ImpressionsFinancePort.creer` — Lot Finance, étape 4c (fusion.md §5).
+ * reprise.md §5.12 : le compteur doit être écrit avant l'ouverture de la
+ * boîte système ; c'est `sequenceImpression`/`ui/ecrans/finance.tsx` (comme
+ * pour le reçu, P18) qui garantit cet ordre, pas cette fonction.
+ */
+export async function creerImpressionFinanceSupabase(
+  impression: ImpressionFinance,
+  saisonId: string,
+): Promise<ImpressionFinance> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('record_billing_finance_print', {
+    p_season_id: saisonId,
+    p_day: impression.jour,
+    p_movement_ids: impression.mouvementIds,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const ligne = (resultat.data as FinancePrintEvent[] | null)?.[0]
+  if (!ligne) throw new Error("record_billing_finance_print n'a renvoyé aucun événement.")
+  return {
+    id: `${saisonId}:${impression.jour}:${ligne.print_number}`,
+    jour: impression.jour,
+    imprimeLe: isoVersHorodatage(ligne.printed_at),
+    employe: ligne.printed_by_slot_label_snapshot,
+    numeroImpression: ligne.print_number,
+    mouvementIds: ligne.movement_ids,
+    nombreLignes: ligne.row_count,
+  }
 }

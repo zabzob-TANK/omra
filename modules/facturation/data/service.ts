@@ -643,7 +643,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
   let anomalies: string[] = []
   let nombreImpressions = 0
   if (jourSelectionne) {
-    const impressions = await source.impressionsFinance.listerParJour(jourSelectionne)
+    const impressions = await source.impressionsFinance.listerParJour(jourSelectionne, saison.id)
     nombreImpressions = impressions.length
     const idsDuJour = [
       ...tous.filter((m) => m.jour === jourSelectionne).map((m) => m.id),
@@ -659,7 +659,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
   let etatDeLaVeille = '✓'
   if (jourSelectionne) {
     const veille = decalerCleJour(jourSelectionne, -1)
-    const impressionsVeille = await source.impressionsFinance.listerParJour(veille)
+    const impressionsVeille = await source.impressionsFinance.listerParJour(veille, saison.id)
     const idsVeille = [
       ...tous.filter((m) => m.jour === veille).map((m) => m.id),
       ...mouvementsCaisse.filter((m) => m.jour === veille).map((m) => m.id),
@@ -833,7 +833,7 @@ export async function enregistrerImpressionFinance(
   const saison = await source.referentiels.saisonActive()
   const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
-  const impressions = await source.impressionsFinance.listerParJour(jour)
+  const impressions = await source.impressionsFinance.listerParJour(jour, saison.id)
 
   const mouvementIds = [
     ...collecterMouvements(recus)
@@ -843,15 +843,18 @@ export async function enregistrerImpressionFinance(
   ].sort()
 
   const numeroImpression = impressions.length + 1
-  await source.impressionsFinance.creer({
-    id: source.identifiants.nouvelId('impression'),
-    jour,
-    imprimeLe: horodatage(maintenant),
-    employe: utilisateur?.nom ?? '—',
-    numeroImpression,
-    mouvementIds,
-    nombreLignes: mouvementIds.length,
-  })
+  await source.impressionsFinance.creer(
+    {
+      id: source.identifiants.nouvelId('impression'),
+      jour,
+      imprimeLe: horodatage(maintenant),
+      employe: utilisateur?.nom ?? '—',
+      numeroImpression,
+      mouvementIds,
+      nombreLignes: mouvementIds.length,
+    },
+    saison.id,
+  )
 
   await tracer(
     source,
@@ -984,7 +987,7 @@ export async function suiviJournalier(
   const tousMouvements = collecterMouvements(recus)
 
   for (const cle of cles) {
-    const impressions = await source.impressionsFinance.listerParJour(cle)
+    const impressions = await source.impressionsFinance.listerParJour(cle, saison.id)
     if (!impressions.length) continue
     impressionsParJour.push(...impressions)
     const ids = [

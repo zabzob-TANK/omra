@@ -24,13 +24,20 @@ import type {
   BillingReceiptRow,
   CashRegisterRefundMovement,
   FinanceAnomalyAcknowledgement,
+  FinancePrintEvent,
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
 import { cleJourDepuisDateFr } from '../../domain/dates'
 import { dhVersCentimes } from './dh'
 import { isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
 import type { FiltreRecus } from '../ports'
-import type { AcquittementAnomalie, MouvementCaisse, OperationPartagee, Recu } from '../../domain/types'
+import type {
+  AcquittementAnomalie,
+  ImpressionFinance,
+  MouvementCaisse,
+  OperationPartagee,
+  Recu,
+} from '../../domain/types'
 import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 
 const TAILLE_PAGE = 200
@@ -232,6 +239,35 @@ export async function chargerAcquittementAnomalieReel(
     acquitteLe: isoVersHorodatage(ligne.acknowledged_at),
     acquittePar: ligne.acknowledged_by_slot_label_snapshot,
   }
+}
+
+/**
+ * `ImpressionsFinancePort.listerParJour` — Lot Finance, étape 4c (fusion.md
+ * §5). Lecture de `list_billing_finance_print_events`, nouvelle table
+ * `facturation_finance_print_events` (202608040004).
+ */
+export async function listerImpressionsFinanceReel(
+  saisonId: string,
+  jour: string,
+): Promise<ImpressionFinance[]> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('list_billing_finance_print_events', {
+    p_season_id: saisonId,
+    p_day: jour,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const lignes = (resultat.data ?? []) as FinancePrintEvent[]
+  return lignes.map((ligne) => ({
+    // Aucune colonne `id` propre n'est exposée par la RPC ; (saison, jour,
+    // numéro) identifie déjà une impression de façon unique et stable.
+    id: `${saisonId}:${jour}:${ligne.print_number}`,
+    jour,
+    imprimeLe: isoVersHorodatage(ligne.printed_at),
+    employe: ligne.printed_by_slot_label_snapshot,
+    numeroImpression: ligne.print_number,
+    mouvementIds: ligne.movement_ids,
+    nombreLignes: ligne.row_count,
+  }))
 }
 
 /**

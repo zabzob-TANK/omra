@@ -18,8 +18,12 @@ import type {
   LecteurPasseportPort,
   MouvementsCaissePort,
 } from '../ports'
-import { chargerAcquittementAnomalieReel, listerMouvementsCaisseReel } from './read'
-import { acquitterAnomaliesSupabase } from './write'
+import {
+  chargerAcquittementAnomalieReel,
+  listerImpressionsFinanceReel,
+  listerMouvementsCaisseReel,
+} from './read'
+import { acquitterAnomaliesSupabase, creerImpressionFinanceSupabase } from './write'
 
 function indisponible(nom: string): never {
   throw new Error(
@@ -49,18 +53,19 @@ export const mouvementsCaisseSupabase: MouvementsCaissePort = {
 }
 
 /**
- * Lot Finance, étape 4c (impression du journal) — table non encore créée
- * côté omra. En attendant, cette lecture renvoie une valeur vide correcte
- * (aucune impression du journal n'existe réellement) plutôt que de lever une
- * erreur qui bloquerait tout l'écran Finance/Suivi : ce n'est pas un faux
- * succès, c'est l'état réel du système avant que 4c ne soit construit.
+ * Lot Finance, étape 4c (fusion.md §5) : lecture et écriture réelles
+ * (`facturation_finance_print_events`, 202608040004). `saisonId` est requis
+ * pour l'écriture — `service.ts::enregistrerImpressionFinance` le fournit
+ * toujours (reprise.md §5.3, saison active résolue en amont).
  */
 export const impressionsFinanceSupabase: ImpressionsFinancePort = {
-  async listerParJour() {
-    return []
+  async listerParJour(jour, saisonId) {
+    if (!saisonId) return []
+    return listerImpressionsFinanceReel(saisonId, jour)
   },
-  async creer() {
-    return indisponible('impressionsFinance.creer')
+  async creer(impression, saisonId) {
+    if (!saisonId) throw new Error('Saison requise pour enregistrer une impression du journal.')
+    return creerImpressionFinanceSupabase(impression, saisonId)
   },
 }
 

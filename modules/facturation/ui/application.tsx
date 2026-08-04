@@ -556,10 +556,21 @@ export function ApplicationFacturation({
               notifier('اختر يوماً واحداً للطباعة.', true)
               return
             }
-            const resultat = await actions.enregistrerImpressionFinance(journal.jourSelectionne)
-            if (resultat.statut !== 'ok') {
-              notifier('يمكن للموظف طباعة اليوم أو أمس فقط.', true)
-              return
+            // reprise.md §5.12 — le compteur est écrit avant l'ouverture de la
+            // boîte système. Un refus explicite (hors fenêtre autorisée, R-61)
+            // bloque l'impression, comme avant. Un échec inattendu (panne
+            // réseau, etc.), lui, ne doit jamais empêcher l'employé de remettre
+            // le document — même décision de résilience que P18 pour le reçu
+            // (`sequenceImpression`) : l'erreur est affichée, jamais avalée.
+            let echecCompteurInattendu = false
+            try {
+              const resultat = await actions.enregistrerImpressionFinance(journal.jourSelectionne)
+              if (resultat.statut !== 'ok') {
+                notifier('يمكن للموظف طباعة اليوم أو أمس فقط.', true)
+                return
+              }
+            } catch {
+              echecCompteurInattendu = true
             }
             await chargerJournal(periodeFinance)
             // R-67 — A4 paysage, marge 5 mm, posée le temps de l'impression.
@@ -570,6 +581,9 @@ export function ApplicationFacturation({
             window.print()
             document.body.classList.remove('finance-impression')
             style.remove()
+            if (echecCompteurInattendu) {
+              notifier('تعذر تسجيل عداد الطباعة. تمت الطباعة رغم ذلك.', true)
+            }
           }}
           onAcquitter={() => setFenetre({ type: 'anomalieFinance' })}
           onOuvrirDetail={(recuId) => setFenetre({ type: 'detail', recuId })}
@@ -843,10 +857,14 @@ export function ApplicationFacturation({
           onFermer={fermer}
           onConfirmer={async () => {
             if (!journal.jourSelectionne) return
-            const resultat = await actions.acquitterAnomalies(journal.jourSelectionne)
-            if (resultat.statut === 'ok') {
-              await chargerJournal(periodeFinance)
-              await rafraichir()
+            try {
+              const resultat = await actions.acquitterAnomalies(journal.jourSelectionne)
+              if (resultat.statut === 'ok') {
+                await chargerJournal(periodeFinance)
+                await rafraichir()
+              }
+            } catch {
+              notifier('تعذر تأكيد المراجعة. حاول مرة أخرى.', true)
             }
             fermer()
           }}

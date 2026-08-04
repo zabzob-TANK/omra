@@ -178,6 +178,15 @@ export type FinanceAnomalyAcknowledgement = {
   acknowledged_by_slot_label_snapshot: string
 }
 
+/** Ligne brute de `list_billing_finance_print_events`/`record_billing_finance_print`. */
+export type FinancePrintEvent = {
+  print_number: number
+  movement_ids: string[]
+  row_count: number
+  printed_at: string
+  printed_by_slot_label_snapshot: string
+}
+
 /** Ligne brute de `list_cash_register_refund_movements` — une sortie de caisse réelle liée à une annulation. */
 export type CashRegisterRefundMovement = {
   movement_id: string
