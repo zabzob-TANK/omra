@@ -12,6 +12,8 @@
 import { centimesEnTexteDevise } from '../money'
 
 export type CodeErreur =
+  // Disponibilité générale
+  | 'saison-indisponible'
   // Identité et contact
   | 'prenom-obligatoire'
   | 'nom-obligatoire'
@@ -72,6 +74,7 @@ export type CodeErreur =
   | 'image-deja-presente'
   | 'aucune-image-importee'
   | 'suppression-image-reservee-administrateur'
+  | 'format-image-non-accepte'
 
 export interface ErreurValidation {
   /** Champ concerné, tel qu'identifié dans le formulaire. */
@@ -120,6 +123,8 @@ export function ok<T>(valeur: T): Resultat<T> {
  * en arabe. Rien n'est traduit ni reformulé.
  */
 export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) => string> = {
+  'saison-indisponible': () =>
+    'لا توجد موسم نشط. يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة.',
   'prenom-obligatoire': () => 'الاسم إجباري.',
   'nom-obligatoire': () => 'النسب إجباري.',
   'telephone-obligatoire': () => 'رقم الهاتف إجباري.',
@@ -187,6 +192,8 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
   'aucune-image-importee': () => 'Importez une image avant de l’enregistrer.',
   'suppression-image-reservee-administrateur': () =>
     'Seul l’administrateur peut supprimer l’image.',
+  'format-image-non-accepte': () =>
+    'Format non accepté — utilisez une image JPG, PNG ou WebP.',
 }
 
 /** Rend le message d'une erreur, dans la langue du fichier de référence. */

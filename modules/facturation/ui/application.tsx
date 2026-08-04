@@ -138,6 +138,11 @@ export function ApplicationFacturation({
   comptesEssai: string[]
 }) {
   const [etat, setEtat] = useState(etatInitial)
+  // Aucune saison active : registre, Finance, Suivi journalier et Paiements
+  // affichent un message propre au lieu de leur contenu habituel — état
+  // d'exploitation normal (avant la première saison, ou entre deux), pas une
+  // panne. Voir `EcranAVenir` plus bas et `service.ts::chargerEtat()`.
+  const aucuneSaison = etat.saisonIndisponible
   // L'authentification omra a déjà eu lieu avant que cette interface ne soit
   // montée (`requireActiveAccount()` dans `app/facturation/page.tsx`) :
   // `chargerEtat()` porte donc toujours un utilisateur réel ici, et l'écran
@@ -415,10 +420,12 @@ export function ApplicationFacturation({
 
         <div className="omra-spacer" />
 
-        <div className="omra-season">
-          <span className="omra-season-dot" />
-          <TexteArabe>{T.saisonActive(etat.saison.nom)}</TexteArabe>
-        </div>
+        {!aucuneSaison ? (
+          <div className="omra-season">
+            <span className="omra-season-dot" />
+            <TexteArabe>{T.saisonActive(etat.saison.nom)}</TexteArabe>
+          </div>
+        ) : null}
 
         <button
           className="omra-icon-btn"
@@ -514,7 +521,15 @@ export function ApplicationFacturation({
         </div>
       </header>
 
-      {ecran.nom === 'registre' ? (
+      {ecran.nom === 'registre' && aucuneSaison ? (
+        <EcranAVenir
+          titre="لا توجد موسم نشط"
+          note="يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة."
+          etiquette="بانتظار الإدارة"
+        />
+      ) : null}
+
+      {ecran.nom === 'registre' && !aucuneSaison ? (
         <EcranRegistre
           recus={etat.recus}
           rechercheNom={rechercheNom}
@@ -534,7 +549,18 @@ export function ApplicationFacturation({
 
       {ecran.nom === 'statistiques' ? <EcranStatistiques /> : null}
 
-      {ecran.nom === 'finance' && financeIndisponible ? (
+      {ecran.nom === 'finance' && aucuneSaison ? (
+        <>
+          <SousNavFinance active="finance" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre="لا توجد موسم نشط"
+            note="يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة."
+            etiquette="بانتظار الإدارة"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'finance' && !aucuneSaison && financeIndisponible ? (
         <>
           <SousNavFinance active="finance" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
           <EcranAVenir
@@ -545,7 +571,7 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
-      {ecran.nom === 'finance' && !financeIndisponible && journal ? (
+      {ecran.nom === 'finance' && !aucuneSaison && !financeIndisponible && journal ? (
         <EcranFinance
           journal={journal}
           aujourdhui={aujourdhui}
@@ -592,7 +618,18 @@ export function ApplicationFacturation({
         />
       ) : null}
 
-      {ecran.nom === 'suivi' && financeIndisponible ? (
+      {ecran.nom === 'suivi' && aucuneSaison ? (
+        <>
+          <SousNavFinance active="suivi" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre="لا توجد موسم نشط"
+            note="يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة."
+            etiquette="بانتظار الإدارة"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'suivi' && !aucuneSaison && financeIndisponible ? (
         <>
           <SousNavFinance active="suivi" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
           <EcranAVenir
@@ -605,7 +642,7 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
-      {ecran.nom === 'suivi' && !financeIndisponible && suivi ? (
+      {ecran.nom === 'suivi' && !aucuneSaison && !financeIndisponible && suivi ? (
         <>
           <SousNavFinance
             active="suivi"
@@ -681,7 +718,18 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
-      {ecran.nom === 'paiements' && financeIndisponible ? (
+      {ecran.nom === 'paiements' && aucuneSaison ? (
+        <>
+          <SousNavFinance active="paiements" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranAVenir
+            titre="لا توجد موسم نشط"
+            note="يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة."
+            etiquette="بانتظار الإدارة"
+          />
+        </>
+      ) : null}
+
+      {ecran.nom === 'paiements' && !aucuneSaison && financeIndisponible ? (
         <>
           <SousNavFinance active="paiements" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
           <EcranAVenir
@@ -694,7 +742,7 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
-      {ecran.nom === 'paiements' && !financeIndisponible && registre ? (
+      {ecran.nom === 'paiements' && !aucuneSaison && !financeIndisponible && registre ? (
         <>
           <SousNavFinance
             active="paiements"
@@ -732,6 +780,7 @@ export function ApplicationFacturation({
           operations={etat.operations}
           recus={etat.recus}
           imagesOperations={etat.imagesOperations}
+          modeDemonstration={etat.modeDemonstration}
           onFermer={fermer}
           onEnregistrer={async (saisie, confirme, image, passeport) => {
             const resultat = await actions.creerRecu(saisie, confirme)
@@ -753,6 +802,7 @@ export function ApplicationFacturation({
           recus={etat.recus}
           operations={etat.operations}
           imagesOperations={etat.imagesOperations}
+          modeDemonstration={etat.modeDemonstration}
           recuVerrouilleId={fenetre.recuId}
           onFermer={fermer}
           onEnregistrer={async (saisie, confirme, image) => {
@@ -893,6 +943,7 @@ export function ApplicationFacturation({
       {fenetre.type === 'paiementImage' ? (
         <ModalePaiementImage
           cible={fenetre.cible}
+          modeDemonstration={etat.modeDemonstration}
           onFermer={fermer}
           onEnregistrer={async (fichier) => {
             const donnees = new FormData()

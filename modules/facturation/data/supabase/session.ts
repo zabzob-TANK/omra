@@ -12,6 +12,7 @@ import 'server-only'
  * privilèges internes élevés — s'authentifient ici, jamais via `/login`.
  */
 
+import type { User } from '@supabase/supabase-js'
 import type { ActiveAccount } from '@/lib/account-access'
 import { findActiveAccountByAuthUserId } from '@/lib/account-access'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -19,6 +20,25 @@ import { createClient } from '@/lib/supabase/server'
 import { ROLE_ADMINISTRATEUR } from '../../domain/constants'
 import type { Utilisateur } from '../../domain/types'
 import type { SessionPort } from '../ports'
+
+/**
+ * `getUser()` sécurisé : un jeton de rafraîchissement périmé, révoqué ou
+ * corrompu peut le faire lever au lieu de simplement renvoyer une erreur
+ * (comportement observé selon les versions du client Supabase). Traité ici
+ * exactement comme une absence de session — jamais de page plantée, jamais
+ * d'utilisateur fantôme.
+ */
+async function utilisateurAuthActif(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<User | null> {
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (error || !data.user) return null
+    return data.user
+  } catch {
+    return null
+  }
+}
 
 /** Rôle affiché pour les slots 2 à 6. Seul `ROLE_ADMINISTRATEUR` a une valeur contractuelle (`estAdministrateur`). */
 const ROLE_EMPLOYE = 'موظف'
@@ -50,10 +70,10 @@ function utilisateurDepuisCompte(compte: ActiveAccount): Utilisateur {
 
 async function utilisateurDepuisCompteActif(): Promise<Utilisateur | null> {
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data.user) return null
+  const utilisateurAuth = await utilisateurAuthActif(supabase)
+  if (!utilisateurAuth) return null
 
-  const compte = await findActiveAccountByAuthUserId(data.user.id)
+  const compte = await findActiveAccountByAuthUserId(utilisateurAuth.id)
   if (!compte) return null
 
   return utilisateurDepuisCompte(compte)
@@ -122,11 +142,11 @@ export const sessionSupabase: SessionPort = {
     // `signInWithPassword` sur le compte déjà connecté rafraîchit sa session
     // (cookies gérés par `createClient()`) sans changer d'identité.
     const supabase = await createClient()
-    const { data, error: erreurUtilisateur } = await supabase.auth.getUser()
-    if (erreurUtilisateur || !data.user?.email) return false
+    const utilisateurAuth = await utilisateurAuthActif(supabase)
+    if (!utilisateurAuth?.email) return false
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: data.user.email,
+      email: utilisateurAuth.email,
       password: motDePasse,
     })
     return !error

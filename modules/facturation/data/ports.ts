@@ -57,6 +57,17 @@ import type {
  * L'adaptateur de démonstration les sert depuis les constantes du prototype ;
  * l'adaptateur Omra les servira depuis les tables existantes du projet officiel.
  */
+
+/**
+ * Signale l'absence de toute saison active — un état d'exploitation normal
+ * (avant la première saison, ou entre deux), pas une panne. `saisonActive()`
+ * doit lever précisément cette erreur dans ce cas, jamais une `Error`
+ * générique : `service.ts::chargerEtat()` la reconnaît pour afficher un
+ * message propre au lieu de laisser planter toute l'interface, sans masquer
+ * une véritable erreur de lecture (base injoignable, etc.).
+ */
+export class SaisonIndisponibleError extends Error {}
+
 export interface ReferentielsPort {
   /** Saison courante. Fournit `reductionMaxCentimes`, utilisé par R-06. */
   saisonActive(): Promise<Saison>
@@ -271,6 +282,17 @@ export interface JournalAuditPort {
  * l'interface reste celle d'un stockage de fichiers afin que le passage au
  * stockage réel ne modifie ni le métier ni l'interface.
  */
+
+/**
+ * Signale un fichier dont le type MIME n'est pas accepté pour un justificatif
+ * (sécurité : seuls JPG/PNG/WebP sont acceptés, jamais SVG). `deposer()` doit
+ * lever précisément cette erreur dans ce cas, jamais une `Error` générique :
+ * `service.ts` la reconnaît pour renvoyer un `Resultat` d'erreur normal
+ * (message propre affiché à l'utilisateur) plutôt que de laisser planter
+ * toute la page.
+ */
+export class FormatImageNonAccepteError extends Error {}
+
 export interface StockageFichiersPort {
   /** Dépose un fichier et renvoie sa référence. */
   deposer(fichier: {

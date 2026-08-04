@@ -24,6 +24,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ReferenceFichier } from '../../domain/types'
+import { FormatImageNonAccepteError } from '../ports'
 import type { StockageFichiersPort } from '../ports'
 import { isoVersHorodatage } from './dates'
 
@@ -46,7 +47,9 @@ const depotsEnAttente = new Map<string, DepotEnAttente>()
 export const stockageSupabase: StockageFichiersPort = {
   async deposer(fichier) {
     if (!EXTENSION_PAR_TYPE[fichier.typeMime]) {
-      throw new Error(`Type d'image non autorisé pour un justificatif : ${fichier.typeMime}`)
+      throw new FormatImageNonAccepteError(
+        `Type d'image non autorisé pour un justificatif : ${fichier.typeMime}`,
+      )
     }
     const jeton = crypto.randomUUID()
     depotsEnAttente.set(jeton, { contenu: fichier.contenu, typeMime: fichier.typeMime })

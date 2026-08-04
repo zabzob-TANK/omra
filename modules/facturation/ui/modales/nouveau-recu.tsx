@@ -61,6 +61,8 @@ interface Proprietes {
   ) => Promise<Resultat<{ recuId: string; numero: number }>>
   /** R-38 — aperçus des images déjà portées par les opérations partagées. */
   imagesOperations: Record<string, string>
+  /** Voir `ModalePaiementImage`/`ModalePasseport` — masque les boutons d'exemple/démo hors démonstration. */
+  modeDemonstration: boolean
 }
 
 function saisieVierge(): SaisieNouveauRecu {
@@ -89,6 +91,7 @@ export function ModaleNouveauRecu({
   onFermer,
   onEnregistrer,
   imagesOperations,
+  modeDemonstration,
 }: Proprietes) {
   const [saisie, setSaisie] = useState<SaisieNouveauRecu>(saisieVierge())
   const [erreurs, setErreurs] = useState<ErreurValidation[]>([])
@@ -161,6 +164,7 @@ export function ModaleNouveauRecu({
       <ModalePasseport
         initial={saisie.passeport}
         apercuInitial={imagesPasseport?.apercu}
+        modeDemonstration={modeDemonstration}
         onFermer={() => setPasseportOuvert(false)}
         onValider={(passeport: Passeport, images: ImagesPasseport | null) => {
           modifier({
@@ -500,6 +504,7 @@ export function ModaleNouveauRecu({
       {image.ouverte ? (
         <ModalePaiementImage
           cible={cibleImageInstrument(saisie.instrument, saisie.premierVersement)}
+          modeDemonstration={modeDemonstration}
           onFermer={image.fermer}
           onEnregistrer={(fichier) => image.retenir(fichier.contenu, fichier.nomOrigine)}
         />

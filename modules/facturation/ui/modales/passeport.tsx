@@ -63,9 +63,23 @@ interface Proprietes {
   apercuInitial?: string
   onFermer: () => void
   onValider: (passeport: Passeport, images: ImagesPasseport | null) => void
+  /**
+   * Vrai uniquement sur l'adaptateur de démonstration. Le remplissage
+   * démonstratif dépose un portrait SVG — accepté par cet adaptateur, jamais
+   * par le stockage réel (JPG/PNG/WebP uniquement, sécurité). Masqué en
+   * dehors de la démonstration pour qu'aucun clic ne produise un dépôt voué
+   * à l'échec côté omra.
+   */
+  modeDemonstration: boolean
 }
 
-export function ModalePasseport({ initial, apercuInitial, onFermer, onValider }: Proprietes) {
+export function ModalePasseport({
+  initial,
+  apercuInitial,
+  onFermer,
+  onValider,
+  modeDemonstration,
+}: Proprietes) {
   const P = T.passeport
   const [brouillon, setBrouillon] = useState<Passeport>(initial ?? passeportVierge())
   const [images, setImages] = useState<ImagesPasseport | null>(null)
@@ -223,9 +237,11 @@ export function ModalePasseport({ initial, apercuInitial, onFermer, onValider }:
                   }}
                 />
               </label>
-              <button className="passeport-demo" type="button" onClick={remplirDemonstration}>
-                {P.remplirDemo}
-              </button>
+              {modeDemonstration ? (
+                <button className="passeport-demo" type="button" onClick={remplirDemonstration}>
+                  {P.remplirDemo}
+                </button>
+              ) : null}
               <div className="passeport-aide">{P.noteImage}</div>
             </div>
 

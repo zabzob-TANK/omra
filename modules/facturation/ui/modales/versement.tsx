@@ -60,6 +60,8 @@ interface Proprietes {
   ) => Promise<Resultat<{ recuId: string }>>
   /** R-38 — aperçus des images déjà portées par les opérations partagées. */
   imagesOperations: Record<string, string>
+  /** Voir `ModalePaiementImage` — masque le bouton d'exemple hors démonstration. */
+  modeDemonstration: boolean
 }
 
 export function ModaleVersement({
@@ -69,6 +71,7 @@ export function ModaleVersement({
   onFermer,
   onEnregistrer,
   imagesOperations,
+  modeDemonstration,
 }: Proprietes) {
   const recuVerrouille = recuVerrouilleId
     ? (recus.find((r) => r.id === recuVerrouilleId) ?? null)
@@ -397,6 +400,7 @@ export function ModaleVersement({
           {image.ouverte ? (
             <ModalePaiementImage
               cible={cibleImageInstrument(saisie.instrument, saisie.montant)}
+              modeDemonstration={modeDemonstration}
               onFermer={image.fermer}
               onEnregistrer={(fichier) => image.retenir(fichier.contenu, fichier.nomOrigine)}
             />

@@ -102,12 +102,21 @@ import type {
   Vol,
 } from '../domain/types'
 import { modeDemonstration, sourceDonnees } from './index'
+import { FormatImageNonAccepteError, SaisonIndisponibleError } from './ports'
 import type { SourceDonnees } from './ports'
 
 /** Instantané complet servi à l'interface. */
 export interface EtatFacturation {
   utilisateur: Utilisateur | null
   estAdministrateur: boolean
+  /**
+   * Vrai lorsqu'aucune saison active n'existe (avant la première saison, ou
+   * entre deux) — état d'exploitation normal, pas une panne. Les autres
+   * champs ci-dessous sont alors vides plutôt qu'absents ; l'interface doit
+   * les ignorer et afficher un message propre plutôt que le registre, Finance,
+   * le suivi journalier ou les paiements.
+   */
+  saisonIndisponible: boolean
   saison: Saison
   hotels: Hotel[]
   vols: Vol[]
@@ -140,6 +149,7 @@ export function etatAnonyme(): EtatFacturation {
   return {
     utilisateur: null,
     estAdministrateur: false,
+    saisonIndisponible: false,
     saison: { id: '', nom: '', reductionMaxCentimes: 0, duree: '', active: false },
     hotels: [],
     vols: [],
@@ -204,7 +214,34 @@ export async function deconnecter(): Promise<void> {
 export async function chargerEtat(): Promise<EtatFacturation> {
   const source = sourceDonnees()
   const utilisateur = await source.session.utilisateurCourant()
-  const saison = await source.referentiels.saisonActive()
+
+  let saison: Saison
+  try {
+    saison = await source.referentiels.saisonActive()
+  } catch (erreur) {
+    if (!(erreur instanceof SaisonIndisponibleError)) throw erreur
+    // Aucune saison active : rien de ce qui suit n'est calculable (référentiels,
+    // reçus, tarifs dépendent tous de saison.id). L'interface affiche un
+    // message propre à la place du registre, de Finance, du suivi journalier
+    // et des paiements — un administrateur doit créer et activer une saison.
+    return {
+      utilisateur,
+      estAdministrateur: utilisateur ? source.session.estAdministrateur(utilisateur) : false,
+      saisonIndisponible: true,
+      saison: { id: '', nom: '', reductionMaxCentimes: 0, duree: '', active: false },
+      hotels: [],
+      vols: [],
+      chambres: [],
+      rabatteurs: [],
+      tarifs: [],
+      recus: [],
+      operations: [],
+      imagesOperations: {},
+      portraitsPasseport: {},
+      audit: [],
+      modeDemonstration: modeDemonstration(),
+    }
+  }
 
   const [hotels, vols, chambres, rabatteurs, tarifs, recus, operations, audit] = await Promise.all([
     source.referentiels.hotels(),
@@ -242,6 +279,7 @@ export async function chargerEtat(): Promise<EtatFacturation> {
   return {
     utilisateur,
     estAdministrateur: utilisateur ? source.session.estAdministrateur(utilisateur) : false,
+    saisonIndisponible: false,
     saison,
     hotels,
     vols,
@@ -281,7 +319,13 @@ export async function creerRecu(
   depassementConfirme = false,
 ): Promise<Resultat<{ recuId: string; numero: number }>> {
   const source = sourceDonnees()
-  const base = await contexteCommun(source)
+  let base: Awaited<ReturnType<typeof contexteCommun>>
+  try {
+    base = await contexteCommun(source)
+  } catch (erreurSaison) {
+    if (!(erreurSaison instanceof SaisonIndisponibleError)) throw erreurSaison
+    return { statut: 'erreurs', erreurs: [{ champ: 'saison', code: 'saison-indisponible' }] }
+  }
 
   const clientId = source.identifiants.nouvelId('client')
 
@@ -347,7 +391,13 @@ export async function ajouterVersement(
   depassementConfirme = false,
 ): Promise<Resultat<{ recuId: string }>> {
   const source = sourceDonnees()
-  const base = await contexteCommun(source)
+  let base: Awaited<ReturnType<typeof contexteCommun>>
+  try {
+    base = await contexteCommun(source)
+  } catch (erreurSaison) {
+    if (!(erreurSaison instanceof SaisonIndisponibleError)) throw erreurSaison
+    return { statut: 'erreurs', erreurs: [{ champ: 'saison', code: 'saison-indisponible' }] }
+  }
 
   // reprise.md §5.3 — un clic « ajouter un paiement » sur une ligne du registre
   // transmet et verrouille `recuId` : l'identifiant réel du reçu tranche, le
@@ -397,7 +447,13 @@ export async function annulerRecu(
   saisie: SaisieAnnulation,
 ): Promise<Resultat<null>> {
   const source = sourceDonnees()
-  const base = await contexteCommun(source)
+  let base: Awaited<ReturnType<typeof contexteCommun>>
+  try {
+    base = await contexteCommun(source)
+  } catch (erreurSaison) {
+    if (!(erreurSaison instanceof SaisonIndisponibleError)) throw erreurSaison
+    return { statut: 'erreurs', erreurs: [{ champ: 'saison', code: 'saison-indisponible' }] }
+  }
   const recu = await source.recus.parId(recuId)
   if (!recu) return { statut: 'erreurs', erreurs: [{ champ: 'motif', code: 'numero-recu-introuvable' }] }
 
@@ -451,7 +507,13 @@ export async function modifierRecu(
   saisie: SaisieModification,
 ): Promise<Resultat<null>> {
   const source = sourceDonnees()
-  const base = await contexteCommun(source)
+  let base: Awaited<ReturnType<typeof contexteCommun>>
+  try {
+    base = await contexteCommun(source)
+  } catch (erreurSaison) {
+    if (!(erreurSaison instanceof SaisonIndisponibleError)) throw erreurSaison
+    return { statut: 'erreurs', erreurs: [{ champ: 'saison', code: 'saison-indisponible' }] }
+  }
   const recu = await source.recus.parId(recuId)
   if (!recu) return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'numero-recu-introuvable' }] }
 
@@ -1317,12 +1379,18 @@ export async function ajouterImageOperation(
     return { statut: 'erreurs', erreurs: [{ champ: 'image', code: 'image-deja-presente' }] }
   }
 
-  const reference = await source.fichiers.deposer({
-    contenu: fichier.contenu,
-    nomOrigine: fichier.nomOrigine,
-    typeMime: fichier.typeMime,
-    origine: fichier.origine ?? 'upload',
-  })
+  let reference: ReferenceFichier
+  try {
+    reference = await source.fichiers.deposer({
+      contenu: fichier.contenu,
+      nomOrigine: fichier.nomOrigine,
+      typeMime: fichier.typeMime,
+      origine: fichier.origine ?? 'upload',
+    })
+  } catch (erreurDepot) {
+    if (!(erreurDepot instanceof FormatImageNonAccepteError)) throw erreurDepot
+    return { statut: 'erreurs', erreurs: [{ champ: 'image', code: 'format-image-non-accepte' }] }
+  }
   const referenceSignee: ReferenceFichier = {
     ...reference,
     deposePar: utilisateur?.nom ?? '—',
@@ -1445,8 +1513,15 @@ export async function ajouterImagesPasseport(
     }
   }
 
-  const originale = await source.fichiers.deposer({ ...fichiers.originale, origine: 'upload' })
-  const portrait = await source.fichiers.deposer({ ...fichiers.portrait, origine: 'upload' })
+  let originale: ReferenceFichier
+  let portrait: ReferenceFichier
+  try {
+    originale = await source.fichiers.deposer({ ...fichiers.originale, origine: 'upload' })
+    portrait = await source.fichiers.deposer({ ...fichiers.portrait, origine: 'upload' })
+  } catch (erreurDepot) {
+    if (!(erreurDepot instanceof FormatImageNonAccepteError)) throw erreurDepot
+    return { statut: 'erreurs', erreurs: [{ champ: 'passeport', code: 'format-image-non-accepte' }] }
+  }
   await source.recus.definirImagesPasseport(recuId, originale, portrait)
 
   return ok(null)

@@ -15,6 +15,7 @@ import 'server-only'
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { SaisonIndisponibleError } from '../ports'
 
 export type ProgrammeActif = {
   seasonId: string
@@ -43,7 +44,7 @@ export async function chargerProgrammeActif(): Promise<ProgrammeActif> {
     .eq('status', 'active')
     .maybeSingle()
   if (seasonError) throw new Error(`Saison active illisible : ${seasonError.message}`)
-  if (!season) throw new Error('Aucune saison active n’est configurée dans Omra.')
+  if (!season) throw new SaisonIndisponibleError('Aucune saison active n’est configurée dans Omra.')
 
   const { data: program, error: programError } = await admin
     .from('omra_programs')

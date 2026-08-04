@@ -33,9 +33,22 @@ interface Proprietes {
   cible: CiblePaiement
   onFermer: () => void
   onEnregistrer: (fichier: { contenu: Blob; nomOrigine: string }) => void
+  /**
+   * Vrai uniquement sur l'adaptateur de démonstration (données fictives en
+   * mémoire). Le bouton « Utiliser un exemple » dépose une vignette SVG —
+   * acceptée par cet adaptateur, mais jamais par le stockage réel (JPG/PNG/
+   * WebP uniquement, sécurité). Masqué en dehors de la démonstration pour
+   * qu'aucun clic ne produise un dépôt voué à l'échec côté omra.
+   */
+  modeDemonstration: boolean
 }
 
-export function ModalePaiementImage({ cible, onFermer, onEnregistrer }: Proprietes) {
+export function ModalePaiementImage({
+  cible,
+  onFermer,
+  onEnregistrer,
+  modeDemonstration,
+}: Proprietes) {
   const I = T.paiementImage
   // L'aperçu n'existe que le temps de la fenêtre : rien n'est enregistré tant
   // que la confirmation n'a pas eu lieu. L'URL objet est créée avec le
@@ -133,24 +146,26 @@ export function ModalePaiementImage({ cible, onFermer, onEnregistrer }: Propriet
                 }}
               />
             </label>
-            <button
-              className="cheque-action"
-              onClick={() =>
-                retenir(
-                  imageExemplePaiement({
-                    reference: cible.numero,
-                    banque: cible.banque,
-                    montant: cible.montant,
-                    payeur: cible.payeur,
-                    date: cible.date,
-                    virement: cible.virement,
-                  }),
-                  NOM_FICHIER_EXEMPLE,
-                )
-              }
-            >
-              Utiliser un exemple
-            </button>
+            {modeDemonstration ? (
+              <button
+                className="cheque-action"
+                onClick={() =>
+                  retenir(
+                    imageExemplePaiement({
+                      reference: cible.numero,
+                      banque: cible.banque,
+                      montant: cible.montant,
+                      payeur: cible.payeur,
+                      date: cible.date,
+                      virement: cible.virement,
+                    }),
+                    NOM_FICHIER_EXEMPLE,
+                  )
+                }
+              >
+                Utiliser un exemple
+              </button>
+            ) : null}
             <button
               className="cheque-action principale"
               disabled={!brouillon}

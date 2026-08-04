@@ -63,16 +63,35 @@ export async function updateSession(request: NextRequest) {
 
   // À partir d'ici : uniquement /admin* et /login, univers Administration,
   // identifié par `admin_accounts` — jamais par `account_slots`.
-  const { data, error } = await supabase.auth.getUser()
+  //
+  // Un jeton de rafraîchissement périmé, révoqué ou corrompu peut faire
+  // lever `getUser()` au lieu de simplement renvoyer une erreur (selon les
+  // versions du client Supabase). Le Proxy tourne sur chaque requête
+  // /admin* et /login : une exception non rattrapée ici plante la requête
+  // entière (500), pas seulement une page. Traité exactement comme une
+  // absence de session, et le cookie invalide est nettoyé (`signOut()`) —
+  // sans quoi la même erreur se reproduirait à chaque requête suivante.
+  let utilisateur: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] | null = null
+  let jetonInvalide = false
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    utilisateur = data.user
+    jetonInvalide = Boolean(error) && !data.user
+  } catch {
+    jetonInvalide = true
+  }
 
-  if (error || !data.user) {
+  if (!utilisateur) {
+    // Ne nettoyer le cookie que si une session invalide a réellement été
+    // rencontrée — jamais pour une simple visite anonyme sans cookie du tout.
+    if (jetonInvalide) await supabase.auth.signOut()
     if (isLoginPath) {
       return response
     }
     return versLogin()
   }
 
-  const compteAdmin = await findActiveAdminAccountByAuthUserId(data.user.id)
+  const compteAdmin = await findActiveAdminAccountByAuthUserId(utilisateur.id)
 
   if (!compteAdmin) {
     if (isLoginPath) {
