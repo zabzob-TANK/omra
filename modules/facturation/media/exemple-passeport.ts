@@ -1,25 +1,27 @@
 /**
- * Portrait factice et jeu de données de démonstration du passeport.
+ * Images d'exemple et jeu de données du remplissage démonstratif du
+ * passeport.
  *
- * ⚠️ Contenu de démonstration, confiné à ce fichier. Le fichier de référence
- * fabrique le même portrait SVG (`makePassportPortrait`) et propose le même
- * bouton « ملء بيانات تجريبية » avec exactement ces valeurs.
+ * Specimens fictifs réels (JPG), servis depuis `public/facturation/
+ * exemples/` — remplacent les anciennes vignettes SVG générées côté client,
+ * jamais acceptées par le stockage réel (JPG/PNG/WebP uniquement, sécurité).
  *
- * Ce n'est **pas** une lecture automatique : le fichier marque lui-même ce
- * remplissage `prototype-ai-simulation`, et rien n'analyse l'image.
+ * Bouton « ملء بيانات تجريبية » — visible uniquement en démonstration
+ * (`ModalePasseport`, `modeDemonstration`). Ce n'est **pas** une lecture
+ * automatique : le fichier de référence marque lui-même ce remplissage
+ * `prototype-ai-simulation`, et rien n'analyse l'image.
  */
 
-/** Portrait générique, reprenant le tracé du fichier de référence. */
-export function portraitPasseport(initiales: string): Blob {
-  const etiquette = String(initiales || 'P').trim().slice(0, 2) || 'P'
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="320" viewBox="0 0 260 320">' +
-    '<rect width="260" height="320" fill="#edf0e5"/>' +
-    '<circle cx="130" cy="112" r="55" fill="#c8d0bd"/>' +
-    '<path d="M42 292c12-74 52-112 88-112s76 38 88 112" fill="#9cab8d"/>' +
-    `<text x="130" y="305" text-anchor="middle" font-family="Arial" font-size="22" fill="#47593c">${etiquette}</text>` +
-    '</svg>'
-  return new Blob([svg], { type: 'image/svg+xml' })
+import { chargerImageExemple } from './charger-exemple'
+
+/** Exemple pour le scan complet du passeport (« originale »). */
+export function scanPasseportExemple(): Promise<Blob> {
+  return chargerImageExemple('/facturation/exemples/passeport-specimen.jpg')
+}
+
+/** Exemple pour le portrait de la personne, tiré du scan. */
+export function portraitPasseportExemple(): Promise<Blob> {
+  return chargerImageExemple('/facturation/exemples/photo-identite-specimen.jpg')
 }
 
 /** Valeurs du bouton « ملء بيانات تجريبية », reprises telles quelles. */

@@ -22,8 +22,9 @@ import { formaterDate } from '../../domain/format'
 import type { Passeport } from '../../domain/types'
 import {
   PASSEPORT_DEMONSTRATION,
-  portraitPasseport,
+  portraitPasseportExemple,
   reduireImage,
+  scanPasseportExemple,
 } from '../../media/exemple-passeport'
 import { Champ, Saisie } from '../champs'
 import { T } from '../textes'
@@ -134,9 +135,18 @@ export function ModalePasseport({
   }
 
   /** Remplissage de démonstration — valeurs fixes, aucune analyse d'image. */
-  const remplirDemonstration = () => {
+  const remplirDemonstration = async () => {
+    try {
+      const [originale, portrait] = await Promise.all([
+        scanPasseportExemple(),
+        portraitPasseportExemple(),
+      ])
+      retenirImages(originale, portrait)
+    } catch {
+      setMessage(P.imageIllisible)
+      return
+    }
     const D = PASSEPORT_DEMONSTRATION
-    retenirImages(portraitPasseport(D.initiales), portraitPasseport(D.initiales))
     setBrouillon({
       prenom: D.prenom,
       nom: D.nom,

@@ -35,10 +35,10 @@ interface Proprietes {
   onEnregistrer: (fichier: { contenu: Blob; nomOrigine: string }) => void
   /**
    * Vrai uniquement sur l'adaptateur de démonstration (données fictives en
-   * mémoire). Le bouton « Utiliser un exemple » dépose une vignette SVG —
-   * acceptée par cet adaptateur, mais jamais par le stockage réel (JPG/PNG/
-   * WebP uniquement, sécurité). Masqué en dehors de la démonstration pour
-   * qu'aucun clic ne produise un dépôt voué à l'échec côté omra.
+   * mémoire). Le bouton « Utiliser un exemple » dépose un specimen JPG réel
+   * (`media/exemple-paiement.ts`) — accepté par le stockage réel, mais réservé
+   * à la démonstration : ce n'est pas un vrai justificatif, jamais à écrire
+   * dans les données réelles.
    */
   modeDemonstration: boolean
 }
@@ -58,6 +58,7 @@ export function ModalePaiementImage({
     nomOrigine: string
     apercu: string
   } | null>(null)
+  const [erreurExemple, setErreurExemple] = useState('')
 
   const retenir = (contenu: Blob, nomOrigine: string) => {
     setBrouillon((precedent) => {
@@ -149,22 +150,21 @@ export function ModalePaiementImage({
             {modeDemonstration ? (
               <button
                 className="cheque-action"
-                onClick={() =>
-                  retenir(
-                    imageExemplePaiement({
-                      reference: cible.numero,
-                      banque: cible.banque,
-                      montant: cible.montant,
-                      payeur: cible.payeur,
-                      date: cible.date,
-                      virement: cible.virement,
-                    }),
-                    NOM_FICHIER_EXEMPLE,
-                  )
-                }
+                onClick={async () => {
+                  try {
+                    const contenu = await imageExemplePaiement()
+                    setErreurExemple('')
+                    retenir(contenu, NOM_FICHIER_EXEMPLE)
+                  } catch {
+                    setErreurExemple("Impossible de charger l'image d'exemple.")
+                  }
+                }}
               >
                 Utiliser un exemple
               </button>
+            ) : null}
+            {erreurExemple ? (
+              <span style={{ color: '#b91c1c', fontSize: '0.85em' }}>{erreurExemple}</span>
             ) : null}
             <button
               className="cheque-action principale"
