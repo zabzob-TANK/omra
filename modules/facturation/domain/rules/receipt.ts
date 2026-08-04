@@ -34,10 +34,13 @@ export function restantDu(recu: Pick<Recu, 'convenuCentimes' | 'versements'>): n
  *
  * Reproduit `stat()`, y compris l'ordre de priorité : l'annulation l'emporte
  * sur tout le reste, puis un restant nul vaut « soldé », sinon « incomplet ».
+ * Comparaison stricte à zéro, comme `stat()` : un restant négatif (trop-perçu,
+ * P13/§5.11) reste « incomplet », pas « soldé » — sans quoi l'anomalie
+ * deviendrait invisible, contrairement à la règle qui l'exige affichée.
  */
 export function statutAffiche(recu: Pick<Recu, 'statut' | 'convenuCentimes' | 'versements'>): StatutAffiche {
   if (recu.statut === STATUT_ANNULE) return STATUT_ANNULE
-  return restantDu(recu) <= 0 ? STATUT_SOLDE : STATUT_INCOMPLET
+  return restantDu(recu) === 0 ? STATUT_SOLDE : STATUT_INCOMPLET
 }
 
 /** Dernier versement enregistré, ou `null`. */
@@ -50,5 +53,5 @@ export function dernierVersement(recu: Pick<Recu, 'versements'>): Versement | nu
  * Reproduit `statusAfter` : '✓' si le reçu est soldé après ce versement, sinon '•'.
  */
 export function symboleSituation(restantApresCentimes: number): '✓' | '•' {
-  return restantApresCentimes <= 0 ? '✓' : '•'
+  return restantApresCentimes === 0 ? '✓' : '•'
 }

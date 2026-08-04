@@ -40,6 +40,49 @@ rapport tient compte de cet état réel, pas de l'ancien état documenté.
 
 ## Bugs trouvés
 
+### -1. Un trop-perçu se faisait passer pour un reçu soldé, sans aucune trace visible (corrigé)
+
+Trouvé en testant volontairement un scénario d'anomalie : changer le
+programme (hôtel/vol/chambre) d'un reçu déjà payé peut légitimement faire
+baisser le montant convenu sous ce qui a déjà été encaissé — un trop-perçu.
+La règle (P13/§5.11, confirmée dans `CLAUDE.md`) dit que ce n'est **jamais
+un refus**, seulement une anomalie qui doit **rester visible**, jamais
+résolue silencieusement.
+
+Vérifié : le trop-perçu était bien accepté (pas de refus), mais devenait
+ensuite **invisible** — le reçu s'affichait « مسدد » (soldé) exactement
+comme un reçu normalement réglé, dans la même couleur bleue calme, sans
+aucune trace ailleurs (le bandeau d'anomalies de Finance couvre un tout
+autre sujet : les mouvements apparus après une impression du journal, pas
+les trop-perçus).
+
+Cause trouvée en comparant au fichier de référence : trois fonctions
+portées comparaient le restant avec `<= 0` là où le fichier de référence
+compare **strictement** à `=== 0` (`stat()`, `restColor` du tableau des
+chèques/virements, `showToast` de `savePay()`) — un restant négatif y est
+traité **comme un restant positif** (donc « incomplet », en rouge), pas
+comme un restant nul. Le port avait inversé ce cas précis : négatif traité
+comme nul plutôt que comme non-nul.
+
+**Corrigé** — comparaison `=== 0` rétablie à cinq endroits :
+`modules/facturation/domain/rules/receipt.ts` (`statutAffiche`,
+`symboleSituation`), `modules/facturation/domain/rules/payment.ts`
+(`motifRefusVersement`, R-17 — un trop-perçu n'est plus considéré
+« déjà soldé », un nouveau versement reste tentable mais R-21 le
+bloquera avec un message montrant le vrai restant négatif, plus
+informatif), `modules/facturation/ui/ecrans/registre.tsx` et
+`modules/facturation/ui/modales/detail.tsx` (couleur rouge au lieu de
+bleu), `modules/facturation/ui/application.tsx` (message de notification).
+Trois tests existants affirmaient l'ancien comportement sans aucune
+justification écrite (contrairement au cas du libellé français, où un
+commentaire explicite existait) — corrigés pour refléter le comportement
+du fichier de référence, avec le raisonnement en commentaire.
+
+**Revérifié en conditions réelles** sur le reçu test n°11 (convenu abaissé
+sous le payé par un changement de chambre) : le reçu affiche maintenant
+« غير مكتمل » en rouge avec « -200 » bien visible, au lieu de disparaître
+comme soldé.
+
 ### 0. Après « ajouter un paiement », l'appli ne rouvrait pas le reçu (corrigé)
 
 Signalé par le commanditaire : après avoir enregistré un paiement
@@ -338,8 +381,19 @@ Testés en interactif en mode démonstration (`http://127.0.0.1:3001/facturation
 
 ## Fichiers modifiés sur `chantier-local`
 
+- `modules/facturation/domain/rules/receipt.ts` — `statutAffiche`/`symboleSituation`
+  comparent le restant strictement à zéro (item -1, trop-perçu visible).
+- `modules/facturation/domain/rules/payment.ts` — `motifRefusVersement`
+  (R-17) idem (item -1).
+- `modules/facturation/domain/rules/receipt.test.ts`,
+  `modules/facturation/domain/rules/payment.test.ts` — tests corrigés pour
+  refléter ce comportement (item -1).
+- `modules/facturation/ui/ecrans/registre.tsx`,
+  `modules/facturation/ui/modales/detail.tsx` — couleur rouge conservée
+  pour un restant négatif (item -1).
 - `modules/facturation/ui/application.tsx` — navigation vers l'écran du
-  reçu après un ajout de paiement réussi (item 0 ci-dessus).
+  reçu après un ajout de paiement réussi (item 0 ci-dessus) ; message de
+  notification aligné sur `=== 0` (item -1).
 - `modules/facturation/data/service.ts` — `contexteCommun()` et 3 autres
   appels : `recus.lister()`/`operationsPartagees.lister()` scopés à la
   saison active partout, sans exception.

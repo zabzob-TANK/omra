@@ -275,11 +275,18 @@ export function EcranRegistre({
                         <Montant centimes={paye} avecDevise={false} />
                       </td>
                       <td className="centre">
-                        {/* Restant nul : bleu, comme partout ailleurs. */}
+                        {/*
+                          Restant exactement nul : bleu, comme partout
+                          ailleurs. Le fichier de référence colore en rouge
+                          toute autre valeur, y compris négative (trop-perçu,
+                          P13/§5.11) : le masquer en bleu le rendrait
+                          invisible, contrairement à la règle qui l'exige
+                          affiché comme anomalie.
+                        */}
                         <span
                           style={{
-                            color: restant <= 0 ? 'var(--solde)' : 'var(--danger)',
-                            fontWeight: restant <= 0 ? 400 : 600,
+                            color: restant === 0 ? 'var(--solde)' : 'var(--danger)',
+                            fontWeight: restant === 0 ? 400 : 600,
                           }}
                         >
                           <Montant centimes={restant} avecDevise={false} />

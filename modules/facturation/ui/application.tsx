@@ -817,9 +817,10 @@ export function ApplicationFacturation({
               setEtat(suivant)
               const cible = suivant.recus.find((r) => r.id === resultat.valeur.recuId)
               const reste = cible ? restantDu(cible) : 0
-              // Message du fichier de référence, selon que le reçu est soldé ou non.
+              // Message du fichier de référence (`rest===0`), selon que le
+              // reçu est exactement soldé ou non.
               notifier(
-                reste <= 0
+                reste === 0
                   ? `تم — الوصل ${cible?.numero ?? ''} مسدد بالكامل`
                   : `تم تسجيل الدفعة — الباقي ${centimesEnTexteDevise(reste)}`,
               )

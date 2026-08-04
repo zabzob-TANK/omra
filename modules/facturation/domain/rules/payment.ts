@@ -74,8 +74,12 @@ export function motifRefusVersement(recu: Recu | null): ErreurValidation | null 
   if (!recu) return { champ: 'numeroRecu', code: 'numero-recu-introuvable' }
   // R-16
   if (recu.statut === STATUT_ANNULE) return { champ: 'numeroRecu', code: 'recu-annule' }
-  // R-17
-  if (restantDu(recu) <= 0) return { champ: 'numeroRecu', code: 'recu-deja-solde' }
+  // R-17 — comparaison stricte à zéro, comme `rest(r)===0` du fichier de
+  // référence : un restant négatif (trop-perçu, P13/§5.11) n'est pas
+  // « déjà soldé », un nouveau versement reste tentable — R-21 le refusera
+  // ensuite avec un message qui montre le restant réel (négatif), plus
+  // informatif que « déjà soldé ».
+  if (restantDu(recu) === 0) return { champ: 'numeroRecu', code: 'recu-deja-solde' }
   // R-18
   if (recu.versements.length >= MAX_VERSEMENTS) {
     return {

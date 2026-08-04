@@ -189,7 +189,13 @@ export function ModaleDetail({
               </div>
               <div className="appoint">{T.detail.nbVersements(recu.versements.length)}</div>
             </div>
-            <div className={`detail-finance-cellule restant${restant <= 0 ? ' solde' : ''}`}>
+            {/*
+              Restant exactement nul : bleu. Toute autre valeur, y compris
+              négative (trop-perçu, P13/§5.11), reste en rouge comme le
+              fichier de référence — sans quoi l'anomalie deviendrait
+              invisible.
+            */}
+            <div className={`detail-finance-cellule restant${restant === 0 ? ' solde' : ''}`}>
               <div className="etiquette">{T.detail.restant}</div>
               <div className="valeur grande">
                 <Montant centimes={restant} />

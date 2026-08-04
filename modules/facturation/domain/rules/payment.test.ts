@@ -66,12 +66,16 @@ describe('R-16, R-17, R-18 — état du reçu', () => {
     expect(codes(saisie(), solde)).toEqual(['recu-deja-solde'])
   })
 
-  it('refuse un reçu en trop-perçu (restant négatif)', () => {
+  it('un reçu en trop-perçu (restant négatif) n’est pas « déjà soldé » — R-21 refuse ensuite tout nouveau montant', () => {
+    // Comparaison stricte à zéro, comme `rest(r)===0` du fichier de
+    // référence : un trop-perçu (P13/§5.11) reste tentable ici, mais R-21
+    // (montant > restant, ici négatif) le bloque avec un message qui montre
+    // le vrai restant — plus informatif qu'un « déjà soldé » générique.
     const tropPercu = unRecu({
       convenuCentimes: 1000000,
       versements: [unVersement({ montantCentimes: 1200000 })],
     })
-    expect(codes(saisie(), tropPercu)).toEqual(['recu-deja-solde'])
+    expect(codes(saisie(), tropPercu)).toEqual(['montant-superieur-au-restant'])
   })
 
   it('refuse un septième versement', () => {

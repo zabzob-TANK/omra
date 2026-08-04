@@ -49,12 +49,15 @@ describe('U-06 — statut affiché', () => {
     expect(statutAffiche(recu)).toBe('مسدد')
   })
 
-  it('affiche « soldé » en cas de trop-perçu (restant négatif)', () => {
+  it('affiche « incomplet », pas « soldé », en cas de trop-perçu (restant négatif)', () => {
+    // Comparaison stricte à zéro, comme `stat()` du fichier de référence :
+    // un trop-perçu (P13/§5.11) doit rester visible comme anomalie, pas
+    // disparaître sous « soldé ».
     const recu = unRecu({
       convenuCentimes: 1000000,
       versements: [unVersement({ montantCentimes: 1200000 })],
     })
-    expect(statutAffiche(recu)).toBe('مسدد')
+    expect(statutAffiche(recu)).toBe('غير مكتمل')
   })
 
   it('affiche « incomplet » quand il reste à payer', () => {
@@ -88,7 +91,9 @@ describe('dernier versement et symbole de situation', () => {
     expect(symboleSituation(1)).toBe('•')
   })
 
-  it('marque ✓ en cas de trop-perçu (restant négatif)', () => {
-    expect(symboleSituation(-200000)).toBe('✓')
+  it('marque • (pas ✓) en cas de trop-perçu (restant négatif)', () => {
+    // `remainingAfter===0` dans le fichier de référence (`savePay()`) : même
+    // raison que pour `statutAffiche`.
+    expect(symboleSituation(-200000)).toBe('•')
   })
 })
