@@ -345,6 +345,7 @@ export function ModaleModification({
                   coche={saisie.groupeCoche}
                   onChange={(coche) => modifier({ groupeCoche: coche })}
                   label={T.nouveau.groupeCoche}
+                  classe="case-groupe"
                 />
                 {saisie.groupeCoche ? (
                   <div className="omra-fields" style={{ marginTop: 10 }}>

@@ -175,13 +175,16 @@ export function CaseACocher({
   coche,
   onChange,
   label,
+  classe,
 }: {
   coche: boolean
   onChange: (coche: boolean) => void
   label: string
+  /** Classe supplémentaire, pour une case mise en retrait visuel. */
+  classe?: string
 }) {
   return (
-    <label className="omra-check">
+    <label className={`omra-check${classe ? ` ${classe}` : ''}`}>
       <input
         type="checkbox"
         className="omra-input"

@@ -14,7 +14,7 @@
 import { useState } from 'react'
 
 import { dateDuJour } from '../../domain/dates'
-import { formaterMontant, formaterTelephone, nettoyerArabe } from '../../domain/format'
+import { formaterMontant, formaterMontantAffiche, formaterTelephone, nettoyerArabe } from '../../domain/format'
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../../domain/money'
 import type { ErreurValidation, Resultat } from '../../domain/rules/errors'
 import type { SaisieNouveauRecu } from '../../domain/rules/create-receipt'
@@ -359,11 +359,12 @@ export function ModaleNouveauRecu({
               plafond de réduction reste vérifié par le noyau métier. */}
           <Champ label={T.nouveau.reduction}>
             <Saisie
-              valeur={saisie.reduction}
+              valeur={formaterMontantAffiche(saisie.reduction)}
               onChange={(v) => modifier({ reduction: formaterMontant(v) })}
               invalide={enErreur(erreurs, 'reduction')}
               mono
               inputMode="numeric"
+              classe="champ-texte-grand"
             />
           </Champ>
         </div>
@@ -405,13 +406,13 @@ export function ModaleNouveauRecu({
           <div className="recu-encadre prix">
             <div className="ligne">
               <span>{T.detail.prixOrigine}</span>
-              <b className="mono" dir="ltr">
+              <b className="mono prix-original" dir="ltr">
                 {tarif === null ? sansMontant : centimesEnTexteDevise(tarif)}
               </b>
             </div>
             <div className="ligne">
               <span>{T.registre.colonnes.reduction}</span>
-              <b className="mono" dir="ltr">
+              <b className="mono prix-reduction" dir="ltr">
                 {centimesEnTexteDevise(reduction)}
               </b>
             </div>
@@ -424,36 +425,18 @@ export function ModaleNouveauRecu({
           </div>
         </div>
 
-        <div style={{ marginTop: 12 }}>
-          <CaseACocher
-            coche={saisie.groupeCoche}
-            onChange={(coche) => modifier({ groupeCoche: coche })}
-            label={T.nouveau.groupeCoche}
-          />
-        </div>
-        {saisie.groupeCoche ? (
-          <div className="omra-fields" style={{ marginTop: 10 }}>
-            <Champ label={T.nouveau.groupeCode}>
-              <Saisie
-                valeur={saisie.groupe}
-                onChange={(v) => modifier({ groupe: v })}
-                invalide={enErreur(erreurs, 'groupe')}
-              />
-            </Champ>
-          </div>
-        ) : null}
-
       </section>
 
       <section className="recu-section">
         <div className="omra-fields duo champ-encaissement">
           <Champ label={T.nouveau.montant}>
             <Saisie
-              valeur={saisie.premierVersement}
+              valeur={formaterMontantAffiche(saisie.premierVersement)}
               onChange={(v) => modifier({ premierVersement: formaterMontant(v) })}
               invalide={enErreur(erreurs, 'premierVersement')}
               mono
               inputMode="numeric"
+              classe="champ-texte-grand"
             />
           </Champ>
           {/* Le fichier de référence pose le mode de paiement en liste
@@ -468,8 +451,28 @@ export function ModaleNouveauRecu({
         </div>
       </section>
 
+      <div style={{ marginTop: 8 }}>
+        <CaseACocher
+          coche={saisie.groupeCoche}
+          onChange={(coche) => modifier({ groupeCoche: coche })}
+          label={T.nouveau.groupeCoche}
+          classe="case-groupe"
+        />
+      </div>
+      {saisie.groupeCoche ? (
+        <div className="omra-fields" style={{ marginTop: 10 }}>
+          <Champ label={T.nouveau.groupeCode}>
+            <Saisie
+              valeur={saisie.groupe}
+              onChange={(v) => modifier({ groupe: v })}
+              invalide={enErreur(erreurs, 'groupe')}
+            />
+          </Champ>
+        </div>
+      ) : null}
+
       {/* Le fichier de référence place la note en toute fin de formulaire. */}
-      <div className="omra-fields" style={{ marginTop: 14 }}>
+      <div className="omra-fields" style={{ marginTop: 10 }}>
         <Champ label={T.nouveau.note} pleine>
           <Saisie valeur={saisie.note} onChange={(v) => modifier({ note: v })} />
         </Champ>

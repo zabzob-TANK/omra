@@ -57,6 +57,16 @@ export function formaterMontant(valeur: string): string {
 }
 
 /**
+ * Affichage uniquement : groupe les milliers d'un montant en cours de saisie
+ * par un espace (50000 -> 50 000), pour lire le champ plus facilement pendant
+ * la frappe. La valeur stockée reste les chiffres purs de `formaterMontant` —
+ * ceci ne change rien à la validation ni au calcul.
+ */
+export function formaterMontantAffiche(valeur: string): string {
+  return formaterMontant(valeur).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+/**
  * U-11 — Retire tout caractère non arabe.
  * Reproduit `cleanAr()`. Appliqué aux noms, prénoms et autres champs arabes.
  */

@@ -944,6 +944,25 @@ input[type='number'] {
   border-bottom: 1px solid var(--border);
 }
 
+/*
+ * Nouveau reçu resserré pour tenir en entier sur des écrans plus petits.
+ * `.omra-modal-head`/`.omra-modal-foot` sont partagés par toutes les
+ * fenêtres de l'appli : on ne resserre qu'ici, jamais globalement. Exclut
+ * `.versement-coque`, qui partage la classe `recu-coque` mais n'a pas
+ * demandé ce resserrement.
+ */
+.recu-coque:not(.versement-coque) .omra-modal-head {
+  padding: 6px 18px;
+}
+
+.recu-coque:not(.versement-coque) .omra-modal-foot {
+  padding: 10px 18px;
+}
+
+.recu-coque:not(.versement-coque) .omra-modal-body {
+  padding: 10px 18px;
+}
+
 .omra-modal-head h2 {
   font-size: 16.5px;
   font-weight: 700;
@@ -1127,6 +1146,17 @@ input[type='number'] {
   gap: 8px;
   font-size: 12.5px;
   font-weight: 700;
+}
+
+/*
+ * Case « groupe / famille » : rendue discrète (à peine apparente) plutôt que
+ * mise en avant comme un champ normal. Réutilise les teintes existantes,
+ * pas de nouvelle couleur.
+ */
+.omra-check.case-groupe {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted-2);
 }
 
 .omra-hint {
@@ -1552,7 +1582,7 @@ input[type='number'] {
   align-items: center;
   gap: 10px;
   margin: 0 0 10px;
-  padding-bottom: 7px;
+  padding-bottom: 3px;
   border-bottom: 1px solid #e7e3d6;
 }
 
@@ -1589,7 +1619,7 @@ input[type='number'] {
 }
 
 .passeport-scan {
-  padding: 8px 11px;
+  padding: 4px 11px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
@@ -1774,6 +1804,20 @@ input[type='number'] {
   background: #fcfbf8;
 }
 
+/* Nouveau reçu seulement (voir note plus haut sur `.recu-coque`) : bandeau
+   plus compact, `.recu-bandeau` est aussi utilisé par Ajouter un versement. */
+.recu-coque:not(.versement-coque) .recu-bandeau {
+  padding: 8px 24px 4px;
+}
+
+.recu-coque:not(.versement-coque) .recu-bandeau-label {
+  margin-bottom: 2px;
+}
+
+.recu-coque:not(.versement-coque) .recu-bandeau-date {
+  margin-top: 2px;
+}
+
 .recu-bandeau-label {
   font-size: 10.5px;
   color: #9ca28f;
@@ -1796,15 +1840,15 @@ input[type='number'] {
 
 /* Le fichier laisse davantage d'air entre voyageur, programme et paiement. */
 .recu-section {
-  margin-top: 24px;
+  margin-top: 14px;
 }
 
 .recu-section > h3 {
   font-size: 11.5px;
   font-weight: 700;
   color: var(--accent);
-  margin: 0 0 14px;
-  padding-bottom: 9px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1825,7 +1869,7 @@ input[type='number'] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 10px;
   align-items: stretch;
 }
 
@@ -1834,7 +1878,13 @@ input[type='number'] {
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /*
+   * Calé sur le bas plutôt que centré : l'encadré prix a 3 lignes contre 2
+   * pour l'encadré totaux, donc un centrage indépendant décale leurs lignes
+   * finales l'une par rapport à l'autre. Caler les deux sur le bas garantit
+   * que « المبلغ المتفق » et « الباقي » tombent toujours à la même hauteur.
+   */
+  justify-content: flex-end;
 }
 
 /* Chaque bloc porte un liseré de sa propre teinte, pour qu'on ne les
@@ -1878,6 +1928,17 @@ input[type='number'] {
   text-align: center;
 }
 
+/*
+ * المدفوع / الباقي recentrées pour tomber sous le champ de saisie du montant
+ * (resté centré, lui, à sa demande). Sans ce padding, leur centre est 26,6px
+ * plus à gauche que celui du champ, car leur boîte est resserrée par
+ * l'étiquette voisine dans la grille — le champ n'a pas cette contrainte.
+ */
+.recu-encadre.totaux .ligne b {
+  padding-left: 53px;
+}
+
+
 .recu-encadre .ligne.totale {
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   margin-top: 6px;
@@ -1894,10 +1955,13 @@ input[type='number'] {
  * lorsqu'il tombe à zéro — il ne reste alors plus rien à payer.
  */
 .recu-encadre.prix .ligne.totale b {
-  color: var(--accent);
+  font-size: 22px;
+  font-weight: 900;
+  color: rgb(58, 74, 63);
 }
 
 .recu-encadre.totaux .ligne.totale b {
+  font-size: 24px;
   color: var(--danger);
 }
 
@@ -1914,6 +1978,67 @@ input[type='number'] {
 .champ-encaissement .omra-input:not(.invalide) {
   background: var(--accent-soft);
   border-color: #cddac2;
+}
+
+/*
+ * Texte plus grand, jamais plus gras (montant payé + réduction). Sélecteur à
+ * deux classes : une règle globale `.billing-app input` (balise + classe)
+ * est plus spécifique qu'une classe seule et l'emportait sinon.
+ */
+/*
+ * Padding vertical resserré pour compenser la police plus grande : sans ça,
+ * ce champ dépasse ses voisins de rangée (الوسيط / طريقة الدفع, ~41,4px)
+ * puisque `.omra-input` n'a pas de hauteur fixe, seulement du padding.
+ */
+.omra-input.champ-texte-grand {
+  font-size: 18px;
+  font-weight: 500;
+  padding: 6px 13px;
+}
+
+
+/*
+ * Au clic, ce champ doit s'éclaircir comme n'importe quel autre champ de
+ * l'appli (voir `.omra-input:focus` plus haut) — sans cette règle, notre vert
+ * de repos est plus spécifique que le focus général et reste figé, ce qui
+ * casse le retour visuel attendu au clic.
+ */
+.champ-encaissement .omra-input:focus:not(.invalide) {
+  background: var(--champ-fond-actif);
+  border-color: var(--champ-bord-actif);
+}
+
+/* Encadré vert (montant payé / reste) : chiffres agrandis, restent centrés. */
+.recu-encadre.totaux .ligne b {
+  font-size: 18px;
+}
+
+/*
+ * Encadré tan (prix) : retour à un alignement à droite, collé au bord,
+ * plutôt que centré — décision reprise après essai du centrage.
+ */
+.recu-encadre.prix .ligne b {
+  text-align: right;
+}
+
+/*
+ * Les 3 lignes de l'encadré prix calculaient chacune la largeur de leur
+ * étiquette indépendamment (grid par ligne, pas de grille partagée) : les
+ * montants ne tombaient pas à la même verticale d'une ligne à l'autre.
+ * Largeur fixe = la plus longue étiquette (« المبلغ المتفق », ~84px) + marge.
+ */
+.recu-encadre.prix .ligne {
+  grid-template-columns: 90px 1fr;
+}
+
+.recu-encadre.prix .ligne .prix-original {
+  font-size: 18px;
+  color: rgb(167, 167, 170);
+}
+
+.recu-encadre.prix .ligne .prix-reduction {
+  font-size: 14px;
+  color: rgb(89, 89, 89);
 }
 
 /*
