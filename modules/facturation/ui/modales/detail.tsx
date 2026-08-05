@@ -11,6 +11,7 @@
 
 import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
 import { collecterOperationsBancaires } from '../../domain/rules/cheque-register'
+import { motifRefusVersement } from '../../domain/rules/payment'
 import { restantDu, statutAffiche, totalPaye } from '../../domain/rules/receipt'
 import type { OperationPartagee, Recu, Saison } from '../../domain/types'
 import { Dialogue } from '../dialogue'
@@ -38,16 +39,21 @@ function Ligne({
   label,
   large,
   children,
+  classeValeur,
 }: {
   label: string
   /** Étiquette élargie, pour la carte d'identité. */
   large?: boolean
   children: React.ReactNode
+  /** Classe supplémentaire, pour une valeur mise en retrait visuel. */
+  classeValeur?: string
 }) {
   return (
     <div className={`detail-ligne${large ? ' large' : ''}`}>
       <span className="detail-ligne-label">{label}</span>
-      <span className="detail-ligne-valeur">{children}</span>
+      <span className={`detail-ligne-valeur${classeValeur ? ` ${classeValeur}` : ''}`}>
+        {children}
+      </span>
     </div>
   )
 }
@@ -81,6 +87,8 @@ interface Proprietes {
   onOuvrirRecu: () => void
   /** Ouvre le détail de l'opération bancaire depuis la colonne « الوثيقة ». */
   onOuvrirInstrument: (cle: string) => void
+  /** Raccourci : ouvre directement « Ajouter un versement » pour ce reçu. */
+  onNouveauVersement: () => void
 }
 
 export function ModaleDetail({
@@ -91,12 +99,14 @@ export function ModaleDetail({
   onFermer,
   onOuvrirRecu,
   onOuvrirInstrument,
+  onNouveauVersement,
 }: Proprietes) {
   const statut = libelleStatut(recu)
   const paye = totalPaye(recu)
   const restant = restantDu(recu)
   const nomComplet = `${recu.prenom} ${recu.nom}`
   const modifie = recu.modifications.length > 0
+  const versementImpossible = Boolean(motifRefusVersement(recu))
 
   // Le fichier relie chaque versement bancaire à son opération pour savoir s'il
   // porte déjà une image. On réutilise le regroupement du domaine.
@@ -206,8 +216,29 @@ export function ModaleDetail({
       }
       pied={
         <>
-          {/* Le fichier place l'action d'impression en premier. */}
-          <button className="omra-btn primary" onClick={onOuvrirRecu}>
+          <button
+            className="omra-btn"
+            title={T.registre.ajouterDfp}
+            disabled={versementImpossible}
+            onClick={onNouveauVersement}
+          >
+            <svg
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              width="14"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          {/* Le fichier place l'action d'impression en premier parmi ses
+              propres boutons ; celui-ci reste juste après le raccourci
+              d'ajout de dfp, ajouté hors fichier de référence. */}
+          <button className="omra-btn primary" title={T.detail.voirRecu} onClick={onOuvrirRecu}>
             <svg
               fill="none"
               height="14"
@@ -220,7 +251,6 @@ export function ModaleDetail({
               <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
               <circle cx="12" cy="12" r="3" />
             </svg>
-            {T.detail.voirRecu}
           </button>
           <button className="omra-btn" onClick={onFermer}>
             {T.detail.fermer}
@@ -277,7 +307,7 @@ export function ModaleDetail({
               <Ligne label={T.detail.chambre}>
                 <Reference>{recu.chambre}</Reference>
               </Ligne>
-              <Ligne label={T.detail.saison}>
+              <Ligne label={T.detail.saison} classeValeur="detail-ligne-valeur-discrete">
                 <TexteArabe>{saison.nom}</TexteArabe>
               </Ligne>
             </div>
@@ -286,10 +316,10 @@ export function ModaleDetail({
           <section className="detail-carte">
             <h3>{T.detail.infosEnregistrement}</h3>
             <div className="detail-lignes duo">
-              <Ligne label={T.detail.employe}>
+              <Ligne label={T.detail.employe} classeValeur="detail-ligne-valeur-discrete">
                 <TexteArabe>{recu.employe}</TexteArabe>
               </Ligne>
-              <Ligne label={T.detail.impression}>
+              <Ligne label={T.detail.impression} classeValeur="detail-ligne-valeur-discrete">
                 <Reference>{recu.impressions}</Reference>
               </Ligne>
               {modifie && recu.derniereModification ? (

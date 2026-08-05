@@ -1740,7 +1740,7 @@ input[type='number'] {
 }
 
 .detail-identite .nom {
-  font-size: 23px;
+  font-size: 37px;
   font-weight: 700;
   color: #fff;
   line-height: 1.15;
@@ -1858,6 +1858,15 @@ input[type='number'] {
 
 .omra-fields.duo {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/*
+ * Ajouter un versement seulement : المبلغ au-dessus de طريقة الدفع, pas côte
+ * à côte. `.champ-encaissement` est partagé avec Nouveau reçu, qui garde le
+ * côte-à-côte — d'où le scope à `.versement-coque`.
+ */
+.versement-coque .champ-encaissement {
+  grid-template-columns: 1fr;
 }
 
 /*
@@ -2287,6 +2296,11 @@ input.mono[inputmode='numeric'] {
   background: var(--accent-soft);
 }
 
+/* مجموع الدفعات agrandie, sans la décaler de ses voisines dans la rangée. */
+.detail-finance-cellule.paye .valeur {
+  font-size: 20px;
+}
+
 .detail-finance-cellule.restant {
   background: #fdf3f1;
 }
@@ -2367,6 +2381,12 @@ input.mono[inputmode='numeric'] {
 .detail-ligne-valeur {
   font-weight: 600;
   min-width: 0;
+}
+
+/* الموسم / الموظف / الطباعة mis en retrait — moins importants que le reste. */
+.detail-ligne-valeur-discrete {
+  font-size: 9px;
+  color: rgb(107, 107, 107);
 }
 
 .detail-note {
@@ -2990,18 +3010,82 @@ input.mono[inputmode='numeric'] {
  * chiffre que l'on vient vérifier. La disposition en une seule rangée de six
  * cellules tassait ces informations et noyait le nom.
  */
-.versement-resume {
+/* Nom du voyageur détaché de l'encadré vert, en grand titre centré. */
+.versement-nom-titre {
   margin-top: 14px;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+/*
+ * Encadré vert et tableau des dfp côte à côte plutôt qu'empilés. Le tableau
+ * (2ᵉ colonne, à gauche en RTL) est plus large que l'encadré : il doit
+ * pouvoir afficher les détails d'un chèque/virement (référence + banque +
+ * date) sans être trop à l'étroit.
+ */
+.versement-grille {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 12px;
+  align-items: start;
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .versement-grille {
+    grid-template-columns: 1fr;
+  }
+}
+
+.versement-resume {
   padding: 12px 16px;
   background: var(--accent-soft);
   border-radius: 12px;
 }
 
-.versement-resume-nom {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 8px;
+.versement-champs-paiement {
+  margin-top: 12px;
+}
+
+/*
+ * Ces champs sont maintenant posés sur le fond vert de l'encadré résumé :
+ * garder le vert plein de `.champ-encaissement` les rendait illisibles
+ * (vert sur vert). Fond clair choisi par le commanditaire à la place.
+ */
+.versement-champs-paiement input.omra-input:not(.invalide) {
+  background: rgb(255, 250, 245);
+}
+
+.versement-champs-paiement select.omra-input:not(.invalide) {
+  background: rgb(255, 250, 245);
+}
+
+/* Au clic, un blanc pur plutôt que le blanc cassé standard des autres champs. */
+.versement-champs-paiement .omra-input:focus:not(.invalide) {
+  background: #fff;
+}
+
+/*
+ * Montant : texte plus grand sans agrandir la boîte du champ (padding
+ * resserré pour compenser), comme pour le champ équivalent de Nouveau reçu.
+ */
+.versement-champs-paiement input.omra-input {
+  font-size: 17px;
+  padding: 6.5px 13px;
+}
+
+/*
+ * Colonne référence du tableau des dfp : peut contenir « référence · date ·
+ * banque », trop long pour rester sur une ligne maintenant que le tableau
+ * partage la largeur avec l'encadré résumé. Autoriser le retour à la ligne
+ * plutôt que déborder hors du tableau. Scopé à cette table précise (le
+ * tableau du dossier complet, `.omra-mini-table` aussi, reste en nowrap).
+ */
+.versement-recap .omra-mini-table td:last-child {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .versement-resume-ligne {
@@ -3036,6 +3120,12 @@ input.mono[inputmode='numeric'] {
 /* Plus rien à payer après cette dfp : le bleu du soldé, comme ailleurs. */
 .versement-resume-ligne.finale b.solde {
   color: var(--solde);
+}
+
+/* Retire le margin-top hérité de `.omra-panel` : dans la grille, l'encadré
+   vert et ce tableau doivent démarrer à la même hauteur. */
+.versement-recap {
+  margin-top: 0;
 }
 
 /* La mention de lecture seule passe en tête de carte, face au titre. */

@@ -903,6 +903,7 @@ export function ApplicationFacturation({
                     setFenetre({ type: 'paiementDetail', cle }),
                   )
                 }}
+                onNouveauVersement={() => setFenetre({ type: 'versement', recuId: recu.id })}
               />
             )
           })()

@@ -408,7 +408,7 @@ export const T = {
     aideNumero: 'اكتب رقم الوصل مباشرة',
     montant: 'المبلغ *',
     payeAvant: 'المدفوع سابقًا',
-    restantApres: 'الباقي بعد هذه الدفعة',
+    restantApres: 'الباقي',
     recap: 'ملخص الدفعات الست',
     recapAide: 'للقراءة والمعاينة فقط',
     detailsInstrument: 'تفاصيل الشيك / التحويل',

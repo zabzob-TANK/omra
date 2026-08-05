@@ -209,14 +209,29 @@ export function ModaleVersement({
 
       {recu && !refus ? (
         <>
+          <div className="versement-nom-titre">
+            <TexteArabe>{`${recu.prenom} ${recu.nom}`}</TexteArabe>
+          </div>
+
+          {recu.versements.length === MAX_VERSEMENTS - 1 ? (
+            <p className="omra-hint" style={{ marginTop: 10, color: 'var(--warn)' }}>
+              الدفعة السادسة يجب أن تساوي كامل الباقي بالضبط ({centimesEnTexteDevise(restant)}).
+            </p>
+          ) : null}
+
           {/*
-            Résumé du reçu visé : le nom en tête, les trois repères du dossier,
-            puis le reste après cette dfp détaché sous un filet — c'est le
-            chiffre que l'on vient vérifier en saisissant une dfp.
+            Résumé du reçu visé : les trois repères du dossier, puis le reste
+            après cette dfp détaché sous un filet — c'est le chiffre que l'on
+            vient vérifier en saisissant une dfp. Côte à côte avec le tableau
+            des dfp déjà enregistrées.
           */}
+          <div className="versement-grille">
           <div className="versement-resume">
-            <div className="versement-resume-nom">
-              <TexteArabe>{`${recu.prenom} ${recu.nom}`}</TexteArabe>
+            <div className="versement-resume-ligne">
+              <span>{T.registre.colonnes.nbVersements}</span>
+              <b className="mono">
+                {recu.versements.length} / {MAX_VERSEMENTS}
+              </b>
             </div>
             <div className="versement-resume-ligne">
               <span>{T.registre.colonnes.convenu}</span>
@@ -230,12 +245,6 @@ export function ModaleVersement({
                 <Montant centimes={totalPaye(recu)} />
               </b>
             </div>
-            <div className="versement-resume-ligne">
-              <span>{T.registre.colonnes.nbVersements}</span>
-              <b className="mono">
-                {recu.versements.length} / {MAX_VERSEMENTS}
-              </b>
-            </div>
             <div className="versement-resume-ligne finale">
               <span>{T.versement.restantApres}</span>
               {/* Restant nul après cette dfp : bleu, comme partout ailleurs. */}
@@ -243,13 +252,27 @@ export function ModaleVersement({
                 <Montant centimes={Math.max(0, restant - montantCentimes)} />
               </b>
             </div>
-          </div>
 
-          {recu.versements.length === MAX_VERSEMENTS - 1 ? (
-            <p className="omra-hint" style={{ marginTop: 10, color: 'var(--warn)' }}>
-              الدفعة السادسة يجب أن تساوي كامل الباقي بالضبط ({centimesEnTexteDevise(restant)}).
-            </p>
-          ) : null}
+            {/* Montant et mode de paiement, empilés sous le résumé. */}
+            <div className="omra-fields duo champ-encaissement versement-champs-paiement">
+              <Champ label={T.versement.montant}>
+                <Saisie
+                  valeur={saisie.montant}
+                  onChange={(v) => modifier({ montant: formaterMontant(v) })}
+                  invalide={enErreur(erreurs, 'montant')}
+                  mono
+                  inputMode="numeric"
+                />
+              </Champ>
+              <Champ label={T.nouveau.methode}>
+                <Selection
+                  valeur={natureCourante}
+                  onChange={(valeur) => modifier({ instrument: instrumentPourNature(valeur) })}
+                  options={NATURES.map((n) => ({ valeur: n.valeur, libelle: n.libelle }))}
+                />
+              </Champ>
+            </div>
+          </div>
 
           <div className="omra-panel versement-recap">
             <div className="versement-recap-entete">
@@ -346,25 +369,6 @@ export function ModaleVersement({
               </tbody>
             </table>
           </div>
-
-          {/* Montant et mode de paiement sur une même rangée. */}
-          <div className="omra-fields duo champ-encaissement" style={{ marginTop: 14 }}>
-            <Champ label={T.versement.montant}>
-              <Saisie
-                valeur={saisie.montant}
-                onChange={(v) => modifier({ montant: formaterMontant(v) })}
-                invalide={enErreur(erreurs, 'montant')}
-                mono
-                inputMode="numeric"
-              />
-            </Champ>
-            <Champ label={T.nouveau.methode}>
-              <Selection
-                valeur={natureCourante}
-                onChange={(valeur) => modifier({ instrument: instrumentPourNature(valeur) })}
-                options={NATURES.map((n) => ({ valeur: n.valeur, libelle: n.libelle }))}
-              />
-            </Champ>
           </div>
 
         </>
