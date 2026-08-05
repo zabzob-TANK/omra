@@ -446,7 +446,6 @@ export function ModaleNouveauRecu({
       </section>
 
       <section className="recu-section">
-        <h3>{T.nouveau.sectionPremiereDfp}</h3>
         <div className="omra-fields duo champ-encaissement">
           <Champ label={T.nouveau.montant}>
             <Saisie
