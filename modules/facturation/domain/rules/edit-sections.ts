@@ -501,17 +501,21 @@ export function preparerModification(
 }
 
 /**
- * R-54, R-55 — Champs et versements jamais modifiables.
+ * R-54, R-55 — Champs et versements jamais modifiables, quel que soit le rôle.
  *
  * Rendus explicites pour être testables et pour que l'interface les grise sans
  * dupliquer la règle.
+ *
+ * §5.9 — le montant du premier versement n'appartient plus à cette liste
+ * depuis que l'administrateur (slot 1) peut le corriger (voir plus haut dans
+ * ce fichier, section `firstPayment` de `preparerModification`) : ce n'est pas
+ * un champ « jamais modifiable », mais un champ modifiable par un seul rôle.
+ * Un employé (slots 2 à 6) reste bloqué sur ce montant précis — cette
+ * restriction est imposée par `contexte.estAdministrateur` dans
+ * `preparerModification`, pas par cette liste, qui ne décrit que ce qui est
+ * verrouillé pour tout le monde sans exception.
  */
-export const CHAMPS_NON_MODIFIABLES = [
-  'numero',
-  'date',
-  'rabatteur',
-  'montantPremierVersement',
-] as const
+export const CHAMPS_NON_MODIFIABLES = ['numero', 'date', 'rabatteur'] as const
 
 /** R-55 — Seul le premier versement est concerné par une modification. */
 export function versementModifiable(rang: number): boolean {

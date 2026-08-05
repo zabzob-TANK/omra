@@ -2902,6 +2902,21 @@ input.mono[inputmode='numeric'] {
   font-weight: 700;
 }
 
+/*
+ * Second encadré, affiché seulement en cas de trop-perçu : le montant
+ * réellement remboursable (plafonné au convenu), distingué du montant payé
+ * juste au-dessus par une teinte d'avertissement — jamais de rouge, qui est
+ * réservé aux erreurs de validation.
+ */
+.annul-montant-plafonne {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.annul-montant-plafonne strong {
+  color: var(--warn);
+}
+
 /* ------------------------------------------- Registre : pied et état vide */
 
 /* Pied du tableau : nombre affiché puis bascule des reçus annulés. */
@@ -3120,6 +3135,16 @@ input.mono[inputmode='numeric'] {
 /* Plus rien à payer après cette dfp : le bleu du soldé, comme ailleurs. */
 .versement-resume-ligne.finale b.solde {
   color: var(--solde);
+}
+
+/*
+ * Montant saisi supérieur au restant : l'aperçu devient négatif au lieu
+ * d'être plafonné à zéro, pour ne jamais laisser croire à un règlement exact
+ * là où R-20/R-21 refuseront l'enregistrement. Rouge, comme le restant du
+ * reçu ailleurs dans l'écran de détail.
+ */
+.versement-resume-ligne.finale b.depassement {
+  color: var(--danger);
 }
 
 /* Retire le margin-top hérité de `.omra-panel` : dans la grille, l'encadré

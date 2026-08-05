@@ -9,6 +9,8 @@
  * opérations dupliquées n'existe ; le texte est repris tel quel, en français.
  */
 
+import { useState } from 'react'
+
 import { centimesEnTexteDevise } from '../../domain/money'
 import { Dialogue } from '../dialogue'
 import { T } from '../textes'
@@ -26,17 +28,38 @@ export function ModaleDepassement({
   onRetour,
   onConfirmer,
 }: Proprietes) {
+  // `onConfirmer` déclenche un enregistrement asynchrone (versement, reçu ou
+  // correction) dans le composant parent, mais ce dernier ne peut pas désactiver
+  // les boutons de cette fenêtre : elle remplace entièrement la sienne pendant
+  // la confirmation (`if (depassement) return <ModaleDepassement .../>`). Sans
+  // ce garde local, un double clic sur « confirmer » — ou un clic pendant
+  // l'attente — déclenche deux enregistrements pour une seule confirmation de
+  // dépassement, alors que R-32 exige une confirmation explicite et auditée,
+  // pas deux écritures silencieuses.
+  const [enCours, setEnCours] = useState(false)
+
+  const confirmer = () => {
+    if (enCours) return
+    setEnCours(true)
+    onConfirmer()
+  }
+
+  const retour = () => {
+    if (enCours) return
+    onRetour()
+  }
+
   return (
     <Dialogue
       titre={T.depassement.titre}
       taille="small"
-      onFermer={onRetour}
+      onFermer={retour}
       pied={
         <>
-          <button className="omra-btn" onClick={onRetour}>
+          <button className="omra-btn" onClick={retour} disabled={enCours}>
             {T.depassement.retour}
           </button>
-          <button className="omra-btn primary" onClick={onConfirmer}>
+          <button className="omra-btn primary" onClick={confirmer} disabled={enCours}>
             {T.depassement.confirmer}
           </button>
         </>

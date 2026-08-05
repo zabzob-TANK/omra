@@ -285,7 +285,11 @@ export function creerSourceDemonstration(
     async reserverNumero() {
       return prochainNumero++
     },
-    async creer(donnees: CreationRecu) {
+    // R-32 — l'adaptateur de démonstration n'a pas de RPC à revalider côté
+    // serveur : `confirmeDepassement` n'a donc aucun effet ici, mais figure
+    // dans la signature pour rester conforme à `RecusPort` (voir write.ts,
+    // qui la retransmet réellement à Supabase).
+    async creer(donnees: CreationRecu, _confirmeDepassement: boolean) {
       const recu: Recu = {
         id: identifiants.nouvelId('recu'),
         numero: donnees.numero,
@@ -321,7 +325,7 @@ export function creerSourceDemonstration(
       recus.push(recu)
       return copier(recu)
     },
-    async ajouterVersement(recuId: string, versement: Versement) {
+    async ajouterVersement(recuId: string, versement: Versement, _confirmeDepassement: boolean) {
       const recu = recus.find((r) => r.id === recuId)
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
       recu.versements.push(versement)
@@ -340,7 +344,13 @@ export function creerSourceDemonstration(
       recu.modifiePar = modification.employe
       return copier(recu)
     },
-    async corrigerPremierVersement(recuId, versement, nouvelleOperation, modification) {
+    async corrigerPremierVersement(
+      recuId,
+      versement,
+      nouvelleOperation,
+      modification,
+      _confirmeDepassement,
+    ) {
       const recu = recus.find((r) => r.id === recuId)
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
       const premier = recu.versements[0]

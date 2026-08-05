@@ -59,6 +59,19 @@ export interface ContexteAnnulation {
 }
 
 /**
+ * R-46 — Montant réellement remboursable si le reçu est annulé maintenant :
+ * le total payé, mais jamais plus que le convenu (§5.10, §5.11). Le trop-perçu
+ * n'est jamais restitué, même à l'annulation.
+ *
+ * Exportée séparément de `preparerAnnulation` pour que l'écran de confirmation
+ * puisse afficher ce montant — et non le total payé brut — avant même que le
+ * formulaire (motif, mode, mot de passe) soit rempli.
+ */
+export function montantRemboursableCentimes(recu: Pick<Recu, 'convenuCentimes' | 'versements'>): number {
+  return Math.min(totalPaye(recu), recu.convenuCentimes)
+}
+
+/**
  * R-43 à R-47 — Valide et prépare l'annulation.
  *
  * L'ordre reproduit `doCancel()` : les trois champs obligatoires sont contrôlés
@@ -91,7 +104,7 @@ export function preparerAnnulation(
   // R-46 — le montant remboursé est le total réellement payé, tous modes
   // confondus, mais jamais plus que le convenu : le trop-perçu n'est jamais
   // restitué, même à l'annulation (§5.10, §5.11).
-  const montantRembourseCentimes = Math.min(totalPaye(recu), recu.convenuCentimes)
+  const montantRembourseCentimes = montantRemboursableCentimes(recu)
   const modeRemboursement = saisie.modeRemboursement as ModeRemboursement
 
   const donnees: DonneesAnnulation = {

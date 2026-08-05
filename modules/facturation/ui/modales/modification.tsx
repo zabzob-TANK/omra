@@ -144,7 +144,10 @@ export function ModaleModification({
       onFermer={onFermer}
       classeCoque="modif-coque"
       bandeau={
-        // R-54, R-55 — rappel des valeurs que la modification ne touche jamais.
+        // R-54, R-55 — rappel des valeurs que la modification ne touche jamais
+        // pour tout le monde. §5.9 — le montant du premier versement en est
+        // délibérément exclu pour un administrateur, pour qui il n'est pas
+        // fixe : `premierMontantAdmin` le dit, au lieu de `premierMontantFixe`.
         <div className="modif-fixes">
           <div>
             <div className="etiquette">{T.modification.numeroFixe}</div>
@@ -161,7 +164,9 @@ export function ModaleModification({
             <div className="valeur">{recu.rabatteur || '—'}</div>
           </div>
           <div>
-            <div className="etiquette">{T.modification.premierMontantFixe}</div>
+            <div className="etiquette">
+              {estAdministrateur ? T.modification.premierMontantAdmin : T.modification.premierMontantFixe}
+            </div>
             <div className="valeur mono" dir="ltr">
               {premierVersement ? <Montant centimes={premierVersement.montantCentimes} /> : '—'}
             </div>

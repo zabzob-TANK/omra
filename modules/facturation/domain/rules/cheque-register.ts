@@ -397,9 +397,14 @@ export function libellesInstrument(nature: string): {
     libelleImport: virement
       ? 'Importer ou photographier le justificatif'
       : 'Importer ou photographier le chèque',
+    // Le texte de la branche chèque référençait par erreur « le module de
+    // démonstration » — une formulation de démonstration qui n'a pas sa place
+    // dans un libellé métier (règle : le mode démonstration ne doit jamais
+    // transparaître dans un texte destiné à la production). Alignée sur la
+    // formulation, déjà correcte, de la branche virement juste au-dessus.
     sansImage: virement
       ? 'Le justificatif reste facultatif et pourra être ajouté plus tard.'
-      : 'L’image pourra être ajoutée depuis le module de démonstration.',
+      : 'L’image reste facultative et pourra être ajoutée plus tard.',
     entete: (numero: string) =>
       virement ? `Virement — référence ${numero}` : `Chèque n° ${numero}`,
   }

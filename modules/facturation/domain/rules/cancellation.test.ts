@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { annulationConservelesDonnees, preparerAnnulation, type SaisieAnnulation } from './cancellation'
+import {
+  annulationConservelesDonnees,
+  montantRemboursableCentimes,
+  preparerAnnulation,
+  type SaisieAnnulation,
+} from './cancellation'
 import { unRecu, unVersement } from './fixtures'
 
 const CONTEXTE = {
@@ -86,6 +91,31 @@ describe('R-45 — aucune suppression', () => {
   it('détecte une perte de versements', () => {
     const ampute = { ...recu, statut: 'ملغى' as const, versements: [] }
     expect(annulationConservelesDonnees(recu, ampute)).toBe(false)
+  })
+})
+
+describe('R-46 — montantRemboursableCentimes (exportée pour l’écran de confirmation)', () => {
+  it('vaut le total payé quand il ne dépasse pas le convenu', () => {
+    expect(montantRemboursableCentimes(recu)).toBe(1000000)
+  })
+
+  it('se plafonne au convenu en cas de trop-perçu, avant même la saisie du formulaire', () => {
+    const tropPercu = unRecu({
+      convenuCentimes: 2000000,
+      versements: [unVersement({ montantCentimes: 2200000 })],
+    })
+    expect(montantRemboursableCentimes(tropPercu)).toBe(2000000)
+  })
+
+  it('correspond exactement au montantRembourseCentimes calculé par preparerAnnulation', () => {
+    const tropPercu = unRecu({
+      convenuCentimes: 2000000,
+      versements: [unVersement({ montantCentimes: 2200000 })],
+    })
+    const resultat = preparerAnnulation(saisie(), tropPercu, CONTEXTE)
+    expect(
+      resultat.statut === 'ok' && resultat.valeur.donnees.montantRembourseCentimes,
+    ).toBe(montantRemboursableCentimes(tropPercu))
   })
 })
 

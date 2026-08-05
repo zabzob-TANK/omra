@@ -162,7 +162,10 @@ export async function reserverNumeroSupabase(): Promise<number> {
 }
 
 /** `RecusPort.creer`. */
-export async function creerRecuSupabase(donnees: CreationRecu): Promise<Recu> {
+export async function creerRecuSupabase(
+  donnees: CreationRecu,
+  confirmeDepassement: boolean,
+): Promise<Recu> {
   const programme = await chargerProgrammeActif()
   const hotelId = programme.hotels.find((h) => h.name === donnees.hotel)?.id
   const flightId = programme.flights.find((f) => f.label === donnees.vol)?.id
@@ -215,14 +218,15 @@ export async function creerRecuSupabase(donnees: CreationRecu): Promise<Recu> {
     p_bank_name: instrument.p_bank_name,
     p_instrument_date: instrument.p_instrument_date,
     p_payer_name: instrument.p_payer_name,
-    // La confirmation de dépassement a déjà été obtenue par le domaine avant
-    // d'appeler ce port (R-32, `preparerCreationRecu` → `depassementConfirme`) :
-    // il n'est jamais invoké tant qu'elle manque. Un dépassement inédit
-    // détecté ici (concurrence rare sur une même opération partagée, entre la
-    // lecture du domaine et cette écriture) reste tracé intégralement
-    // (`payment_operation.over_allocation_confirmed`) — limite résiduelle
-    // documentée dans AUDIT-BACKEND.md.
-    p_confirm_over_allocation: true,
+    // R-32 — durcissement : ce port retransmet la confirmation réellement
+    // obtenue par le domaine (`preparerCreationRecu` → `depassementConfirme`),
+    // au lieu d'affirmer inconditionnellement `true`. La RPC recalcule
+    // elle-même `v_over_allocation_confirmed` à partir de l'allocation réelle
+    // et rejette l'appel si un dépassement existe sans confirmation : un
+    // dépassement inédit détecté ici (concurrence rare sur une même opération
+    // partagée, entre la lecture du domaine et cette écriture) est donc
+    // désormais bloqué par le serveur, pas seulement toléré silencieusement.
+    p_confirm_over_allocation: confirmeDepassement,
   })
   if (error) throw new Error(messageErreur(error))
 
@@ -235,7 +239,11 @@ export async function creerRecuSupabase(donnees: CreationRecu): Promise<Recu> {
 }
 
 /** `RecusPort.ajouterVersement`. */
-export async function ajouterVersementSupabase(recuId: string, versement: Versement): Promise<Recu> {
+export async function ajouterVersementSupabase(
+  recuId: string,
+  versement: Versement,
+  confirmeDepassement: boolean,
+): Promise<Recu> {
   const detail = await chargerDetailRecuBrut(recuId)
   if (!detail) throw new Error('Reçu introuvable pour l’ajout du versement.')
 
@@ -254,7 +262,9 @@ export async function ajouterVersementSupabase(recuId: string, versement: Versem
     p_bank_name: instrument.p_bank_name,
     p_instrument_date: instrument.p_instrument_date,
     p_payer_name: instrument.p_payer_name,
-    p_confirm_over_allocation: true,
+    // R-32 — durcissement : voir le commentaire équivalent dans
+    // `creerRecuSupabase` ci-dessus, même RPC family, même correctif.
+    p_confirm_over_allocation: confirmeDepassement,
   })
   if (error) throw new Error(messageErreur(error))
 
@@ -400,6 +410,7 @@ export async function corrigerPremierVersementSupabase(
   versement: CorrectionPremierVersement,
   _nouvelleOperation: OperationPartagee | null,
   modification: Modification,
+  confirmeDepassement: boolean,
 ): Promise<Recu> {
   const detail = await chargerDetailRecuBrut(recuId)
   if (!detail) throw new Error('Reçu introuvable pour la correction du premier versement.')
@@ -432,10 +443,11 @@ export async function corrigerPremierVersementSupabase(
     p_bank_name: instrument.p_bank_name,
     p_instrument_date: instrument.p_instrument_date,
     p_payer_name: instrument.p_payer_name,
-    // Le domaine a déjà obtenu la confirmation avant d'appeler ce port
-    // (R-32, preparerModification → confirmation-requise), comme pour
-    // creerRecuSupabase/ajouterVersementSupabase ci-dessus.
-    p_confirm_over_allocation: true,
+    // R-32 — durcissement : voir le commentaire équivalent dans
+    // `creerRecuSupabase` ci-dessus. `correct_billing_receipt_first_payment_method`
+    // (202608030006) recalcule elle-même `v_over_allocation`/`v_over_allocation_confirmed`
+    // et rejette l'appel si un dépassement existe sans confirmation.
+    p_confirm_over_allocation: confirmeDepassement,
   })
   if (error) throw new Error(messageErreur(error))
 

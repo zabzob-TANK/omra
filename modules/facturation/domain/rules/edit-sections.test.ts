@@ -424,10 +424,18 @@ describe('R-53 — section premier versement', () => {
 })
 
 describe('R-54, R-55 — champs et versements non modifiables', () => {
-  it('recense les champs verrouillés', () => {
+  it('recense les champs verrouillés pour tout le monde, sans exception de rôle', () => {
     expect(CHAMPS_NON_MODIFIABLES).toContain('rabatteur')
     expect(CHAMPS_NON_MODIFIABLES).toContain('numero')
-    expect(CHAMPS_NON_MODIFIABLES).toContain('montantPremierVersement')
+    expect(CHAMPS_NON_MODIFIABLES).toContain('date')
+  })
+
+  it('n’y range plus le montant du premier versement, modifiable par l’administrateur seul (§5.9)', () => {
+    // §5.9 — ce champ n'est pas « jamais modifiable » : il est réservé à
+    // l'administrateur, ce que `preparerModification` impose via
+    // `contexte.estAdministrateur`, pas via cette liste. Le régresser ici
+    // reviendrait à réintroduire la contradiction corrigée par ce test.
+    expect(CHAMPS_NON_MODIFIABLES).not.toContain('montantPremierVersement')
   })
 
   it('n’autorise la modification que du premier versement', () => {

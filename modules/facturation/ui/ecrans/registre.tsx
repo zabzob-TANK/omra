@@ -335,7 +335,11 @@ export function EcranRegistre({
                         <TexteArabe>{recu.rabatteur}</TexteArabe>
                       </td>
                       <td className="omra-cell-muted">
-                        <span className="omra-note">{recu.note || '—'}</span>
+                        {/* domain/bidi.ts range « note » parmi les valeurs
+                            arabes, au même titre que hôtel/vol/rabatteur
+                            ci-dessus : seule cette colonne n'était pas
+                            passée par `TexteArabe`. */}
+                        <TexteArabe className="omra-note">{recu.note || '—'}</TexteArabe>
                       </td>
                       <td className="omra-cell-muted">
                         <TexteArabe>{recu.employe}</TexteArabe>
@@ -346,7 +350,13 @@ export function EcranRegistre({
                       <td className="omra-cell-muted">
                         <Telephone>{recu.telephone}</Telephone>
                       </td>
-                      <td className="omra-cell-muted">{recu.groupe || '—'}</td>
+                      {/* Étiquette libre pouvant contenir de l'arabe (règle
+                          groupe/famille) : même traitement que dans le
+                          détail du voyageur (`detail.tsx`), qui la passe
+                          déjà par `TexteArabe`. */}
+                      <td className="omra-cell-muted">
+                        <TexteArabe>{recu.groupe || '—'}</TexteArabe>
+                      </td>
                       <td onDoubleClick={(evenement) => evenement.stopPropagation()}>
                         {/* Ordre du fichier : annuler, modifier, imprimer, dépense. */}
                         <div className="omra-row-actions">

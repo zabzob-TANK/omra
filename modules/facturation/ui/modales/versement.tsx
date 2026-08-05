@@ -103,6 +103,10 @@ export function ModaleVersement({
 
   const restant = recu ? restantDu(recu) : 0
   const montantCentimes = dirhamsSaisisEnCentimes(saisie.montant)
+  // Aperçu non plafonné : négatif tant que le montant saisi dépasse le
+  // restant, pour ne jamais afficher « soldé » sur un dépassement qui sera
+  // refusé à l'enregistrement (R-20, R-21).
+  const restantApresVersement = restant - montantCentimes
 
   const soumettre = async (confirme: boolean) => {
     setEnvoi(true)
@@ -247,9 +251,25 @@ export function ModaleVersement({
             </div>
             <div className="versement-resume-ligne finale">
               <span>{T.versement.restantApres}</span>
-              {/* Restant nul après cette dfp : bleu, comme partout ailleurs. */}
-              <b className={`mono${restant - montantCentimes <= 0 ? ' solde' : ''}`}>
-                <Montant centimes={Math.max(0, restant - montantCentimes)} />
+              {/*
+                Le montant saisi n'est pas encore validé par le domaine : tant
+                qu'il dépasse le restant, R-21 (ou R-20 pour la sixième dfp)
+                refusera l'enregistrement. Afficher `0 DH` en bleu « soldé »
+                pour ce cas ferait croire à un règlement exact au lieu d'un
+                dépassement — la vraie valeur (négative) est donc montrée telle
+                quelle, en rouge, comme le restant du reçu ailleurs dans
+                l'écran de détail. Bleu réservé au restant exactement nul.
+              */}
+              <b
+                className={`mono${
+                  restantApresVersement === 0
+                    ? ' solde'
+                    : restantApresVersement < 0
+                      ? ' depassement'
+                      : ''
+                }`}
+              >
+                <Montant centimes={restantApresVersement} />
               </b>
             </div>
 

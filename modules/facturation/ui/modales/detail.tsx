@@ -286,7 +286,13 @@ export function ModaleDetail({
               <TexteArabe>{recu.rabatteur || '—'}</TexteArabe>
             </Ligne>
             <Ligne label={T.detail.note} large>
-              <span className="detail-note">{recu.note || '—'}</span>
+              {/*
+                domain/bidi.ts recense « note » parmi les valeurs arabes
+                (RTL, plaintext) au même titre que rabatteur/hôtel/vol
+                juste au-dessus — cette ligne utilisait un <span> nu, seule
+                exception de cette carte à ne pas passer par `TexteArabe`.
+              */}
+              <TexteArabe className="detail-note">{recu.note || '—'}</TexteArabe>
             </Ligne>
             <Ligne label={T.detail.groupe} large>
               <TexteArabe>{recu.groupe || '—'}</TexteArabe>

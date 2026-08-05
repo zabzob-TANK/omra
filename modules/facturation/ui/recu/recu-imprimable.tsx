@@ -12,7 +12,6 @@
  * comme dans le fichier.
  */
 
-import { MAX_VERSEMENTS } from '../../domain/constants'
 import type { DonneesRecuImprimable } from './donnees'
 import './recu.css'
 
@@ -288,6 +287,3 @@ export function RecuImprimable({
     </section>
   )
 }
-
-/** Rappel du plafond, pour les messages de l'atelier. */
-export const MAXIMUM_LIGNES = MAX_VERSEMENTS

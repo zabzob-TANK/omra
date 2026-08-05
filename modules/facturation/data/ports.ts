@@ -175,9 +175,24 @@ export interface RecusPort {
    * L'implémentation doit garantir l'unicité même en accès concurrent.
    */
   reserverNumero(): Promise<number>
-  creer(donnees: CreationRecu): Promise<Recu>
-  /** R-22 — Ajoute un versement en fin de liste, sans toucher aux précédents. */
-  ajouterVersement(recuId: string, versement: Versement): Promise<Recu>
+  /**
+   * R-32 — `confirmeDepassement` reflète la confirmation réellement obtenue
+   * par le domaine (`preparerCreationRecu` → `depassementConfirme`) pour ce
+   * reçu précis, jamais une valeur fixe : l'implémentation Supabase la
+   * retransmet telle quelle à `create_complete_facturation_receipt`, qui
+   * revalide elle-même l'allocation côté serveur avant d'accepter un
+   * dépassement.
+   */
+  creer(donnees: CreationRecu, confirmeDepassement: boolean): Promise<Recu>
+  /**
+   * R-22, R-32 — Ajoute un versement en fin de liste, sans toucher aux
+   * précédents. `confirmeDepassement` : voir `creer()` ci-dessus.
+   */
+  ajouterVersement(
+    recuId: string,
+    versement: Versement,
+    confirmeDepassement: boolean,
+  ): Promise<Recu>
   /** R-49 à R-55 — Applique une modification de section et empile sa trace. */
   appliquerModification(
     recuId: string,
@@ -189,12 +204,14 @@ export interface RecusPort {
    * unique ↔ partagé, et montant pour un administrateur) et empile sa trace.
    * Le premier versement ne s'exprimant pas comme un `Partial<Recu>`, cette
    * méthode existe à part de `appliquerModification`.
+   * R-32 — `confirmeDepassement` : voir `creer()` ci-dessus.
    */
   corrigerPremierVersement(
     recuId: string,
     versement: CorrectionPremierVersement,
     nouvelleOperation: OperationPartagee | null,
     modification: Modification,
+    confirmeDepassement: boolean,
   ): Promise<Recu>
   /** R-45 à R-47 — Annule sans jamais supprimer. */
   annuler(

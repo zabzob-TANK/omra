@@ -397,7 +397,17 @@ export const T = {
     partDeCeVoyageur: 'المبلغ المدفوع هنا هو حصة هذا المسافر',
     montantDistribue: 'المبلغ الموزع',
     restantDisponible: 'المتبقي المتاح',
-    uneSeuleImage: 'صورة واحدة فقط لكل عملية',
+    /**
+     * Libellé de la 4ᵉ ligne du récapitulatif d'opération partagée : la part
+     * (`partCentimes`) que ce reçu précis prélève sur l'opération.
+     *
+     * Remplace ici l'ancienne clé `uneSeuleImage`, qui portait par erreur le
+     * texte de la règle « une seule image par opération » — sans rapport avec
+     * un montant — et qui doublonnait `T.imageInstrument.uneSeuleParOperation`
+     * (la formulation correcte de cette règle, utilisée près de la carte
+     * d'image). Supprimée : elle n'était référencée nulle part ailleurs.
+     */
+    parCeVersement: 'حصة هذا الوصل من العملية',
     imageDepuisRegistre:
       'هذه العملية مسجلة مسبقًا. تضاف الصورة لاحقًا من سجل المدفوعات، وليس من وصل هذا العميل.',
   },
@@ -431,6 +441,13 @@ export const T = {
     avertissement:
       'الوصل لا يُحذف أبدًا. اختر فقط هل الاسترجاع يخرج من الصندوق أم يُدار خارجه.',
     montantPaye: 'المبلغ المدفوع',
+    /**
+     * R-46, §5.10-§5.11 — montant réellement remboursable si l'annulation est
+     * confirmée : jamais plus que le convenu, même si le montant payé est
+     * supérieur (trop-perçu). N'apparaît que lorsque les deux valeurs diffèrent.
+     */
+    montantRemboursable: 'المبلغ القابل للاسترجاع من الصندوق',
+    avertissementTropPercu: 'المبلغ الزائد عن السعر المتفق عليه يبقى في الصندوق ولا يُسترجع.',
     modeRemboursement: 'طريقة الاسترجاع *',
     choisir: 'اختر',
     depuisCaisse: 'من الصندوق',
@@ -454,6 +471,13 @@ export const T = {
     dateFixe: 'تاريخ التسجيل — ثابت',
     rabatteurFixe: 'الوسيط — غير قابل للتعديل',
     premierMontantFixe: 'مبلغ الدفعة الأولى — ثابت',
+    /**
+     * §5.9 — remplace `premierMontantFixe` dans ce même bandeau lorsque
+     * l'utilisateur connecté est administrateur : pour lui seul, ce montant
+     * n'est pas fixe, il est modifiable plus bas dans la section « طريقة
+     * الدفعة الأولى ». Un employé (slots 2-6) continue de voir « ثابت ».
+     */
+    premierMontantAdmin: 'مبلغ الدفعة الأولى — قابل للتعديل من طرف المدير فقط',
     gabaritMotif: 'مثال: تصحيح خطأ في الإدخال',
     aucunPrix: 'لا يوجد ثمن محدد لهذه التركيبة.',
     operationCollective: 'عملية جماعية — شخص واحد يدفع عن عدة أشخاص',

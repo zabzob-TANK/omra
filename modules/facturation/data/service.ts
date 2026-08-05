@@ -375,7 +375,7 @@ export async function creerRecu(
       recuIds: [],
     })
 
-    recu = await source.recus.creer(donnees)
+    recu = await source.recus.creer(donnees, depassementConfirme)
     await source.clients.rattacherRecu(clientId, recu.id)
   } catch (erreurEcriture) {
     // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
@@ -438,7 +438,7 @@ export async function ajouterVersement(
   const cible = recu as Recu
   try {
     if (nouvelleOperation) await source.operationsPartagees.creer(nouvelleOperation)
-    await source.recus.ajouterVersement(cible.id, versement)
+    await source.recus.ajouterVersement(cible.id, versement, depassementConfirme)
   } catch (erreurEcriture) {
     // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
     // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
@@ -580,6 +580,7 @@ export async function modifierRecu(
         premierVersementCorrige.versement,
         premierVersementCorrige.nouvelleOperation,
         modification,
+        depassementConfirme,
       )
     } else {
       await source.recus.appliquerModification(recuId, champsModifies, modification)

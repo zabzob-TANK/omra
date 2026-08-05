@@ -10,7 +10,7 @@
 import { useState } from 'react'
 
 import type { ErreurValidation, Resultat } from '../../domain/rules/errors'
-import type { SaisieAnnulation } from '../../domain/rules/cancellation'
+import { montantRemboursableCentimes, type SaisieAnnulation } from '../../domain/rules/cancellation'
 import { totalPaye } from '../../domain/rules/receipt'
 import type { Recu } from '../../domain/types'
 import { Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
@@ -34,6 +34,12 @@ export function ModaleAnnulation({ recu, onFermer, onAnnuler }: Proprietes) {
   const [envoi, setEnvoi] = useState(false)
 
   const modifier = (patch: Partial<SaisieAnnulation>) => setSaisie({ ...saisie, ...patch })
+
+  // R-46, §5.10-§5.11 — `remboursable` est toujours celui que retiendrait
+  // `preparerAnnulation` : identique à `paye` sauf trop-perçu, où il reste
+  // plafonné au convenu.
+  const paye = totalPaye(recu)
+  const remboursable = montantRemboursableCentimes(recu)
 
   const soumettre = async () => {
     setEnvoi(true)
@@ -73,9 +79,31 @@ export function ModaleAnnulation({ recu, onFermer, onAnnuler }: Proprietes) {
       <div className="annul-montant">
         <span>{T.annulation.montantPaye}</span>
         <strong>
-          <Montant centimes={totalPaye(recu)} />
+          <Montant centimes={paye} />
         </strong>
       </div>
+
+      {/*
+        R-46, §5.10-§5.11 — en cas de trop-perçu, le montant payé ci-dessus et
+        ce que la caisse rendra réellement diffèrent : le serveur (et
+        `preparerAnnulation`) plafonnent au convenu, jamais au total payé.
+        Un second encadré rend cet écart visible avant la confirmation, pour
+        qu'un employé ne sorte jamais plus de la caisse que ce que le système
+        enregistrera.
+      */}
+      {remboursable < paye ? (
+        <>
+          <div className="annul-montant annul-montant-plafonne">
+            <span>{T.annulation.montantRemboursable}</span>
+            <strong>
+              <Montant centimes={remboursable} />
+            </strong>
+          </div>
+          <p className="omra-hint" style={{ color: 'var(--warn)', marginTop: -6, marginBottom: 13 }}>
+            {T.annulation.avertissementTropPercu}
+          </p>
+        </>
+      ) : null}
 
       <div className="omra-fields">
         <Champ label={T.annulation.modeRemboursement} pleine>

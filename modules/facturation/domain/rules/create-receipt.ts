@@ -9,7 +9,7 @@
  * immédiatement le traitement.
  */
 
-import { MAX_VERSEMENTS, STATUT_ACTIF } from '../constants'
+import { STATUT_ACTIF } from '../constants'
 import { chiffresTelephone } from '../format'
 import { dirhamsSaisisEnCentimes } from '../money'
 import type { OperationPartagee, Passeport, Tarif, Versement } from '../types'
@@ -269,6 +269,3 @@ export const VALEURS_INITIALES_RECU = {
   modifications: [] as const,
   motifAnnulation: '',
 } as const
-
-/** R-18 — Rappel du plafond, exposé pour l'interface. */
-export const MAXIMUM_VERSEMENTS = MAX_VERSEMENTS

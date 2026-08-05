@@ -325,7 +325,7 @@ export function BlocInstrument({
                 />
               </div>
               <div>
-                <span>{T.instrument.uneSeuleImage}</span>
+                <span>{T.instrument.parCeVersement}</span>
                 <Montant centimes={partCentimes} />
               </div>
             </div>
