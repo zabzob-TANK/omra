@@ -12,7 +12,7 @@
 import { NATURE_CHEQUE, NATURE_ESPECES, NATURE_VIREMENT } from '../domain/constants'
 import { formaterDate, formaterMontant } from '../domain/format'
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../domain/money'
-import { natureNormalisee } from '../domain/payment-method'
+import { natureAbregee, natureNormalisee } from '../domain/payment-method'
 import type { SaisieInstrument } from '../domain/rules/instrument'
 import type { ErreurValidation } from '../domain/rules/errors'
 import { optionsOperations } from '../domain/rules/shared-payment'
@@ -27,6 +27,19 @@ export const NATURES = [
   { valeur: NATURE_CHEQUE, libelle: T.methodes.cheque },
   { valeur: NATURE_VIREMENT, libelle: T.methodes.virement },
 ]
+
+/**
+ * Libellé abrégé de la méthode, comme `receiptMethodDisplay()`. Partagé entre
+ * le mini-tableau de versement.tsx et sa fenêtre de confirmation d'identité
+ * (confirmation-versement.tsx), pour éviter un import circulaire entre les deux.
+ */
+export function libelleNature(valeur: string): string {
+  const nature = natureNormalisee(valeur)
+  if (nature === 'نقد') return T.methodes.especes
+  if (nature === 'شيك') return T.methodes.cheque
+  if (nature === 'تحويل بنكي') return T.methodes.virement
+  return natureAbregee(valeur)
+}
 
 /**
  * R-23 — changer de nature réinitialise la portée et les champs d'instrument,

@@ -417,7 +417,12 @@ export const T = {
     numeroRecu: 'رقم الوصل *',
     aideNumero: 'اكتب رقم الوصل مباشرة',
     montant: 'المبلغ *',
-    payeAvant: 'المدفوع سابقًا',
+    /**
+     * Total en temps réel : ce qui a déjà été payé plus le montant en train
+     * d'être saisi (pas encore enregistré) — pas seulement les versements
+     * déjà validés.
+     */
+    payeApres: 'المبلغ المدفوع',
     restantApres: 'الباقي',
     recap: 'ملخص الدفعات الست',
     recapAide: 'للقراءة والمعاينة فقط',
@@ -621,5 +626,17 @@ export const T = {
       'سيتم الاحتفاظ بهذه المخالفة في بيانات العملية. لا توجد أي مراقبة تلقائية للعمليات المكررة.',
     confirmer: 'تأكيد وحفظ',
     retour: 'إلغاء',
+  },
+
+  /**
+   * Fenêtre de confirmation d'identité affichée juste avant l'enregistrement
+   * d'un versement (uniquement cet écran, pas Nouveau reçu ni la correction
+   * du 1er versement) : nom en grand, montant en dessous, oui/non.
+   */
+  confirmationVersement: {
+    titre: 'تأكيد قبل التسجيل',
+    consigne: 'تحقق من الاسم والمبلغ قبل المتابعة',
+    oui: 'نعم',
+    non: 'لا',
   },
 } as const

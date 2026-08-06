@@ -3035,6 +3035,33 @@ input.mono[inputmode='numeric'] {
 }
 
 /*
+ * Fenêtre de confirmation d'identité avant l'enregistrement d'un versement :
+ * le nom domine (c'est ce qu'on vient revérifier), le montant en dessous,
+ * plus discret mais toujours net.
+ */
+.confirmation-versement-nom {
+  margin-top: 18px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.confirmation-versement-montant {
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+}
+
+.confirmation-versement-methode {
+  margin-top: 12px;
+  text-align: center;
+}
+
+/*
  * Encadré vert et tableau des dfp côte à côte plutôt qu'empilés. Le tableau
  * (2ᵉ colonne, à gauche en RTL) est plus large que l'encadré : il doit
  * pouvoir afficher les détails d'un chèque/virement (référence + banque +
@@ -3092,6 +3119,21 @@ input.mono[inputmode='numeric'] {
 }
 
 /*
+ * Étiquettes resserrées pour ce duo précis (montant en premier dans le
+ * fichier source, méthode en second — l'ordre visuel RTL les affiche
+ * inversés) : elles restent lisibles mais plus discrètes que le label
+ * standard de 12,5px, ce champ étant déjà mis en avant par la valeur
+ * saisie juste en dessous.
+ */
+.versement-champs-paiement .omra-field:first-child label {
+  font-size: 11px;
+}
+
+.versement-champs-paiement .omra-field:last-child label {
+  font-size: 10px;
+}
+
+/*
  * Colonne référence du tableau des dfp : peut contenir « référence · date ·
  * banque », trop long pour rester sur une ligne maintenant que le tableau
  * partage la largeur avec l'encadré résumé. Autoriser le retour à la ligne
@@ -3113,11 +3155,28 @@ input.mono[inputmode='numeric'] {
   color: var(--muted);
 }
 
+/*
+ * Chaque ligne est une grille indépendante : sans ce plancher, une étiquette
+ * plus courte (« الباقي ») rétrécit sa colonne « auto » et son montant
+ * n'atterrit plus à la même position horizontale que les lignes au-dessus.
+ * Largeur calculée sur la plus longue étiquette courante (« المدفوع سابقًا »,
+ * ~72,5px), avec une petite marge. N'affecte pas les lignes dont l'étiquette
+ * dépasse déjà cette largeur (ex. « الإجمالي بعد هذه الدفعة »).
+ */
+.versement-resume-ligne > span:first-child {
+  min-width: 74px;
+}
+
 .versement-resume-ligne b {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
   text-align: center;
+}
+
+/* Couleur choisie par le commanditaire pour distinguer le total en direct. */
+.versement-resume-ligne.paye b {
+  color: #7b6b6e;
 }
 
 .versement-resume-ligne.finale {
@@ -3127,9 +3186,10 @@ input.mono[inputmode='numeric'] {
   font-size: 14px;
 }
 
+/* Couleur choisie par le commanditaire ; remplace le vert par défaut. */
 .versement-resume-ligne.finale b {
   font-size: 17px;
-  color: var(--accent);
+  color: #6b434b;
 }
 
 /* Plus rien à payer après cette dfp : le bleu du soldé, comme ailleurs. */

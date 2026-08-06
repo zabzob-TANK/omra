@@ -17,7 +17,7 @@ import { MAX_VERSEMENTS } from '../../domain/constants'
 import { dateDuJour } from '../../domain/dates'
 import { formaterMontant } from '../../domain/format'
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../../domain/money'
-import { codeCouleurNature, natureAbregee, natureNormalisee } from '../../domain/payment-method'
+import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
 import type { ErreurValidation, Resultat } from '../../domain/rules/errors'
 import { messageErreur } from '../../domain/rules/errors'
 import { motifRefusVersement, type SaisieVersement } from '../../domain/rules/payment'
@@ -25,22 +25,20 @@ import { restantDu, totalPaye } from '../../domain/rules/receipt'
 import type { OperationPartagee, Recu } from '../../domain/types'
 import { Champ, enErreur, ListeErreurs, Saisie, Selection } from '../champs'
 import { Dialogue } from '../dialogue'
-import { BlocInstrument, instrumentPourNature, instrumentVierge, NATURES } from '../instrument-panel'
+import {
+  BlocInstrument,
+  instrumentPourNature,
+  instrumentVierge,
+  libelleNature,
+  NATURES,
+} from '../instrument-panel'
 import { CarteImageInstrument } from '../carte-image-instrument'
 import { cibleImageInstrument, useBrouillonImage } from '../image-instrument'
 import { ModalePaiementImage } from './paiement-image'
 import { Montant, TexteArabe } from '../bidi'
+import { ModaleConfirmationVersement } from './confirmation-versement'
 import { ModaleDepassement } from './depassement'
 import { T } from '../textes'
-
-/** Libellé abrégé de la méthode, comme `receiptMethodDisplay()`. */
-function libelleNature(valeur: string): string {
-  const nature = natureNormalisee(valeur)
-  if (nature === 'نقد') return T.methodes.especes
-  if (nature === 'شيك') return T.methodes.cheque
-  if (nature === 'تحويل بنكي') return T.methodes.virement
-  return natureAbregee(valeur)
-}
 
 interface Proprietes {
   recus: Recu[]
@@ -86,6 +84,10 @@ export function ModaleVersement({
   const [depassement, setDepassement] = useState<{ montant: number; disponible: number } | null>(
     null,
   )
+  // Confirmation d'identité : s'ouvre au clic sur « Enregistrer », avant tout
+  // envoi. Volontairement propre à cet écran (pas Nouveau reçu, pas la
+  // correction du 1er versement).
+  const [confirmationIdentite, setConfirmationIdentite] = useState(false)
   const [envoi, setEnvoi] = useState(false)
   // R-35 — l'image reste un brouillon local jusqu'à l'enregistrement du versement.
   const image = useBrouillonImage()
@@ -107,6 +109,7 @@ export function ModaleVersement({
   // restant, pour ne jamais afficher « soldé » sur un dépassement qui sera
   // refusé à l'enregistrement (R-20, R-21).
   const restantApresVersement = restant - montantCentimes
+  const natureCourante = natureNormalisee(saisie.instrument.nature)
 
   const soumettre = async (confirme: boolean) => {
     setEnvoi(true)
@@ -122,10 +125,12 @@ export function ModaleVersement({
     if (resultat.statut === 'erreurs') {
       setErreurs(resultat.erreurs)
       setDepassement(null)
+      setConfirmationIdentite(false)
       return
     }
     if (resultat.statut === 'confirmation-requise') {
       setErreurs([])
+      setConfirmationIdentite(false)
       setDepassement({
         montant: resultat.montantCentimes,
         disponible: resultat.disponibleCentimes,
@@ -133,6 +138,19 @@ export function ModaleVersement({
       return
     }
     onFermer()
+  }
+
+  if (confirmationIdentite && recu) {
+    return (
+      <ModaleConfirmationVersement
+        nom={recu.nom}
+        prenom={recu.prenom}
+        montantCentimes={montantCentimes}
+        nature={natureCourante}
+        onNon={() => setConfirmationIdentite(false)}
+        onOui={() => soumettre(false)}
+      />
+    )
   }
 
   if (depassement) {
@@ -148,7 +166,6 @@ export function ModaleVersement({
 
   // Le bloc bancaire passe en colonne latérale dès que le mode n'est plus
   // les espèces, comme dans le formulaire de création.
-  const natureCourante = natureNormalisee(saisie.instrument.nature)
   const instrumentOuvert = natureCourante !== 'نقد'
 
   return (
@@ -178,7 +195,7 @@ export function ModaleVersement({
           </button>
           <button
             className="omra-btn primary"
-            onClick={() => soumettre(false)}
+            onClick={() => setConfirmationIdentite(true)}
             disabled={envoi || !utilisable}
           >
             {T.versement.enregistrer}
@@ -243,10 +260,10 @@ export function ModaleVersement({
                 <Montant centimes={recu.convenuCentimes} />
               </b>
             </div>
-            <div className="versement-resume-ligne">
-              <span>{T.versement.payeAvant}</span>
+            <div className="versement-resume-ligne paye">
+              <span>{T.versement.payeApres}</span>
               <b className="mono">
-                <Montant centimes={totalPaye(recu)} />
+                <Montant centimes={totalPaye(recu) + montantCentimes} />
               </b>
             </div>
             <div className="versement-resume-ligne finale">
