@@ -40,6 +40,8 @@ import type {
 } from '../../domain/types'
 import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 
+type ClientSupabase = Awaited<ReturnType<typeof createClient>>
+
 const TAILLE_PAGE = 200
 
 export function messageErreur(erreur: { message?: string } | null): string {
@@ -99,8 +101,11 @@ async function listerLignesRecus(filtre?: FiltreRecus): Promise<BillingReceiptRo
  * `payment_operation_id` d'un versement unique, volontairement effacé dans
  * `Versement.operationPartageeId` par `mapVersement()` (R-38).
  */
-export async function chargerDetailRecuBrut(id: string): Promise<BillingReceiptDetail | null> {
-  const supabase = await createClient()
+export async function chargerDetailRecuBrut(
+  id: string,
+  clientPartage?: ClientSupabase,
+): Promise<BillingReceiptDetail | null> {
+  const supabase = clientPartage ?? (await createClient())
   const resultat = await supabase.rpc('get_billing_receipt_details', { p_receipt_id: id })
   if (resultat.error) {
     if (resultat.error.message?.includes('not found')) return null
@@ -110,8 +115,8 @@ export async function chargerDetailRecuBrut(id: string): Promise<BillingReceiptD
 }
 
 /** Construit un `Recu` complet pour un identifiant de reçu donné. */
-async function chargerRecuParId(id: string): Promise<Recu | null> {
-  const detail = await chargerDetailRecuBrut(id)
+async function chargerRecuParId(id: string, clientPartage?: ClientSupabase): Promise<Recu | null> {
+  const detail = await chargerDetailRecuBrut(id, clientPartage)
   return detail ? mapReceiptDetailToRecu(detail) : null
 }
 
@@ -122,14 +127,24 @@ async function chargerRecuParId(id: string): Promise<Recu | null> {
  * complets avec leurs versements — la RPC de liste ne renvoie que des
  * agrégats. Même stratégie que `lib/facturation/read-server.ts`, par lots de
  * 20 appels en parallèle.
+ *
+ * Un seul client Supabase est créé puis partagé par tous les appels du lot :
+ * `createClient()` par appel ferait rafraîchir le jeton de session en
+ * parallèle par jusqu'à 20 clients indépendants dès qu'il est expiré, chacun
+ * avec le même refresh token à usage unique — l'un l'emporte, les autres
+ * échouent, et `get_billing_receipt_details` tombe en « permission denied »
+ * faute de jeton valide.
  */
 export async function listerRecus(filtre?: FiltreRecus): Promise<Recu[]> {
+  const supabase = await createClient()
   const lignes = await listerLignesRecus(filtre)
   const recus: Recu[] = []
 
   for (let offset = 0; offset < lignes.length; offset += 20) {
     const lot = lignes.slice(offset, offset + 20)
-    const resultats = await Promise.all(lot.map((ligne) => chargerRecuParId(ligne.receipt_id)))
+    const resultats = await Promise.all(
+      lot.map((ligne) => chargerRecuParId(ligne.receipt_id, supabase)),
+    )
     for (const recu of resultats) {
       if (recu) recus.push(recu)
     }
