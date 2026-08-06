@@ -125,7 +125,13 @@ export const sessionSupabase: SessionPort = {
 
   async deconnecter() {
     const supabase = await createClient()
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Jeton déjà invalide (session expirée entre-temps) : la déconnexion
+      // est de toute façon déjà acquise du point de vue de l'employé, voir
+      // lib/supabase/proxy.ts pour le même garde-fou côté Administration.
+    }
   },
 
   async utilisateurCourant() {

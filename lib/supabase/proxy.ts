@@ -84,7 +84,18 @@ export async function updateSession(request: NextRequest) {
   if (!utilisateur) {
     // Ne nettoyer le cookie que si une session invalide a réellement été
     // rencontrée — jamais pour une simple visite anonyme sans cookie du tout.
-    if (jetonInvalide) await supabase.auth.signOut()
+    // `signOut()` sur un jeton déjà invalide lève lui-même (« Invalid
+    // Refresh Token: Refresh Token Not Found ») : le but ici est seulement de
+    // nettoyer un cookie mort, pas d'exiger qu'il l'était encore un instant
+    // avant — sans ce filet, cette exception plantait la requête entière sur
+    // *chaque* visite à /admin ou /login tant que le cookie périmé restait là.
+    if (jetonInvalide) {
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // Déjà invalide : rien de plus à nettoyer côté serveur Supabase.
+      }
+    }
     if (isLoginPath) {
       return response
     }

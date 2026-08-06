@@ -15,7 +15,12 @@ export function LogoutButton() {
   async function signOut() {
     setPending(true)
     const supabase = createClient()
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Jeton déjà invalide : la déconnexion est de toute façon déjà
+      // acquise, voir lib/supabase/proxy.ts pour le même garde-fou.
+    }
     router.replace('/login')
     router.refresh()
   }
