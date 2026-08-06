@@ -171,21 +171,20 @@ export async function recuParNumero(numero: number, saisonId?: string): Promise<
  * métier). Voir `mappers.ts` pour les champs non disponibles depuis cette RPC
  * (créateur, statut archivé, image).
  *
- * `saisonId` est accepté mais volontairement **non transmis** à la RPC :
- * la migration 202608040005 qui ajoute `p_season_id` côté base est
- * préparée et testée (voir RAPPORT-CHANTIER.md) mais pas encore déployée.
- * L'envoyer ferait échouer tout appel réel (« Could not find the function
- * ... in the schema cache »). Renvoyer `p_season_id` dans l'appel RPC dès
- * que la migration est poussée — c'est la seule ligne à changer ici.
+ * `saisonId` isole strictement par saison (202608040005, déployée
+ * 2026-08-06) : une opération partagée ayant ne serait-ce qu'une allocation
+ * hors de `saisonId` disparaît entièrement de la liste, même s'il lui reste
+ * un solde réel non alloué — décision du commanditaire, aucun pont entre
+ * saisons archivées et saison active.
  */
 export async function listerOperationsPartageesReutilisables(
   mode: 'cheque' | 'transfer' | null = null,
   saisonId: string | null = null,
 ): Promise<OperationPartagee[]> {
-  void saisonId
   const supabase = await createClient()
   const resultat = await supabase.rpc('list_reusable_payment_operations', {
     p_payment_mode: mode,
+    p_season_id: saisonId,
   })
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const lignes = (resultat.data ?? []) as ReusablePaymentOperation[]

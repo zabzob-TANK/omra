@@ -1,23 +1,26 @@
 -- Corrige un mélange de saisons dans list_reusable_payment_operations
--- (202608030003) : la fonction listait toutes les opérations mshtarakées
+-- (202608030003) : la fonction listait toutes les opérations partagées
 -- actives « sans restriction de dossier ni de saison » (voir son propre
 -- commentaire d'origine), en violation de reprise.md §5.3 (« un écran ne
 -- mélange jamais les saisons »).
 --
--- PRÉPARÉE ET TESTÉE EN BEGIN...ROLLBACK UNIQUEMENT — NON APPLIQUÉE.
--- Voir RAPPORT-CHANTIER.md pour le contexte et la décision métier encore
--- ouverte avant tout déploiement réel.
+-- Décision métier tranchée par le commanditaire (2026-08-06) : isolation
+-- stricte entre saisons. Le reliquat d'un chèque ou virement partagé
+-- appartient à la saison où il a été déposé ; en pratique, ce reliquat doit
+-- être réclamé (remboursé ou non encaissé) dans cette même saison — le cas
+-- d'un reliquat qui survivrait jusqu'à la saison suivante est explicitement
+-- considéré comme rare/anormal, jamais rencontré en usage réel. Aucun pont
+-- n'est donc maintenu entre saisons : une opération dont ne serait-ce
+-- qu'UNE allocation appartient à une autre saison que la saison active
+-- disparaît entièrement de la liste de la saison active, même s'il lui
+-- reste un solde réel non alloué. Alternative envisagée puis explicitement
+-- écartée : garder l'opération visible tant qu'au moins une de ses
+-- allocations appartient à la saison active (aurait exposé ce reliquat
+-- résiduel plutôt que de le rendre invisible) — écartée pour que
+-- l'archivé reste définitivement archivé, sans lien avec le nouveau.
 --
--- Interprétation retenue ici, à confirmer par le commanditaire avant push :
--- une opération partagée reste proposée pour la saison active si elle n'a
--- encore AUCUNE allocation (opération neuve, sans saison propre) OU si AU
--- MOINS UNE de ses allocations appartient à un reçu de la saison active.
--- Une opération dont toutes les allocations appartiennent à d'autres
--- saisons disparaît de la liste. Alternative non retenue : exiger que
--- TOUTES les allocations soient de la saison active (plus strict, mais
--- masquerait une opération légitimement partagée entre dossiers de la
--- même saison dès qu'un dossier annulé d'une autre saison y aurait été
--- alloué par erreur passée).
+-- Une opération neuve, sans aucune allocation, reste toujours visible :
+-- l'isolation ne s'applique qu'aux opérations déjà utilisées.
 --
 -- Au contrôle du 2026-08-04, une seule saison existe en production et les
 -- 4 opérations partagées existantes lui appartiennent toutes : le bug est
@@ -90,22 +93,20 @@ begin
       p_payment_mode is null or
       operation.payment_mode = p_payment_mode
     )
+    -- Isolation stricte : aucune allocation de l'opération ne doit
+    -- appartenir à une saison différente de la saison active. Vacuously
+    -- vrai pour une opération neuve sans aucune allocation.
     and (
       p_season_id is null
       or not exists (
         select 1
-        from public.payment_allocations as any_item
-        where any_item.payment_operation_id = operation.id
-      )
-      or exists (
-        select 1
-        from public.payment_allocations as season_item
-        inner join public.receipt_payments as season_payment
-          on season_payment.id = season_item.receipt_payment_id
-        inner join public.billing_receipts as season_receipt
-          on season_receipt.id = season_payment.receipt_id
-        where season_item.payment_operation_id = operation.id
-          and season_receipt.season_id = p_season_id
+        from public.payment_allocations as other_item
+        inner join public.receipt_payments as other_payment
+          on other_payment.id = other_item.receipt_payment_id
+        inner join public.billing_receipts as other_receipt
+          on other_receipt.id = other_payment.receipt_id
+        where other_item.payment_operation_id = operation.id
+          and other_receipt.season_id <> p_season_id
       )
     )
   order by operation.registered_at desc, operation.id desc;
@@ -113,7 +114,7 @@ end;
 $$;
 
 comment on function public.list_reusable_payment_operations(text, uuid) is
-  'Lists complete shared cheque and transfer operations available to authenticated Facturation users. Allocated and remaining amounts include every allocation, including allocations of cancelled receipts. When p_season_id is provided, operations whose allocations all belong to other seasons are excluded; brand-new operations with zero allocations always remain visible.';
+  'Lists complete shared cheque and transfer operations available to authenticated Facturation users. Allocated and remaining amounts include every allocation, including allocations of cancelled receipts. When p_season_id is provided, operations with any allocation outside that season are excluded entirely (strict season isolation); brand-new operations with zero allocations always remain visible.';
 
 revoke execute on function public.list_reusable_payment_operations(text, uuid)
   from public, anon;
