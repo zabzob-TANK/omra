@@ -57,7 +57,25 @@ export async function updateSession(request: NextRequest) {
   // entièrement sa propre session et son propre écran de connexion — le
   // Proxy ne doit ni la rediriger vers /login, ni la déconnecter. C'est
   // `app/facturation/page.tsx` qui décide seul de ce qu'il affiche.
+  //
+  // Le Proxy tourne sur chaque requête et reste donc le seul endroit capable
+  // de persister un jeton rafraîchi dans un cookie de réponse : un composant
+  // serveur ne le peut pas (voir `lib/supabase/server.ts`). Sans cet appel,
+  // le jeton de session Facturation n'est jamais renouvelé et la moindre
+  // expiration (jeton d'accès ~1h) casse la session sans retour possible
+  // avant reconnexion manuelle.
+  //
+  // getUser() peut lever sur un jeton corrompu ou révoqué (même remarque
+  // qu'en Admin plus bas) : capturé sans autre effet. Une seule tentative,
+  // jamais de retry ici — un jeton irrécupérable doit échouer proprement en
+  // aval (page.tsx / RPC), pas boucler dans le Proxy.
   if (isBillingPath) {
+    try {
+      await supabase.auth.getUser()
+    } catch {
+      // Rafraîchissement impossible : la requête continue avec les cookies
+      // déjà présents, jamais de nouvelle tentative ni de déconnexion ici.
+    }
     return response
   }
 
