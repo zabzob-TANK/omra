@@ -71,6 +71,13 @@ agence. Se marie avec la **session unique par compte**.
   période, quelle formule) avant tout développement.
 - **Session unique par compte** — un nouveau login invalide la session
   précédente du même compte. Prévu, non implémenté.
+- **Déconnexion automatique par inactivité** — après un délai sans activité
+  (30 min par exemple), déconnexion automatique plutôt que de laisser une
+  session ouverte indéfiniment sur un poste quitté. Se branche sur la
+  déconnexion déjà existante, indépendant du reste du code : réalisable à
+  n'importe quelle étape sans préparation ni risque de conflit, pas
+  nécessaire avant le déploiement. Se marie avec la session unique par
+  compte et l'autorisation par appareil ci-dessus.
 - **Export d'une saison archivée en Excel + purge définitive** — outil de
   maintenance : télécharger toute une saison finie puis la supprimer pour
   garder la base légère (admin seulement, export obligatoire avant purge,
