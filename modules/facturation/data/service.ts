@@ -381,7 +381,7 @@ export async function creerRecu(
     // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
     // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
     console.error('creerRecu — échec inattendu de l’écriture :', erreurEcriture)
-    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'erreur-inattendue' }] }
+    return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'erreur-inattendue-creation' }] }
   }
 
   await tracer(
@@ -443,7 +443,7 @@ export async function ajouterVersement(
     // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
     // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
     console.error('ajouterVersement — échec inattendu de l’écriture :', erreurEcriture)
-    return { statut: 'erreurs', erreurs: [{ champ: 'montant', code: 'erreur-inattendue' }] }
+    return { statut: 'erreurs', erreurs: [{ champ: 'montant', code: 'erreur-inattendue-versement' }] }
   }
 
   await tracer(
@@ -497,7 +497,7 @@ export async function annulerRecu(
     // Filet de sécurité : une RPC inattendue ne doit jamais bloquer la
     // fenêtre sans message (voir RAPPORT-CHANTIER.md, modifierRecu()).
     console.error('annulerRecu — échec inattendu de l’écriture :', erreurEcriture)
-    return { statut: 'erreurs', erreurs: [{ champ: 'motif', code: 'erreur-inattendue' }] }
+    return { statut: 'erreurs', erreurs: [{ champ: 'motif', code: 'erreur-inattendue-annulation' }] }
   }
   // La sortie de caisse réelle est déjà actée par `cancel_billing_receipt`
   // (RPC omra, `cash_register_movements`) au moment de l'appel précédent.

@@ -116,7 +116,12 @@ export const sessionSupabase: SessionPort = {
     // recherche initiale par `login`, comme `app/login/actions.ts`.
     const compte = await findActiveAccountByAuthUserId(data.user.id)
     if (!compte || compte.auth_user_id !== slot.auth_user_id) {
-      await supabase.auth.signOut()
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // Jeton déjà invalide : rien de plus à nettoyer côté serveur
+        // Supabase, voir lib/supabase/proxy.ts pour le même garde-fou.
+      }
       return null
     }
 

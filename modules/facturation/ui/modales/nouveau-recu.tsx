@@ -37,6 +37,7 @@ import { ModalePaiementImage } from './paiement-image'
 import { ModaleDepassement } from './depassement'
 import { ModalePasseport, type ImagesPasseport } from './passeport'
 import { IndicateurChargement } from '../spinner'
+import { TexteArabe } from '../bidi'
 
 interface Referentiels {
   saison: Saison
@@ -294,7 +295,9 @@ export function ModaleNouveauRecu({
               <div className="passeport-portrait vide" aria-hidden="true" />
             )}
             <div>
-              <div className="nom">{`${saisie.passeport.prenom} ${saisie.passeport.nom}`.trim()}</div>
+              <div className="nom">
+                <TexteArabe>{`${saisie.passeport.prenom} ${saisie.passeport.nom}`.trim()}</TexteArabe>
+              </div>
               <div className="numero">
                 {T.passeportLie.numero}{' '}
                 <span dir="ltr" className="mono">

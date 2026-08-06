@@ -15,7 +15,14 @@ export type CodeErreur =
   // Disponibilité générale
   | 'saison-indisponible'
   | 'section-indisponible'
+  // Filets de sécurité génériques (RPC inattendue) — un par écriture, jamais
+  // partagés : le texte de `erreur-inattendue` (« vérifie que tu as changé
+  // quelque chose ») n'a de sens que pour une modification, pas pour une
+  // création, un versement ou une annulation. Voir service.ts.
   | 'erreur-inattendue'
+  | 'erreur-inattendue-creation'
+  | 'erreur-inattendue-versement'
+  | 'erreur-inattendue-annulation'
   // Identité et contact
   | 'prenom-obligatoire'
   | 'nom-obligatoire'
@@ -129,6 +136,12 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
     'لا توجد موسم نشط. يجب على المدير إنشاء موسم وتفعيله من لوحة الإدارة قبل استخدام الفوترة.',
   'section-indisponible': () => 'هذا القسم غير متاح حاليًا. جرّب قسمًا آخر أو راجع المدير.',
   'erreur-inattendue': () => 'تعذر حفظ التعديل. تحقق من أنك غيّرت شيئًا فعلاً ثم أعد المحاولة.',
+  'erreur-inattendue-creation': () =>
+    'تعذر إنشاء الوصل. أعد المحاولة، وإذا استمرت المشكلة تواصل مع المدير.',
+  'erreur-inattendue-versement': () =>
+    'تعذر تسجيل الدفعة. أعد المحاولة، وإذا استمرت المشكلة تواصل مع المدير.',
+  'erreur-inattendue-annulation': () =>
+    'تعذر إلغاء الوصل. أعد المحاولة، وإذا استمرت المشكلة تواصل مع المدير.',
   'prenom-obligatoire': () => 'الاسم إجباري.',
   'nom-obligatoire': () => 'النسب إجباري.',
   'telephone-obligatoire': () => 'رقم الهاتف إجباري.',

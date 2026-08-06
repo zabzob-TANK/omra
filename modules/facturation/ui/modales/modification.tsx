@@ -27,7 +27,7 @@ import type { Recu, SectionModifiable, Tarif } from '../../domain/types'
 import { CaseACocher, Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
 import { Dialogue } from '../dialogue'
 import { ModaleDepassement } from './depassement'
-import { Montant } from '../bidi'
+import { Montant, TexteArabe } from '../bidi'
 import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
@@ -162,7 +162,9 @@ export function ModaleModification({
           </div>
           <div>
             <div className="etiquette">{T.modification.rabatteurFixe}</div>
-            <div className="valeur">{recu.rabatteur || '—'}</div>
+            <div className="valeur">
+              <TexteArabe>{recu.rabatteur || '—'}</TexteArabe>
+            </div>
           </div>
           <div>
             <div className="etiquette">

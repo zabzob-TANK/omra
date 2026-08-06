@@ -157,6 +157,24 @@ describe('création d’un reçu de bout en bout', () => {
       source.recus.definirImagesPasseport = original
     }
   })
+
+  it("un échec inattendu de l'écriture renvoie un message propre à la création, jamais celui de la modification", async () => {
+    const source = sourceDonnees()
+    const original = source.recus.creer
+    source.recus.creer = async () => {
+      throw new Error('échec simulé')
+    }
+
+    try {
+      const resultat = await creerRecu(nouveauRecu(), false)
+      expect(resultat.statut).toBe('erreurs')
+      if (resultat.statut === 'erreurs') {
+        expect(resultat.erreurs[0].code).toBe('erreur-inattendue-creation')
+      }
+    } finally {
+      source.recus.creer = original
+    }
+  })
 })
 
 describe('R-86 — journal d’audit', () => {
@@ -339,6 +357,31 @@ describe('annulation de bout en bout', () => {
     })
     expect(resultat.statut).toBe('erreurs')
   })
+
+  it("un échec inattendu de l'écriture renvoie un message propre à l'annulation, jamais celui de la modification", async () => {
+    const cree = await creerRecu(nouveauRecu(), false)
+    if (cree.statut !== 'ok') throw new Error('création refusée')
+
+    const source = sourceDonnees()
+    const original = source.recus.annuler
+    source.recus.annuler = async () => {
+      throw new Error('échec simulé')
+    }
+
+    try {
+      const resultat = await annulerRecu(cree.valeur.recuId, {
+        motif: 'إلغاء السفر',
+        modeRemboursement: 'cash',
+        motDePasse: 'verification',
+      })
+      expect(resultat.statut).toBe('erreurs')
+      if (resultat.statut === 'erreurs') {
+        expect(resultat.erreurs[0].code).toBe('erreur-inattendue-annulation')
+      }
+    } finally {
+      source.recus.annuler = original
+    }
+  })
 })
 
 describe('versement de bout en bout', () => {
@@ -402,6 +445,30 @@ describe('versement de bout en bout', () => {
 
     const confirme = await ajouterVersement(partage, true)
     expect(confirme.statut).toBe('ok')
+  })
+
+  it("un échec inattendu de l'écriture renvoie un message propre au versement, jamais celui de la modification", async () => {
+    const cree = await creerRecu(nouveauRecu({ premierVersement: '1000' }), false)
+    if (cree.statut !== 'ok') throw new Error('création refusée')
+
+    const source = sourceDonnees()
+    const original = source.recus.ajouterVersement
+    source.recus.ajouterVersement = async () => {
+      throw new Error('échec simulé')
+    }
+
+    try {
+      const resultat = await ajouterVersement(
+        { numeroRecu: String(cree.valeur.numero), montant: '1000', instrument: instrumentVierge() },
+        false,
+      )
+      expect(resultat.statut).toBe('erreurs')
+      if (resultat.statut === 'erreurs') {
+        expect(resultat.erreurs[0].code).toBe('erreur-inattendue-versement')
+      }
+    } finally {
+      source.recus.ajouterVersement = original
+    }
   })
 })
 

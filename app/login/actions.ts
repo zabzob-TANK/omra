@@ -59,7 +59,12 @@ export async function login(formData: FormData) {
   const compteAdmin = await findActiveAdminAccountByAuthUserId(data.user.id)
 
   if (!compteAdmin || compteAdmin.auth_user_id !== adminAccount.auth_user_id) {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Jeton déjà invalide : rien de plus à nettoyer côté serveur Supabase,
+      // voir lib/supabase/proxy.ts pour le même garde-fou.
+    }
     redirect('/login?error=acces')
   }
 
