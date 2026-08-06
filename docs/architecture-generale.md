@@ -91,6 +91,31 @@ les deux sont affichés et l'employé choisit.
   (pas d'autorisation par appareil, pas de déconnexion agressive) : ces
   mesures-là concernent la Facturation, pas le pôle Client.
 
+## Décisions d'architecture du pôle Client
+
+- **Lien entre les deux mondes : à sens unique, lien faible.** Chaque client
+  reçoit un numéro de référence interne, partagé entre les deux pôles, sans
+  contrainte de clé étrangère réelle. Raison : une saison entière est
+  supprimée en fin de cycle, et aucune contrainte technique ne doit bloquer
+  ou faire cascader cette suppression. Précision importante : il n'y a pas
+  de bouton « nouveau client » dans le pôle Client — un client naît
+  uniquement par la création d'un reçu en Facturation. Le pôle Client est
+  une couche d'enrichissement et de consultation, jamais une source de
+  création.
+- **Saisons : aucun lien, jamais.** Même passeport, même personne physique :
+  si elle revient une autre saison, c'est un nouveau client, un nouveau
+  dossier. Le pôle Client applique la même règle que la Facturation.
+  Conséquence acceptée : le passeport est rescanné à chaque saison. Décision
+  définitive.
+- **Dépendance entre les deux pôles : confirmée, à sens unique.** Le pôle
+  Client lit les données de la Facturation (paiements, pour « qui a payé /
+  qui n'a pas payé »), en lecture seule. La Facturation ne lit jamais le
+  pôle Client. C'est voulu ainsi.
+- **Tag groupe/famille : reste en Facturation tel quel**, pour son usage
+  actuel. Le pôle Client le reprend comme simple information de contexte
+  (« ces personnes se connaissent »), sans conséquence automatique sur la
+  répartition des chambres.
+
 ## Priorités
 
 1. **Finir la Facturation** : les 2 zones non retestées (suivi journalier,
