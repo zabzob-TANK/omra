@@ -1563,7 +1563,17 @@ export async function ajouterImagesPasseport(
     if (!(erreurDepot instanceof FormatImageNonAccepteError)) throw erreurDepot
     return { statut: 'erreurs', erreurs: [{ champ: 'passeport', code: 'format-image-non-accepte' }] }
   }
-  await source.recus.definirImagesPasseport(recuId, originale, portrait)
+
+  try {
+    await source.recus.definirImagesPasseport(recuId, originale, portrait)
+  } catch (erreurDefinition) {
+    // docs/architecture-generale.md, R3 — le passeport est un confort, jamais
+    // un passage obligé : le noyau omra ne stocke pas ces images (CLAUDE.md
+    // §8, reprise.md R-90). Le reçu vient déjà d'être enregistré avec succès ;
+    // cet échec ne doit jamais remonter après coup. Journalisé pour le
+    // diagnostic, jamais montré à l'employé.
+    console.error('Dépôt des images de passeport ignoré :', erreurDefinition)
+  }
 
   return ok(null)
 }

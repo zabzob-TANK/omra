@@ -119,3 +119,22 @@ d'avant-saison est vide de ce côté-là.
   qui vise 0 DH/mois. Vérifier aussi les conditions de conservation des
   données du fournisseur choisi (les offres gratuites conservent souvent les
   données).
+
+### Dette d'architecture identifiée le 2026-08-06 (pas des bugs, à ne pas corriger avant que le pôle Client existe)
+
+- **Déménager la capture passeport vers le pôle Client** : `ModalePasseport`
+  (`modules/facturation/ui/modales/passeport.tsx`) et la logique associée
+  (type `Passeport` dans `modules/facturation/domain/types.ts`, écran
+  « Nouveau reçu ») vivent aujourd'hui dans le module Facturation alors que
+  toute cette capture — au-delà du nom, qui reste le seul pont autorisé
+  (R4) — appartient au pôle Client.
+- **Supprimer le transit mémoire des images de passeport côté Facturation** :
+  `StockageFichiersPort.deposer()` (`modules/facturation/data/supabase/storage.ts`)
+  met les octets en attente côté serveur Facturation avant que le dépôt
+  échoue plus loin (le noyau omra ne les stocke jamais réellement,
+  conforme à R5) ; ce transit n'a plus lieu d'être une fois le pôle Client
+  en place pour recevoir ces images directement.
+- **Remplacer le type `Client` actuel** (`modules/facturation/domain/types.ts`) :
+  son champ `recuIds: string[]` fait pointer le Client vers ses reçus, alors
+  que la bonne direction est l'inverse — c'est la Facturation qui référence
+  la personne, jamais l'inverse (R1).

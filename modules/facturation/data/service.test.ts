@@ -4,9 +4,10 @@ import { passeportVierge } from '../ui/modales/passeport'
 import { instrumentVierge } from '../ui/instrument-panel'
 import type { SaisieNouveauRecu } from '../domain/rules/create-receipt'
 import type { SaisieModification } from '../domain/rules/edit-sections'
-import { reinitialiserSourceDonnees } from './index'
+import { reinitialiserSourceDonnees, sourceDonnees } from './index'
 import {
   acquitterAnomalies,
+  ajouterImagesPasseport,
   ajouterVersement,
   annulerRecu,
   chargerEtat,
@@ -131,6 +132,30 @@ describe('création d’un reçu de bout en bout', () => {
     expect(cree?.passeport?.mrz).toContain('P<MAR')
     // Aucune lecture automatique : l'origine reste une saisie manuelle.
     expect(cree?.passeport?.resultatBrut?.source).toBe('saisie-manuelle')
+  })
+
+  it("docs/architecture-generale.md, R3 — un échec du dépôt des images de passeport reste silencieux, le reçu déjà créé n'est jamais remis en cause", async () => {
+    const resultat = await creerRecu(nouveauRecu(), false)
+    if (resultat.statut !== 'ok') throw new Error('création refusée')
+
+    // Simule le stub réel (`definirImagesPasseportSupabase`), qui lève
+    // inconditionnellement puisque le passeport est hors périmètre du noyau
+    // omra — sans dépendre de la vraie source Supabase, indisponible en test.
+    const source = sourceDonnees()
+    const original = source.recus.definirImagesPasseport
+    source.recus.definirImagesPasseport = async () => {
+      throw new Error('Les images de passeport ne sont pas disponibles côté omra.')
+    }
+
+    try {
+      const resultatImages = await ajouterImagesPasseport(resultat.valeur.recuId, {
+        originale: { contenu: new ArrayBuffer(4), nomOrigine: 'passeport.jpg', typeMime: 'image/jpeg' },
+        portrait: { contenu: new ArrayBuffer(4), nomOrigine: 'portrait.jpg', typeMime: 'image/jpeg' },
+      })
+      expect(resultatImages.statut).toBe('ok')
+    } finally {
+      source.recus.definirImagesPasseport = original
+    }
   })
 })
 
