@@ -89,6 +89,23 @@ agence. Se marie avec la **session unique par compte**.
   proprement aujourd'hui ; `update_billing_receipt_dossier` ne correspond pas
   encore au tag libre du prototype. Décision produit non tranchée.
 
+## Durcissements — règle appliquée par l'écran mais pas par le noyau
+
+Cas où une règle métier n'est aujourd'hui vérifiée que côté interface (bouton
+grisé, section masquée), jamais par la fonction du domaine elle-même. Sans
+conséquence visible tant que l'écran reste le seul chemin d'accès, mais le
+noyau est censé être la source de vérité indépendante de l'interface — à
+ranger ici, pas à corriger dans l'urgence.
+
+- **R-53, premier versement déjà partagé** — `domain/rules/edit-sections.ts`,
+  `preparerModification()` (section `firstPayment`). `premierVersementModifiable()`
+  exprime bien la règle (« un versement déjà rattaché à une opération
+  partagée ne se détache pas depuis le reçu »), mais seule `modification.tsx`
+  la consulte pour griser le bouton de section. La fonction du domaine ne
+  l'appelle pas elle-même : si un jour un autre écran appelait
+  `preparerModification()` directement, rien ne l'empêcherait de détacher un
+  versement partagé. Identifié le 2026-08-06, non corrigé volontairement.
+
 ## Hébergement / coût (rappel)
 
 - Objectif : **0 DH/mois**, tenu par les offres gratuites (Vercel + Supabase).
