@@ -16,6 +16,7 @@ import { codeCouleurNature } from '../../domain/payment-method'
 import { Dialogue } from '../dialogue'
 import { libelleNature } from '../instrument-panel'
 import { Montant, TexteArabe } from '../bidi'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
@@ -64,6 +65,7 @@ export function ModaleConfirmationVersement({
             {T.confirmationVersement.non}
           </button>
           <button className="omra-btn primary" onClick={confirmer} disabled={enCours}>
+            {enCours ? <IndicateurChargement /> : null}
             {T.confirmationVersement.oui}
           </button>
         </>

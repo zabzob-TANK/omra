@@ -13,6 +13,7 @@ import { useState } from 'react'
 
 import { centimesEnTexteDevise } from '../../domain/money'
 import { Dialogue } from '../dialogue'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
@@ -60,6 +61,7 @@ export function ModaleDepassement({
             {T.depassement.retour}
           </button>
           <button className="omra-btn primary" onClick={confirmer} disabled={enCours}>
+            {enCours ? <IndicateurChargement /> : null}
             {T.depassement.confirmer}
           </button>
         </>

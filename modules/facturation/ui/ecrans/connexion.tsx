@@ -11,6 +11,7 @@
 import { useState } from 'react'
 
 import type { Utilisateur } from '../../domain/types'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
@@ -98,6 +99,7 @@ export function EcranConnexion({ onConnexion, comptesEssai }: Proprietes) {
         </label>
 
         <button className="omra-btn primary omra-login-bouton" onClick={entrer} disabled={envoi}>
+          {envoi ? <IndicateurChargement /> : null}
           {T.connexion.entrer}
         </button>
 

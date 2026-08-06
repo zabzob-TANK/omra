@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 
 import { T } from '../textes'
 import { imageExemplePaiement, NOM_FICHIER_EXEMPLE } from '../../media/exemple-paiement'
+import { IndicateurChargement } from '../spinner'
 
 export interface CiblePaiement {
   cle: string
@@ -32,7 +33,7 @@ export interface CiblePaiement {
 interface Proprietes {
   cible: CiblePaiement
   onFermer: () => void
-  onEnregistrer: (fichier: { contenu: Blob; nomOrigine: string }) => void
+  onEnregistrer: (fichier: { contenu: Blob; nomOrigine: string }) => void | Promise<void>
   /**
    * Vrai uniquement sur l'adaptateur de démonstration (données fictives en
    * mémoire). Le bouton « Utiliser un exemple » dépose un specimen JPG réel
@@ -59,6 +60,7 @@ export function ModalePaiementImage({
     apercu: string
   } | null>(null)
   const [erreurExemple, setErreurExemple] = useState('')
+  const [envoi, setEnvoi] = useState(false)
 
   const retenir = (contenu: Blob, nomOrigine: string) => {
     setBrouillon((precedent) => {
@@ -168,12 +170,16 @@ export function ModalePaiementImage({
             ) : null}
             <button
               className="cheque-action principale"
-              disabled={!brouillon}
+              disabled={!brouillon || envoi}
               style={{ marginLeft: 'auto' }}
-              onClick={() => {
-                if (brouillon) onEnregistrer(brouillon)
+              onClick={async () => {
+                if (!brouillon || envoi) return
+                setEnvoi(true)
+                await onEnregistrer(brouillon)
+                setEnvoi(false)
               }}
             >
+              {envoi ? <IndicateurChargement /> : null}
               {I.enregistrer}
             </button>
           </div>

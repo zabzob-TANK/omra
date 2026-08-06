@@ -629,8 +629,19 @@ input[type='number'] {
   background: var(--accent-soft);
 }
 
+/*
+ * Toute la ligne prend la teinte rouge du badge de statut (pas seulement
+ * lui) : une ligne annulée doit se reconnaître d'un coup d'œil, sans avoir
+ * à lire chaque colonne — demande du commanditaire après confusion réelle
+ * entre lignes actives et annulées.
+ */
 .omra-table tbody tr.annule {
-  opacity: 0.55;
+  background: var(--danger-soft);
+  opacity: 0.75;
+}
+
+.omra-table tbody tr.annule:hover {
+  background: var(--danger-soft);
 }
 
 .omra-cell-muted {
@@ -1031,6 +1042,43 @@ input[type='number'] {
 .omra-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/*
+ * Rond qui tourne, posé dans un bouton pendant son opération en cours.
+ * `currentColor` reprend automatiquement la couleur du texte du bouton
+ * (blanc sur primary/danger, encre sur les boutons neutres).
+ */
+.omra-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-inline-end: 7px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: omra-spin 0.6s linear infinite;
+}
+
+@keyframes omra-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Version agrandie, pour un écran de chargement plein cadre plutôt qu'un bouton. */
+.omra-spinner-grand {
+  display: inline-block;
+  color: var(--accent);
+}
+
+.omra-spinner-grand .omra-spinner {
+  width: 28px;
+  height: 28px;
+  margin-inline-end: 0;
+  border-width: 3px;
+  vertical-align: middle;
 }
 
 /* ------------------------------------------------------------ Formulaires */

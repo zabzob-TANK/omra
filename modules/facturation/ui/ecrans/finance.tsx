@@ -16,19 +16,22 @@
  * Couvre : R-56 à R-67.
  */
 
+import { useState } from 'react'
+
 import type { JournalFinancier } from '../../data/service'
 import type { PeriodeFinance } from '../../domain/rules/finance-day'
 import { centimesEnTexteDevise } from '../../domain/money'
 import { badgeSansCadreALImpression } from '../../domain/rules/finance-day'
 import { DateValeur, Reference, TexteArabe } from '../bidi'
 import { SousNavFinance } from '../sous-nav'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import './finance.css'
 
 interface Proprietes {
   journal: JournalFinancier
   onPeriode: (periode: PeriodeFinance) => void
-  onImprimer: () => void
+  onImprimer: () => Promise<void>
   onAcquitter: () => void
   onOuvrirDetail: (recuId: string) => void
   /** Journée courante et veille, pour l'état des boutons de filtre. */
@@ -53,8 +56,16 @@ export function EcranFinance({
   const C = F.colonnes
   const jour = journal.jourSelectionne
   const filtre = journal.periode.filtre
+  const [impressionEnCours, setImpressionEnCours] = useState(false)
 
   const classeFiltre = (actif: boolean) => `finance-filtre${actif ? ' actif' : ''}`
+
+  const imprimer = async () => {
+    if (impressionEnCours) return
+    setImpressionEnCours(true)
+    await onImprimer()
+    setImpressionEnCours(false)
+  }
 
   return (
     <div className="finance-ecran">
@@ -71,9 +82,10 @@ export function EcranFinance({
           </span>
           <button
             className="finance-bouton impression"
-            disabled={!journal.peutImprimer}
-            onClick={onImprimer}
+            disabled={!journal.peutImprimer || impressionEnCours}
+            onClick={imprimer}
           >
+            {impressionEnCours ? <IndicateurChargement /> : null}
             {F.imprimer}
           </button>
           <button

@@ -36,6 +36,7 @@ import { cibleImageInstrument, useBrouillonImage } from '../image-instrument'
 import { ModalePaiementImage } from './paiement-image'
 import { ModaleDepassement } from './depassement'
 import { ModalePasseport, type ImagesPasseport } from './passeport'
+import { IndicateurChargement } from '../spinner'
 
 interface Referentiels {
   saison: Saison
@@ -213,6 +214,7 @@ export function ModaleNouveauRecu({
             {T.nouveau.annuler}
           </button>
           <button className="omra-btn primary" onClick={() => soumettre(false)} disabled={envoi}>
+            {envoi ? <IndicateurChargement /> : null}
             {T.nouveau.enregistrer}
           </button>
         </>

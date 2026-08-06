@@ -7,7 +7,10 @@
  * la date et l'heure de la confirmation sont conservées au journal.
  */
 
+import { useState } from 'react'
+
 import { Dialogue } from '../dialogue'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
@@ -18,17 +21,35 @@ interface Proprietes {
 }
 
 export function ModaleAnomalieFinance({ nombre, jour, onFermer, onConfirmer }: Proprietes) {
+  // Même garde que ModaleDepassement : `onConfirmer` déclenche un
+  // enregistrement asynchrone dans le parent, qui ne remplace pas cette
+  // fenêtre pendant l'attente (contrairement à Ajouter un versement) — le
+  // garde doit donc vivre ici.
+  const [enCours, setEnCours] = useState(false)
+
+  const confirmer = () => {
+    if (enCours) return
+    setEnCours(true)
+    onConfirmer()
+  }
+
+  const annuler = () => {
+    if (enCours) return
+    onFermer()
+  }
+
   return (
     <Dialogue
       titre={T.anomalie.titre}
       taille="small"
-      onFermer={onFermer}
+      onFermer={annuler}
       pied={
         <>
-          <button className="omra-btn" onClick={onFermer}>
+          <button className="omra-btn" onClick={annuler} disabled={enCours}>
             {T.anomalie.annuler}
           </button>
-          <button className="omra-btn primary" onClick={onConfirmer}>
+          <button className="omra-btn primary" onClick={confirmer} disabled={enCours}>
+            {enCours ? <IndicateurChargement /> : null}
             {T.anomalie.confirmer}
           </button>
         </>

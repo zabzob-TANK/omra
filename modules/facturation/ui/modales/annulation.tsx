@@ -16,6 +16,7 @@ import type { Recu } from '../../domain/types'
 import { Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
 import { Dialogue } from '../dialogue'
 import { Montant } from '../bidi'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
@@ -66,6 +67,7 @@ export function ModaleAnnulation({ recu, onFermer, onAnnuler }: Proprietes) {
             {T.annulation.retour}
           </button>
           <button className="omra-btn danger" onClick={soumettre} disabled={envoi}>
+            {envoi ? <IndicateurChargement /> : null}
             {T.annulation.confirmer}
           </button>
         </>

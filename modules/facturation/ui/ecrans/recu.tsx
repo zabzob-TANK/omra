@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { Recu } from '../../domain/types'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import {
   classesAtelier,
@@ -71,6 +72,7 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
   const [decalageX, setDecalageX] = useState('0')
   const [decalageY, setDecalageY] = useState('0')
   const [message, setMessage] = useState('')
+  const [envoi, setEnvoi] = useState(false)
 
   // La règle `@page` n'est posée que pendant l'affichage de cet écran, afin de
   // ne pas interférer avec les autres impressions de l'application — c'est la
@@ -87,6 +89,7 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
   }, [])
 
   const imprimer = async () => {
+    if (envoi) return
     // R-81 — au-delà de six paiements, le fichier de référence bloque
     // l'impression au lieu de produire un document incomplet.
     if (impressionBloquee(donnees)) {
@@ -94,6 +97,7 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
       return
     }
     setMessage('')
+    setEnvoi(true)
     // P18 — le compteur doit être écrit avant l'ouverture de la boîte système.
     // Décision actée : un échec du compteur ne bloque jamais l'impression —
     // `sequenceImpression` imprime dans tous les cas et relance l'erreur
@@ -102,6 +106,8 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
       await sequenceImpression(onImpression, () => window.print())
     } catch {
       setMessage(MESSAGE_COMPTEUR_IMPRESSION_ECHEC)
+    } finally {
+      setEnvoi(false)
     }
   }
 
@@ -172,7 +178,8 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
         >
           {OUTILS.reinitialiser}
         </button>
-        <button className="primary" onClick={imprimer}>
+        <button className="primary" onClick={imprimer} disabled={envoi}>
+          {envoi ? <IndicateurChargement /> : null}
           {OUTILS.imprimer}
         </button>
         <span className="indication">{OUTILS.indication}</span>

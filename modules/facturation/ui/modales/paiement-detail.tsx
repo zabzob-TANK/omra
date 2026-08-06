@@ -11,16 +11,17 @@
  * réservée à l'administrateur).
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { DetailOperationBancaire } from '../../data/service'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 interface Proprietes {
   detail: DetailOperationBancaire
   onFermer: () => void
   onAjouterImage: () => void
-  onSupprimerImage: () => void
+  onSupprimerImage: () => Promise<void>
 }
 
 export function ModalePaiementDetail({
@@ -31,6 +32,7 @@ export function ModalePaiementDetail({
 }: Proprietes) {
   const D = T.paiementDetail
   const C = D.colonnes
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false)
 
   // R-89 — la touche d'échappement ferme la fenêtre.
   useEffect(() => {
@@ -83,7 +85,17 @@ export function ModalePaiementDetail({
               </span>
             )}
             {detail.suppressionPossible ? (
-              <button className="cheque-action danger" onClick={onSupprimerImage}>
+              <button
+                className="cheque-action danger"
+                disabled={suppressionEnCours}
+                onClick={async () => {
+                  if (suppressionEnCours) return
+                  setSuppressionEnCours(true)
+                  await onSupprimerImage()
+                  setSuppressionEnCours(false)
+                }}
+              >
+                {suppressionEnCours ? <IndicateurChargement /> : null}
                 {D.supprimerImage}
               </button>
             ) : null}

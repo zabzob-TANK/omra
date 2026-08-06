@@ -50,6 +50,7 @@ import {
   libellesInstrument,
 } from '../domain/rules/cheque-register'
 import { EcranAVenir } from './ecrans/a-venir'
+import { EcranChargement } from './ecrans/chargement'
 import { EcranConnexion } from './ecrans/connexion'
 import { EcranFinance } from './ecrans/finance'
 import { EcranPaiements } from './ecrans/paiements'
@@ -575,6 +576,13 @@ export function ApplicationFacturation({
         </>
       ) : null}
 
+      {ecran.nom === 'finance' && !aucuneSaison && !financeIndisponible && !journal ? (
+        <>
+          <SousNavFinance active="finance" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranChargement titre={T.navigation.finance} />
+        </>
+      ) : null}
+
       {ecran.nom === 'finance' && !aucuneSaison && !financeIndisponible && journal ? (
         <EcranFinance
           journal={journal}
@@ -643,6 +651,13 @@ export function ApplicationFacturation({
             dir="ltr"
             lang="fr"
           />
+        </>
+      ) : null}
+
+      {ecran.nom === 'suivi' && !aucuneSaison && !financeIndisponible && !suivi ? (
+        <>
+          <SousNavFinance active="suivi" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranChargement titre={T.finance.sousNav.suiviJournalier} />
         </>
       ) : null}
 
@@ -743,6 +758,13 @@ export function ApplicationFacturation({
             dir="ltr"
             lang="fr"
           />
+        </>
+      ) : null}
+
+      {ecran.nom === 'paiements' && !aucuneSaison && !financeIndisponible && !registre ? (
+        <>
+          <SousNavFinance active="paiements" onPaiements={ouvrirPaiements} onSuiviJournalier={ouvrirSuivi} />
+          <EcranChargement titre={T.finance.sousNav.paiements} />
         </>
       ) : null}
 

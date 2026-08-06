@@ -28,6 +28,7 @@ import { CaseACocher, Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } f
 import { Dialogue } from '../dialogue'
 import { ModaleDepassement } from './depassement'
 import { Montant } from '../bidi'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 /** Sous-titres des sections, repris du fichier de référence. */
@@ -181,6 +182,7 @@ export function ModaleModification({
           </button>
           {section ? (
             <button className="omra-btn primary" onClick={() => soumettre(false)} disabled={envoi}>
+              {envoi ? <IndicateurChargement /> : null}
               {T.modification.enregistrer}
             </button>
           ) : null}
