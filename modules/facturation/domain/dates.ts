@@ -83,11 +83,30 @@ export function dateFrDepuisCleJour(valeur: string | null | undefined): string {
 
 /**
  * U-07 — Valide une date française saisie.
- * Contrôle de forme uniquement : le prototype ne vérifie pas l'existence du jour.
- * Prototype : `okDate()`.
+ *
+ * Le prototype (`okDate()`) ne contrôle que la forme (deux chiffres / deux
+ * chiffres / quatre chiffres), pas l'existence réelle du jour — un écart
+ * volontairement conservé jusqu'ici. Reproduit et corrigé le 2026-08-06,
+ * décision du commanditaire après un bug réel constaté : une date comme
+ * `00/20/2026` passait cette validation sans encombre, provoquait un rejet
+ * côté base de données au moment d'enregistrer, et affichait le message
+ * générique d'erreur inattendue au lieu d'un message clair sur le champ
+ * fautif. Vérifie donc aussi que le jour et le mois existent réellement
+ * (y compris la longueur du mois : 30, 31 jours ou février).
  */
 export function dateFrValide(valeur: string): boolean {
-  return /^\d{2}\/\d{2}\/\d{4}$/.test(valeur)
+  const correspondance = valeur.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (!correspondance) return false
+
+  const jour = Number(correspondance[1])
+  const mois = Number(correspondance[2])
+  const annee = Number(correspondance[3])
+
+  if (mois < 1 || mois > 12) return false
+  if (jour < 1) return false
+
+  const dernierJourDuMois = new Date(annee, mois, 0).getDate()
+  return jour <= dernierJourDuMois
 }
 
 /**

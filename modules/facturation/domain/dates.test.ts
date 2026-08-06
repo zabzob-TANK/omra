@@ -67,9 +67,26 @@ describe('U-07 — validation d’une date saisie', () => {
     expect(dateFrValide('')).toBe(false)
   })
 
-  it('ne contrôle que la forme, pas l’existence du jour — comportement conservé', () => {
-    // Le fichier de référence accepte cette date ; la règle est reproduite telle quelle.
-    expect(dateFrValide('32/13/2025')).toBe(true)
+  it('refuse un jour ou un mois qui n’existent pas — corrigé le 2026-08-06', () => {
+    // Le fichier de référence acceptait cette date (contrôle de forme
+    // uniquement) ; décision du commanditaire de durcir ce point après un
+    // bug réel (une date comme celle-ci passait la validation, puis
+    // échouait au moment d'enregistrer avec un message générique au lieu
+    // d'un message clair sur le champ fautif).
+    expect(dateFrValide('32/13/2025')).toBe(false)
+    expect(dateFrValide('00/20/2026')).toBe(false)
+    expect(dateFrValide('00/05/2025')).toBe(false)
+  })
+
+  it('refuse le 31 pour un mois de 30 jours, accepte les autres jours valides', () => {
+    expect(dateFrValide('31/04/2025')).toBe(false)
+    expect(dateFrValide('30/04/2025')).toBe(true)
+  })
+
+  it('gère février selon les années bissextiles', () => {
+    expect(dateFrValide('29/02/2024')).toBe(true)
+    expect(dateFrValide('29/02/2025')).toBe(false)
+    expect(dateFrValide('28/02/2025')).toBe(true)
   })
 })
 
