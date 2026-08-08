@@ -290,6 +290,19 @@ export function construireJeuDemonstration(
       modifications: d.modifications ?? [],
       derniereModification: d.derniereModification,
       modifiePar: d.modifiePar,
+      // Cohérent avec l'adaptateur Supabase (`traduireAnomalies`) : un
+      // trop-perçu réel (jamais un simple reçu soldé pile) reste visible
+      // indépendamment du statut, même en démonstration.
+      anomalies:
+        cumul > convenuCentimes
+          ? [
+              {
+                type: 'trop-percu' as const,
+                montantCentimes: cumul - convenuCentimes,
+                dernierChangement: `${d.date} ${d.heure}`,
+              },
+            ]
+          : [],
       versements,
     }
 

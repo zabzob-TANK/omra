@@ -243,6 +243,41 @@ export interface Recu {
 
   /** Prototype : `r.vers[]`. */
   versements: Versement[]
+
+  /**
+   * Décision du commanditaire (2026-08-08, reprise.md §5.11) : un restant
+   * ≤ 0 vaut désormais « soldé » partout (`statutAffiche`, `symboleSituation`)
+   * — le trop-perçu n'a donc plus le statut du reçu pour rester visible. Ce
+   * tableau, traduit de `get_billing_receipt_details.active_anomalies` (déjà
+   * calculé côté serveur, jamais recalculé ici), porte cette visibilité de
+   * façon indépendante. Vide tant qu'aucune anomalie n'est active.
+   */
+  anomalies: AnomalieFinanciere[]
+}
+
+/**
+ * Traduction domaine de `active_anomalies` (`get_billing_receipt_details`) :
+ *  - `trop-percu` — restant < 0, uniquement possible après une modification
+ *    commerciale qui réduit le convenu sous ce qui est déjà payé (R-21
+ *    empêche tout surpaiement direct à la saisie d'un versement) ;
+ *  - `reste-a-payer` — restant > 0 signalé comme anomalie par la dernière
+ *    modification commerciale (P13) ; distinct du simple statut « incomplet »
+ *    routinier, qui n'est jamais dans cette liste ;
+ *  - `justificatif-cheque-manquant` — une opération chèque de ce reçu sans
+ *    image active, `operationId` renseigné.
+ *
+ * Jamais fusionnées : trois natures d'anomalie différentes, jamais confondues
+ * à l'écran ni dans le domaine.
+ */
+export type TypeAnomalie = 'trop-percu' | 'reste-a-payer' | 'justificatif-cheque-manquant'
+
+export interface AnomalieFinanciere {
+  type: TypeAnomalie
+  /** `null` pour `justificatif-cheque-manquant`, qui ne porte pas de montant. */
+  montantCentimes: number | null
+  /** Opération concernée — uniquement `justificatif-cheque-manquant`. */
+  operationId?: string
+  dernierChangement: string
 }
 
 /** R-47 — `cash` sort de la caisse espèces, `none` est géré hors caisse. */

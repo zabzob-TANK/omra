@@ -67,6 +67,7 @@ export function unRecu(partiel: Partial<Recu> = {}): Recu {
     motifAnnulation: '',
     impressions: 0,
     modifications: [],
+    anomalies: [],
     versements: [unVersement()],
     ...partiel,
   }

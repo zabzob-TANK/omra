@@ -85,6 +85,14 @@ export const T = {
       actions: 'الإجراءات',
     },
     infobulleLigne: 'انقر مرتين لعرض الملف الكامل',
+    /**
+     * Décision du 2026-08-08 : le trop-perçu ne dépend plus du statut
+     * (« مسدد » désormais, comme tout restant ≤ 0) — ce badge, indépendant,
+     * porte seul sa visibilité. Jamais utilisé pour les autres anomalies
+     * (`reste-a-payer`, `justificatif-cheque-manquant`), qui ne sont pas
+     * dans le périmètre de cette décision.
+     */
+    anomalieTropPercu: 'مبلغ زائد',
     actionAnnuler: 'إلغاء / حذف الوصل',
     actionModifier: 'تعديل',
     actionDfp: 'إضافة دفعة',

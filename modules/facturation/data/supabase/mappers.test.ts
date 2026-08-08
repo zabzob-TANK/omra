@@ -316,6 +316,65 @@ describe('mapReceiptDetailToRecu', () => {
     const recu = mapReceiptDetailToRecu(detailFixture(), null)
     expect(recu.impressions).toBeNull()
   })
+
+  it('traduit une anomalie de trop-perçu (overpayment), jamais confondue avec les autres types', () => {
+    const detail = detailFixture({
+      active_anomalies: [
+        {
+          type: 'overpayment',
+          amount_dh: 200,
+          receipt_id: 'receipt-1',
+          operation_id: null,
+          last_changed_at: '2026-08-03T09:00:00.000Z',
+        },
+      ],
+    })
+    const recu = mapReceiptDetailToRecu(detail, 0)
+    expect(recu.anomalies).toHaveLength(1)
+    expect(recu.anomalies[0].type).toBe('trop-percu')
+    expect(recu.anomalies[0].montantCentimes).toBe(20000)
+    expect(recu.anomalies[0].operationId).toBeUndefined()
+  })
+
+  it('traduit un reste à payer (amount_due) distinctement du trop-perçu', () => {
+    const detail = detailFixture({
+      active_anomalies: [
+        {
+          type: 'amount_due',
+          amount_dh: 500,
+          receipt_id: 'receipt-1',
+          operation_id: null,
+          last_changed_at: '2026-08-03T09:00:00.000Z',
+        },
+      ],
+    })
+    const recu = mapReceiptDetailToRecu(detail, 0)
+    expect(recu.anomalies[0].type).toBe('reste-a-payer')
+    expect(recu.anomalies.some((a) => a.type === 'trop-percu')).toBe(false)
+  })
+
+  it('traduit un justificatif de chèque manquant avec son identifiant d’opération, sans montant', () => {
+    const detail = detailFixture({
+      active_anomalies: [
+        {
+          type: 'cheque_missing_supporting_image',
+          amount_dh: null,
+          receipt_id: 'receipt-1',
+          operation_id: 'operation-9',
+          last_changed_at: '2026-08-03T09:00:00.000Z',
+        },
+      ],
+    })
+    const recu = mapReceiptDetailToRecu(detail, 0)
+    expect(recu.anomalies[0].type).toBe('justificatif-cheque-manquant')
+    expect(recu.anomalies[0].montantCentimes).toBeNull()
+    expect(recu.anomalies[0].operationId).toBe('operation-9')
+  })
+
+  it('reste vide sans anomalie active', () => {
+    const recu = mapReceiptDetailToRecu(detailFixture(), 0)
+    expect(recu.anomalies).toEqual([])
+  })
 })
 
 describe('mapReusableOperationToOperationPartagee', () => {

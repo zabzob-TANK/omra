@@ -49,15 +49,16 @@ describe('U-06 — statut affiché', () => {
     expect(statutAffiche(recu)).toBe('مسدد')
   })
 
-  it('affiche « incomplet », pas « soldé », en cas de trop-perçu (restant négatif)', () => {
-    // Comparaison stricte à zéro, comme `stat()` du fichier de référence :
-    // un trop-perçu (P13/§5.11) doit rester visible comme anomalie, pas
-    // disparaître sous « soldé ».
+  it('affiche « soldé », même en trop-perçu (restant négatif) — décision du 2026-08-08', () => {
+    // reprise.md §5.11 à la lettre : un restant ≤ 0 vaut « soldé », trop-perçu
+    // compris. La visibilité du trop-perçu ne repose plus sur ce statut —
+    // voir `Recu.anomalies` (traduit de `active_anomalies`, testé plus bas
+    // dans mappers.test.ts), affiché indépendamment et en rouge.
     const recu = unRecu({
       convenuCentimes: 1000000,
       versements: [unVersement({ montantCentimes: 1200000 })],
     })
-    expect(statutAffiche(recu)).toBe('غير مكتمل')
+    expect(statutAffiche(recu)).toBe('مسدد')
   })
 
   it('affiche « incomplet » quand il reste à payer', () => {
@@ -91,9 +92,7 @@ describe('dernier versement et symbole de situation', () => {
     expect(symboleSituation(1)).toBe('•')
   })
 
-  it('marque • (pas ✓) en cas de trop-perçu (restant négatif)', () => {
-    // `remainingAfter===0` dans le fichier de référence (`savePay()`) : même
-    // raison que pour `statutAffiche`.
-    expect(symboleSituation(-200000)).toBe('•')
+  it('marque ✓, même en trop-perçu (restant négatif) — même règle que statutAffiche', () => {
+    expect(symboleSituation(-200000)).toBe('✓')
   })
 })

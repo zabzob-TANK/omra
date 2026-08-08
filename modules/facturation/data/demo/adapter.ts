@@ -320,6 +320,9 @@ export function creerSourceDemonstration(
         motifAnnulation: '',
         impressions: 0,
         modifications: [],
+        // Un reçu neuf ne peut pas naître en trop-perçu — R-21 empêche tout
+        // surpaiement dès le premier versement.
+        anomalies: [],
         versements: [donnees.premierVersement],
       }
       recus.push(recu)

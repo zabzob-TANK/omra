@@ -17,10 +17,11 @@
 
 import { MAX_VERSEMENTS } from '../../domain/constants'
 import { telephoneCorrespondRecherche } from '../../domain/format'
+import { centimesEnTexteDevise } from '../../domain/money'
 import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
 import { motifRefusVersement } from '../../domain/rules/payment'
 import { dernierVersement, restantDu, statutAffiche, totalPaye } from '../../domain/rules/receipt'
-import type { Recu } from '../../domain/types'
+import type { AnomalieFinanciere, Recu } from '../../domain/types'
 import { DateValeur, Montant, Reference, Telephone, TexteArabe } from '../bidi'
 import { T } from '../textes'
 
@@ -91,6 +92,15 @@ function situation(recu: Recu): { texte: string; classe: string } {
   if (valeur === 'ملغى') return { texte: T.statuts.annule, classe: 'annule' }
   if (valeur === 'مسدد') return { texte: T.statuts.solde, classe: 'solde' }
   return { texte: T.statuts.incomplet, classe: 'incomplet' }
+}
+
+/**
+ * Décision du 2026-08-08 : seul le trop-perçu (`overpayment`) sort ici, jamais
+ * `reste-a-payer` ni `justificatif-cheque-manquant` — deux anomalies
+ * distinctes, hors du périmètre de cette décision.
+ */
+function anomalieTropPercu(recu: Recu): AnomalieFinanciere | undefined {
+  return recu.anomalies.find((anomalie) => anomalie.type === 'trop-percu')
 }
 
 interface Proprietes {
@@ -282,17 +292,17 @@ export function EcranRegistre({
                       </td>
                       <td className="centre">
                         {/*
-                          Restant exactement nul : bleu, comme partout
-                          ailleurs. Le fichier de référence colore en rouge
-                          toute autre valeur, y compris négative (trop-perçu,
-                          P13/§5.11) : le masquer en bleu le rendrait
-                          invisible, contrairement à la règle qui l'exige
-                          affiché comme anomalie.
+                          Décision du 2026-08-08 (reprise.md §5.11 à la
+                          lettre) : un restant ≤ 0 est soldé, trop-perçu
+                          compris — même bleu calme que partout ailleurs. La
+                          visibilité du trop-perçu ne repose plus sur cette
+                          couleur : voir le badge d'anomalie indépendant
+                          (`omra-anomalie`) juste après.
                         */}
                         <span
                           style={{
-                            color: restant === 0 ? 'var(--solde)' : 'var(--danger)',
-                            fontWeight: restant === 0 ? 400 : 600,
+                            color: restant <= 0 ? 'var(--solde)' : 'var(--danger)',
+                            fontWeight: restant <= 0 ? 400 : 600,
                           }}
                         >
                           <Montant centimes={restant} avecDevise={false} />
@@ -327,6 +337,14 @@ export function EcranRegistre({
                       </td>
                       <td>
                         <span className={`omra-pill ${etat.classe}`}>{etat.texte}</span>
+                        {anomalieTropPercu(recu) ? (
+                          <span
+                            className="omra-anomalie"
+                            title={`${T.registre.anomalieTropPercu} — ${centimesEnTexteDevise(anomalieTropPercu(recu)!.montantCentimes ?? 0)}`}
+                          >
+                            {T.registre.anomalieTropPercu}
+                          </span>
+                        ) : null}
                       </td>
                       <td>
                         <TexteArabe>{recu.hotel}</TexteArabe>

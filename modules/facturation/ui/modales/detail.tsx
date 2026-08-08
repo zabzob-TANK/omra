@@ -9,6 +9,7 @@
  * tableau des versements, puis historique et annulation repliables.
  */
 
+import { centimesEnTexteDevise } from '../../domain/money'
 import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
 import { collecterOperationsBancaires } from '../../domain/rules/cheque-register'
 import { motifRefusVersement } from '../../domain/rules/payment'
@@ -104,6 +105,9 @@ export function ModaleDetail({
   const statut = libelleStatut(recu)
   const paye = totalPaye(recu)
   const restant = restantDu(recu)
+  // Décision du 2026-08-08 : seul le trop-perçu (`overpayment`) sort ici,
+  // jamais `reste-a-payer` ni `justificatif-cheque-manquant` — hors périmètre.
+  const anomalieTropPercu = recu.anomalies.find((anomalie) => anomalie.type === 'trop-percu')
   const nomComplet = `${recu.prenom} ${recu.nom}`
   const modifie = recu.modifications.length > 0
   const versementImpossible = Boolean(motifRefusVersement(recu))
@@ -131,6 +135,14 @@ export function ModaleDetail({
       entete={
         <>
           <span className={`omra-pill ${statut.classe}`}>{statut.texte}</span>
+          {anomalieTropPercu ? (
+            <span
+              className="omra-anomalie"
+              title={`${T.registre.anomalieTropPercu} — ${centimesEnTexteDevise(anomalieTropPercu.montantCentimes ?? 0)}`}
+            >
+              {T.registre.anomalieTropPercu}
+            </span>
+          ) : null}
           <span className={`omra-pill${modifie ? ' modifie' : ''}`}>
             {modifie ? T.detail.modifieNFois(recu.modifications.length) : T.detail.nonModifie}
           </span>
@@ -200,12 +212,12 @@ export function ModaleDetail({
               <div className="appoint">{T.detail.nbVersements(recu.versements.length)}</div>
             </div>
             {/*
-              Restant exactement nul : bleu. Toute autre valeur, y compris
-              négative (trop-perçu, P13/§5.11), reste en rouge comme le
-              fichier de référence — sans quoi l'anomalie deviendrait
-              invisible.
+              Décision du 2026-08-08 (reprise.md §5.11 à la lettre) : un
+              restant ≤ 0 est soldé, trop-perçu compris. Le badge
+              `omra-anomalie` de l'en-tête porte seul la visibilité du
+              trop-perçu, indépendamment de cette couleur.
             */}
-            <div className={`detail-finance-cellule restant${restant === 0 ? ' solde' : ''}`}>
+            <div className={`detail-finance-cellule restant${restant <= 0 ? ' solde' : ''}`}>
               <div className="etiquette">{T.detail.restant}</div>
               <div className="valeur grande">
                 <Montant centimes={restant} />

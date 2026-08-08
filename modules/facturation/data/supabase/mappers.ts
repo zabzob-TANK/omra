@@ -12,10 +12,12 @@ import type {
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
 import type {
+  AnomalieFinanciere,
   OperationPartagee,
   PorteeVersement,
   Recu,
   ReferenceFichier,
+  TypeAnomalie,
   Versement,
 } from '../../domain/types'
 import {
@@ -158,7 +160,32 @@ function mapVersement(
  * `versement.instantane` n'est plus une approximation : il est lu tel quel
  * depuis `receipt_payments.payment_snapshot_*` (migration `202608030001`),
  * figé à l'écriture, jamais recalculé — voir `traduireInstantane`.
+ *
+ * `anomalies` traduit `detail.active_anomalies` (voir `traduireAnomalies`) —
+ * décision du 2026-08-08 : le statut affiché (`statutAffiche`) ne porte plus
+ * seul la visibilité du trop-perçu, ce tableau la porte de façon indépendante.
  */
+/** Traduit `type` brut de `active_anomalies` vers la nomenclature du domaine — jamais fusionnés. */
+function typeAnomalieDepuisBrut(type: BillingReceiptDetail['active_anomalies'][number]['type']): TypeAnomalie {
+  if (type === 'overpayment') return 'trop-percu'
+  if (type === 'amount_due') return 'reste-a-payer'
+  return 'justificatif-cheque-manquant'
+}
+
+/**
+ * Traduit `get_billing_receipt_details.active_anomalies`, déjà calculé côté
+ * serveur (jamais recalculé ici) — voir `AnomalieFinanciere` dans
+ * `domain/types.ts` pour l'origine exacte de chaque type.
+ */
+function traduireAnomalies(detail: BillingReceiptDetail): AnomalieFinanciere[] {
+  return detail.active_anomalies.map((anomalie) => ({
+    type: typeAnomalieDepuisBrut(anomalie.type),
+    montantCentimes: anomalie.amount_dh === null ? null : dhVersCentimes(anomalie.amount_dh),
+    operationId: anomalie.operation_id ?? undefined,
+    dernierChangement: isoVersHorodatage(anomalie.last_changed_at),
+  }))
+}
+
 export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions: number | null): Recu {
   const convenuCentimes = dhVersCentimes(detail.registration.agreed_amount_dh)
   const cancellation = detail.receipt.cancellation
@@ -214,6 +241,7 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions
       .slice()
       .sort((a, b) => a.payment_number - b.payment_number)
       .map((paiement) => mapVersement(detail, paiement)),
+    anomalies: traduireAnomalies(detail),
   }
 }
 
