@@ -105,10 +105,20 @@ export function ModaleVersement({
 
   const restant = recu ? restantDu(recu) : 0
   const montantCentimes = dirhamsSaisisEnCentimes(saisie.montant)
-  // Aperçu non plafonné : négatif tant que le montant saisi dépasse le
-  // restant, pour ne jamais afficher « soldé » sur un dépassement qui sera
-  // refusé à l'enregistrement (R-20, R-21).
-  const restantApresVersement = restant - montantCentimes
+  // Le serveur vient de refuser ce montant précis (R-20, R-21 : dépassement,
+  // ou sixième dfp qui ne solde pas exactement) : l'aperçu ne doit plus
+  // prétendre qu'il aurait réussi. Le champ, lui, n'est jamais vidé — un
+  // employé doit pouvoir corriger 999 999 en 9 999 sans tout retaper ; seuls
+  // les montants DÉRIVÉS (aperçu payé/reste, ligne fictive du tableau plus
+  // bas) reviennent aux vrais totaux actuels pendant que l'erreur est là.
+  // Sans effet sur le dépassement confirmé (R-32, chèque partagé) : ce
+  // parcours renvoie `confirmation-requise` et vide `erreurs` (voir
+  // `soumettre`), jamais une erreur sur ce champ.
+  const montantRefuse = enErreur(erreurs, 'montant')
+  // Aperçu non plafonné tant qu'aucun refus n'est confirmé : négatif tant que
+  // le montant saisi dépasse le restant, pour ne jamais afficher « soldé »
+  // sur un dépassement qui sera refusé à l'enregistrement.
+  const restantApresVersement = montantRefuse ? restant : restant - montantCentimes
   const natureCourante = natureNormalisee(saisie.instrument.nature)
 
   const soumettre = async (confirme: boolean) => {
@@ -263,7 +273,9 @@ export function ModaleVersement({
             <div className="versement-resume-ligne paye">
               <span>{T.versement.payeApres}</span>
               <b className="mono">
-                <Montant centimes={totalPaye(recu) + montantCentimes} />
+                {/* Montant refusé confirmé : vrai total actuel, jamais un
+                    encaissement qui n'a pas eu lieu (voir montantRefuse). */}
+                <Montant centimes={montantRefuse ? totalPaye(recu) : totalPaye(recu) + montantCentimes} />
               </b>
             </div>
             <div className="versement-resume-ligne finale">
@@ -336,7 +348,10 @@ export function ModaleVersement({
                     // l'enregistrer. Rien n'est encore écrit : la ligne est
                     // teintée pour qu'on ne la confonde pas avec une dfp
                     // enregistrée, et les champs non renseignés restent à « — ».
-                    if (index === recu.versements.length && montantCentimes > 0) {
+                    // Disparaît dès que le serveur a refusé ce montant
+                    // (`montantRefuse`) : la ligne ne doit plus suggérer un
+                    // encaissement qui n'a pas eu lieu.
+                    if (index === recu.versements.length && montantCentimes > 0 && !montantRefuse) {
                       const detailsApercu = [
                         saisie.instrument.reference,
                         saisie.instrument.dateInstrument,
