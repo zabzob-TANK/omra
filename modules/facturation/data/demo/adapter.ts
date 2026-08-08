@@ -385,7 +385,9 @@ export function creerSourceDemonstration(
     async incrementerImpressions(recuId: string) {
       const recu = recus.find((r) => r.id === recuId)
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
-      recu.impressions += 1
+      // La démonstration ne simule jamais une lecture ratée : toujours un
+      // nombre réel, jamais `null` (voir le type `Recu.impressions`).
+      recu.impressions = (recu.impressions ?? 0) + 1
       return recu.impressions
     },
     async definirImagesPasseport(recuId, originale, portrait) {

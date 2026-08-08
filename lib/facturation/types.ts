@@ -199,6 +199,15 @@ export type CashRegisterRefundMovement = {
   created_by_slot_label_snapshot: string
 }
 
+/** Ligne brute de `get_billing_receipt_print_summary` — total et dernière impression d'un reçu. */
+export type BillingReceiptPrintSummary = {
+  receipt_id: string
+  print_count: number
+  last_printed_at: string | null
+  last_printed_by_slot_number: number | null
+  last_printed_by_slot_label: string | null
+}
+
 export type BillingReceiptDetail = {
   receipt: {
     id: string

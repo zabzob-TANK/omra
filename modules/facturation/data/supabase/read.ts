@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   BillingAnomaly,
   BillingReceiptDetail,
+  BillingReceiptPrintSummary,
   BillingReceiptRow,
   CashRegisterRefundMovement,
   FinanceAnomalyAcknowledgement,
@@ -114,10 +115,38 @@ export async function chargerDetailRecuBrut(
   return (resultat.data as BillingReceiptDetail | null) ?? null
 }
 
+/**
+ * Nombre d'impressions d'un reçu, via `get_billing_receipt_print_summary`.
+ *
+ * `null` signifie une lecture ratée — jamais confondu avec « jamais imprimé »
+ * (`0`), qui reste une vraie réponse du serveur. Ne lève jamais : une panne
+ * de ce seul compteur ne doit pas faire disparaître le reçu entier de
+ * `chargerRecuParId` (et donc du registre). La trace serveur ci-dessous
+ * évite que la panne reste invisible indéfiniment faute d'alerte dédiée.
+ */
+async function chargerResumeImpressionRecu(
+  id: string,
+  clientPartage?: ClientSupabase,
+): Promise<number | null> {
+  const supabase = clientPartage ?? (await createClient())
+  const resultat = await supabase.rpc('get_billing_receipt_print_summary', { p_receipt_id: id })
+  if (resultat.error) {
+    console.error(
+      `Compteur d'impressions illisible pour le reçu ${id} : ${messageErreur(resultat.error)}`,
+    )
+    return null
+  }
+  const lignes = resultat.data as BillingReceiptPrintSummary[] | null
+  return lignes?.[0]?.print_count ?? null
+}
+
 /** Construit un `Recu` complet pour un identifiant de reçu donné. */
 async function chargerRecuParId(id: string, clientPartage?: ClientSupabase): Promise<Recu | null> {
-  const detail = await chargerDetailRecuBrut(id, clientPartage)
-  return detail ? mapReceiptDetailToRecu(detail) : null
+  const [detail, impressions] = await Promise.all([
+    chargerDetailRecuBrut(id, clientPartage),
+    chargerResumeImpressionRecu(id, clientPartage),
+  ])
+  return detail ? mapReceiptDetailToRecu(detail, impressions) : null
 }
 
 /**

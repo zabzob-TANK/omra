@@ -326,7 +326,13 @@ export function ModaleDetail({
                 <TexteArabe>{recu.employe}</TexteArabe>
               </Ligne>
               <Ligne label={T.detail.impression} classeValeur="detail-ligne-valeur-discrete">
-                <Reference>{recu.impressions}</Reference>
+                {/* `null` = lecture ratée, jamais confondu avec 0 (jamais
+                    imprimé) — l'administrateur doit voir la différence. */}
+                {recu.impressions === null ? (
+                  <span className="detail-impression-inconnue">{T.detail.impressionInconnue}</span>
+                ) : (
+                  <Reference>{recu.impressions}</Reference>
+                )}
               </Ligne>
               {modifie && recu.derniereModification ? (
                 <Ligne label={T.detail.derniereModification}>

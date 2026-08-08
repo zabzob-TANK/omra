@@ -165,6 +165,10 @@ describe('R-85 — original et copie', () => {
   it('ajoute le numéro de la prochaine impression', () => {
     expect(libelleCopie(unRecu({ impressions: 2 }), false)).toBe('نسخة — طباعة رقم 3')
   })
+
+  it('replie sur « نسخة » sans numéro quand le compteur est illisible — jamais un 0 muet', () => {
+    expect(libelleCopie(unRecu({ impressions: null }), false)).toBe('نسخة')
+  })
 })
 
 describe('R-82 — papier à en-tête affichable ou masquable', () => {

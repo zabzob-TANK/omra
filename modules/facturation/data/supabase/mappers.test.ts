@@ -104,7 +104,7 @@ function detailFixture(overrides: Partial<BillingReceiptDetail> = {}): BillingRe
 
 describe('mapReceiptDetailToRecu', () => {
   it('traduit les champs simples et les snapshots d’inscription', () => {
-    const recu = mapReceiptDetailToRecu(detailFixture())
+    const recu = mapReceiptDetailToRecu(detailFixture(), 0)
 
     expect(recu.id).toBe('receipt-1')
     expect(recu.numero).toBe(42)
@@ -118,15 +118,37 @@ describe('mapReceiptDetailToRecu', () => {
     expect(recu.passeport).toBeNull()
   })
 
+  it('met en forme le téléphone stocké en 10 chiffres bruts, format désormais canonique', () => {
+    const recu = mapReceiptDetailToRecu(
+      detailFixture({
+        registration: { ...detailFixture().registration, phone_snapshot: '0613360592' },
+      }),
+      0,
+    )
+    expect(recu.telephone).toBe('0613-36.05.92')
+  })
+
+  it('reste correcte sur une ligne antérieure à la migration, encore mise en forme en base', () => {
+    // `formaterTelephone` est idempotente : une valeur déjà mise en forme se
+    // normalise à l'identique, jamais de double mise en forme visible.
+    const recu = mapReceiptDetailToRecu(
+      detailFixture({
+        registration: { ...detailFixture().registration, phone_snapshot: '0600-11.22.33' },
+      }),
+      0,
+    )
+    expect(recu.telephone).toBe('0600-11.22.33')
+  })
+
   it('convertit les montants dirhams entiers en centimes', () => {
-    const recu = mapReceiptDetailToRecu(detailFixture())
+    const recu = mapReceiptDetailToRecu(detailFixture(), 0)
     expect(recu.tarifCentimes).toBe(33800)
     expect(recu.reductionCentimes).toBe(3800)
     expect(recu.convenuCentimes).toBe(30000)
   })
 
   it('construit les versements à partir des paiements et de leurs opérations', () => {
-    const recu = mapReceiptDetailToRecu(detailFixture())
+    const recu = mapReceiptDetailToRecu(detailFixture(), 0)
     expect(recu.versements).toHaveLength(1)
     const [versement] = recu.versements
     expect(versement.montantCentimes).toBe(20000)
@@ -137,7 +159,7 @@ describe('mapReceiptDetailToRecu', () => {
   })
 
   it('lit l’instantané figé du versement tel quel, sans le recalculer', () => {
-    const recu = mapReceiptDetailToRecu(detailFixture())
+    const recu = mapReceiptDetailToRecu(detailFixture(), 0)
     const [versement] = recu.versements
     expect(versement.instantane.restantApresCentimes).toBe(10000)
     expect(versement.instantane.statutApres).toBe('•')
@@ -167,7 +189,7 @@ describe('mapReceiptDetailToRecu', () => {
         },
       ],
     })
-    const recu = mapReceiptDetailToRecu(detail)
+    const recu = mapReceiptDetailToRecu(detail, 0)
     expect(recu.versements[0].instantane.restantApresCentimes).toBe(0)
     expect(recu.versements[0].instantane.statutApres).toBe('✓')
     // Le convenu de l'instantané reste celui figé au versement, pas le convenu actuel du reçu.
@@ -235,7 +257,7 @@ describe('mapReceiptDetailToRecu', () => {
       ],
     })
 
-    const recu = mapReceiptDetailToRecu(detail)
+    const recu = mapReceiptDetailToRecu(detail, 0)
     const [versement] = recu.versements
     expect(versement.portee).toBe('shared')
     expect(versement.operationPartageeId).toBe('operation-2')
@@ -250,7 +272,7 @@ describe('mapReceiptDetailToRecu', () => {
 
   it('lève une erreur si un paiement n’a pas d’opération associée', () => {
     const detail = detailFixture({ operations: [] })
-    expect(() => mapReceiptDetailToRecu(detail)).toThrow()
+    expect(() => mapReceiptDetailToRecu(detail, 0)).toThrow()
   })
 
   it('traduit une annulation, y compris le mode de remboursement', () => {
@@ -270,12 +292,29 @@ describe('mapReceiptDetailToRecu', () => {
       },
     })
 
-    const recu = mapReceiptDetailToRecu(detail)
+    const recu = mapReceiptDetailToRecu(detail, 0)
     expect(recu.statut).toBe('ملغى')
     expect(recu.motifAnnulation).toBe('demande client')
     expect(recu.modeRemboursement).toBe('cash')
     expect(recu.montantRembourseCentimes).toBe(20000)
     expect(recu.annuleLe).toBe('02/08/2026 11:00')
+  })
+
+  it('reporte le compte d’impressions reçu en second paramètre, sans jamais le recalculer ici', () => {
+    // `impressions` vient de `get_billing_receipt_print_summary`, une RPC
+    // distincte de `get_billing_receipt_details` — voir `chargerRecuParId`
+    // dans read.ts. Ce mapper reste une fonction pure : il ne fait que
+    // reporter la valeur transmise, jamais un 0 codé en dur.
+    const recuSansImpression = mapReceiptDetailToRecu(detailFixture(), 0)
+    expect(recuSansImpression.impressions).toBe(0)
+
+    const recuImprimeTroisFois = mapReceiptDetailToRecu(detailFixture(), 3)
+    expect(recuImprimeTroisFois.impressions).toBe(3)
+  })
+
+  it('reporte `null` tel quel — une lecture ratée n’est jamais un 0', () => {
+    const recu = mapReceiptDetailToRecu(detailFixture(), null)
+    expect(recu.impressions).toBeNull()
   })
 })
 

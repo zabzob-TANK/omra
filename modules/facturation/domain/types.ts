@@ -226,8 +226,14 @@ export interface Recu {
   /** Prototype : `r.refundAmount`, en centimes. R-46. */
   montantRembourseCentimes?: number
 
-  /** Prototype : `r.impressions`. R-84. */
-  impressions: number
+  /**
+   * Prototype : `r.impressions`. R-84.
+   *
+   * `null` signifie une lecture ratée, pas « jamais imprimé » : les deux ne
+   * doivent jamais se confondre à l'écran (voir `data/supabase/read.ts`,
+   * `chargerResumeImpressionRecu`).
+   */
+  impressions: number | null
   /** Prototype : `r.modifications[]`, plus récente en tête. */
   modifications: Modification[]
   /** Prototype : `r.derniereModification`. */

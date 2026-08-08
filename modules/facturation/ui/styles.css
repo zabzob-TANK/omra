@@ -2437,6 +2437,13 @@ input.mono[inputmode='numeric'] {
   color: rgb(107, 107, 107);
 }
 
+/* Compteur d'impressions illisible — distinct de « 0 », jamais discret. */
+.detail-impression-inconnue {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--warn);
+}
+
 .detail-note {
   white-space: pre-wrap;
   font-weight: 500;

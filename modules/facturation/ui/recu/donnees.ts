@@ -162,6 +162,10 @@ export const MESSAGE_COMPTEUR_IMPRESSION_ECHEC =
  */
 export function libelleCopie(recu: Recu, original: boolean): string {
   if (original) return ''
+  // `null` = compteur illisible (voir `data/supabase/read.ts`) : le numéro
+  // de copie devient incertain, mais rien n'empêche d'imprimer pour autant —
+  // repli explicite sur le libellé de base, jamais un 0 muet.
+  if (recu.impressions === null) return 'نسخة'
   return recu.impressions > 0 ? `نسخة — طباعة رقم ${recu.impressions + 1}` : 'نسخة'
 }
 

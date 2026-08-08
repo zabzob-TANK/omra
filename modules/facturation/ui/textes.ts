@@ -573,6 +573,8 @@ export const T = {
     saison: 'الموسم',
     infosEnregistrement: 'معلومات التسجيل',
     impression: 'الطباعة',
+    /** Compteur illisible — jamais confondu avec « jamais imprimé » (0). */
+    impressionInconnue: 'تعذرت القراءة',
     derniereModification: 'آخر تعديل',
     modifiePar: 'عدل بواسطة',
     dfpEnregistrees: 'الدفعات المسجلة',

@@ -144,9 +144,11 @@ function mapVersement(
  *  - `groupe` est renseigné depuis `dossier.label`, en attendant une décision
  *    sur la correspondance entre `omra_dossiers` et le tag groupe/famille du
  *    prototype (reprise.md §5.4, CLAUDE.md) ;
- *  - `impressions` vaut toujours 0 : aucune des quatre RPC de cette étape ne
- *    renvoie l'historique d'impression (`get_billing_receipt_print_summary`
- *    est hors périmètre) ;
+ *  - `impressions` vient de `get_billing_receipt_print_summary` (une RPC
+ *    distincte de `get_billing_receipt_details`), passé en second paramètre
+ *    — voir `chargerRecuParId` dans `read.ts`. `null` signifie que cette
+ *    lecture a échoué, jamais « jamais imprimé » : ce mapper reporte tel quel
+ *    ce que l'appelant lui donne, jamais un 0 par défaut ;
  *  - `modifications` est toujours vide : la forme stockée (`before_data`/
  *    `after_data` en JSON libre dans `history`) ne correspond pas à
  *    `ChangementChamp[]` (avant/après par champ nommé) attendu par le
@@ -157,7 +159,7 @@ function mapVersement(
  * depuis `receipt_payments.payment_snapshot_*` (migration `202608030001`),
  * figé à l'écriture, jamais recalculé — voir `traduireInstantane`.
  */
-export function mapReceiptDetailToRecu(detail: BillingReceiptDetail): Recu {
+export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions: number | null): Recu {
   const convenuCentimes = dhVersCentimes(detail.registration.agreed_amount_dh)
   const cancellation = detail.receipt.cancellation
   const dernierChangement = detail.modifications.last
@@ -201,8 +203,7 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail): Recu {
     montantRembourseCentimes: cancellation
       ? dhVersCentimes(cancellation.total_cancelled_dh)
       : undefined,
-    // Non disponible via ces 4 RPC — voir le commentaire de fonction.
-    impressions: 0,
+    impressions,
     // Non disponible via ces 4 RPC sous la forme attendue — voir le commentaire de fonction.
     modifications: [],
     derniereModification: dernierChangement ? isoVersHorodatage(dernierChangement.occurred_at) : undefined,
