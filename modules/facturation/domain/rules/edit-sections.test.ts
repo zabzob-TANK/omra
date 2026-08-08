@@ -469,6 +469,24 @@ describe('sections identité, contact et groupe', () => {
     )
   })
 
+  it('refuse une lettre au lieu de la retirer en silence — même règle qu’à la création', () => {
+    expect(codes(saisie({ section: 'contact', telephone: '061100750a' }))).toContain(
+      'telephone-dix-chiffres',
+    )
+  })
+
+  it('stocke les 10 chiffres bruts, jamais la mise en forme de l’écran (cohérence avec la création)', () => {
+    const resultat = preparerModification(
+      saisie({ section: 'contact', telephone: '0613-36.05.92', motif: 'correction téléphone' }),
+      recu,
+      CONTEXTE,
+    )
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut === 'ok') {
+      expect(resultat.valeur.champsModifies.telephone).toBe('0613360592')
+    }
+  })
+
   it('exige un code de groupe quand la case est cochée', () => {
     expect(codes(saisie({ section: 'group', groupeCoche: true, groupe: '' }))).toContain(
       'groupe-obligatoire',

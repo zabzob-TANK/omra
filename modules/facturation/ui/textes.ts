@@ -54,7 +54,7 @@ export const T = {
   registre: {
     nouveauRecu: 'وصل جديد',
     ajouterDfp: 'إضافة دفعة',
-    rechercheNom: 'الاسم',
+    rechercheNom: 'الاسم / الهاتف',
     rechercheNumero: 'رقم الوصل',
     rechercher: 'بحث…',
     videTitre: 'لا يوجد أي وصل مطابق',

@@ -65,6 +65,18 @@ describe('R-01, R-02 — identité et contact', () => {
   it('exige exactement dix chiffres', () => {
     expect(codes(saisie({ telephone: '0611-00.75' }))).toContain('telephone-dix-chiffres')
   })
+
+  it('refuse une lettre au lieu de la retirer en silence, même avec dix chiffres par ailleurs', () => {
+    expect(codes(saisie({ telephone: '061100750a' }))).toContain('telephone-dix-chiffres')
+  })
+
+  it('stocke les 10 chiffres bruts, jamais la mise en forme de l’écran (R-02, cohérence avec la modification)', () => {
+    const resultat = preparerCreationRecu(saisie({ telephone: '0611-00.75.00' }), CONTEXTE)
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut === 'ok') {
+      expect(resultat.valeur.donnees.telephone).toBe('0611007500')
+    }
+  })
 })
 
 describe('R-03 — champs de programme obligatoires', () => {

@@ -25,6 +25,7 @@ import {
 } from './codes'
 import { dateSqlVersDateFr, isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
 import { dhVersCentimes } from './dh'
+import { formaterTelephone } from '../../domain/format'
 
 function porteeDepuisUsageKind(usageKind: string): PorteeVersement {
   if (usageKind === 'unique' || usageKind === 'shared') return usageKind
@@ -169,7 +170,10 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail): Recu {
     passeport: null,
     prenom: detail.registration.first_name_snapshot,
     nom: detail.registration.last_name_snapshot,
-    telephone: detail.registration.phone_snapshot ?? '',
+    // Stocké en 10 chiffres bruts (voir `create-receipt.ts`/`edit-sections.ts`) ;
+    // `formaterTelephone` est idempotente sur une valeur déjà mise en forme,
+    // donc sûre même sur une ligne antérieure à la migration de normalisation.
+    telephone: formaterTelephone(detail.registration.phone_snapshot ?? ''),
     hotel: detail.registration.hotel_name_snapshot,
     vol: detail.registration.flight_label_snapshot,
     chambre: detail.registration.room_label_snapshot,

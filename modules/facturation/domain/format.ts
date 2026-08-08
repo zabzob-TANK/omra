@@ -35,6 +35,59 @@ export function chiffresTelephone(valeur: string): number {
 }
 
 /**
+ * Séparateurs de présentation tolérés dans un téléphone saisi : espace, tiret,
+ * point, parenthèses. Tout le reste (lettre ou symbole) est un contenu, pas
+ * une mise en forme — jamais retiré en silence.
+ */
+const SEPARATEURS_TELEPHONE = /[\s.\-()]/g
+
+/**
+ * Normalise un téléphone saisi vers les 10 chiffres bruts, seul format
+ * désormais stocké en base — l'affichage reformate à la lecture
+ * (`formaterTelephone`), jamais la colonne elle-même. Même règle, à la
+ * lettre, quel que soit l'écran appelant :
+ *
+ *  - les séparateurs de présentation (espace, tiret, point, parenthèses)
+ *    sont retirés, sous n'importe quelle disposition — `0612 34 56 78`,
+ *    `0612.34.56.78` et `0612345678` sont le même numéro ;
+ *  - toute autre lettre ou symbole restant après ce nettoyage invalide la
+ *    saisie entière (`null`) — jamais retiré en silence, une faute de frappe
+ *    ne doit jamais devenir un numéro valide sans que personne s'en aperçoive ;
+ *  - le résultat doit faire exactement 10 chiffres (R-02) ; un numéro
+ *    international (`+212...`) n'est pas traité pour l'instant et échoue
+ *    donc cette règle comme n'importe quelle autre saisie invalide.
+ *
+ * Unique fonction de validation/normalisation du téléphone : la création et
+ * la modification d'un reçu l'appellent toutes les deux, pour ne plus jamais
+ * diverger l'une de l'autre.
+ */
+export function telephoneNormalise(saisie: string): string | null {
+  const nettoye = saisie.trim().replace(SEPARATEURS_TELEPHONE, '')
+  return /^[0-9]{10}$/.test(nettoye) ? nettoye : null
+}
+
+/**
+ * Recherche du registre par téléphone : numéro complet — brut ou mis en
+ * forme, peu importe — ou au moins ses 6 derniers chiffres. En dessous de 6
+ * chiffres, trop de faux positifs pour ~500 clients ; retourne `false`,
+ * laissé à la recherche par nom.
+ *
+ * Une requête contenant autre chose que des chiffres et des séparateurs de
+ * présentation n'est pas une recherche téléphone (`false`) : ni erreur, ni
+ * correspondance approximative, elle retombe simplement sur le nom.
+ *
+ * N'écarte jamais plusieurs correspondances au profit d'une seule : c'est un
+ * prédicat de filtre, à appliquer sur toute la liste — jamais un choix
+ * silencieux du premier résultat.
+ */
+export function telephoneCorrespondRecherche(telephoneAffiche: string, requete: string): boolean {
+  const chiffresRequete = requete.replace(SEPARATEURS_TELEPHONE, '')
+  if (chiffresRequete.length < 6 || !/^[0-9]+$/.test(chiffresRequete)) return false
+  const chiffresStockes = telephoneAffiche.replace(/\D/g, '')
+  return chiffresStockes.endsWith(chiffresRequete)
+}
+
+/**
  * U-09 — Masque de date `jj/mm/aaaa`, appliqué progressivement à la frappe.
  * Reproduit `fmtDate()`.
  *

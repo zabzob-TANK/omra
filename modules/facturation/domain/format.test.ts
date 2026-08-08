@@ -7,6 +7,8 @@ import {
   formaterMontant,
   formaterTelephone,
   nettoyerArabe,
+  telephoneCorrespondRecherche,
+  telephoneNormalise,
 } from './format'
 
 describe('U-08 — masque du numéro de téléphone', () => {
@@ -36,6 +38,85 @@ describe('U-08 — masque du numéro de téléphone', () => {
   it('R-02 — compte les chiffres significatifs', () => {
     expect(chiffresTelephone('0611-00.75.00')).toBe(10)
     expect(chiffresTelephone('0611-00.75')).toBe(8)
+  })
+})
+
+describe('téléphone — normalisation partagée création/modification', () => {
+  it('accepte le format déjà mis en forme par la frappe', () => {
+    expect(telephoneNormalise('0613-36.05.92')).toBe('0613360592')
+  })
+
+  it('accepte les chiffres bruts, sans aucun séparateur', () => {
+    expect(telephoneNormalise('0613360592')).toBe('0613360592')
+  })
+
+  it('accepte des espaces à la place des séparateurs habituels', () => {
+    expect(telephoneNormalise('0612 34 56 78')).toBe('0612345678')
+  })
+
+  it('tolère les espaces de bord et les parenthèses', () => {
+    expect(telephoneNormalise('  (0612) 34.56.78  ')).toBe('0612345678')
+  })
+
+  it('refuse une lettre au lieu de la retirer en silence', () => {
+    // Une saisie fautive ne doit jamais devenir un numéro valide sans que
+    // personne ne s'en aperçoive — même avec 10 chiffres par ailleurs.
+    expect(telephoneNormalise('061234567a')).toBeNull()
+    expect(telephoneNormalise('06a1234567')).toBeNull()
+  })
+
+  it('refuse un compte de chiffres différent de dix', () => {
+    expect(telephoneNormalise('061234567')).toBeNull() // 9
+    expect(telephoneNormalise('06123456789')).toBeNull() // 11
+    expect(telephoneNormalise('')).toBeNull()
+  })
+
+  it('ne traite pas le format international pour l’instant — refusé comme toute autre saisie invalide', () => {
+    expect(telephoneNormalise('+212612345678')).toBeNull()
+    expect(telephoneNormalise('00212612345678')).toBeNull()
+  })
+
+  it('les deux mêmes numéros sous des habillages différents se normalisent identiquement', () => {
+    const variantes = ['0613360592', '0613-36.05.92', '0613 36 05 92', '(0613) 36.05.92']
+    const normalises = new Set(variantes.map(telephoneNormalise))
+    expect(normalises.size).toBe(1)
+    expect(normalises.has('0613360592')).toBe(true)
+  })
+})
+
+describe('téléphone — recherche du registre (numéro complet ou 6 derniers chiffres)', () => {
+  const stocke = '0613-36.05.92' // tel qu'affiché, formaterTelephone(phone_snapshot)
+
+  it('trouve par le numéro brut', () => {
+    expect(telephoneCorrespondRecherche(stocke, '0613360592')).toBe(true)
+  })
+
+  it('trouve par le numéro mis en forme, avec ou sans les mêmes séparateurs', () => {
+    expect(telephoneCorrespondRecherche(stocke, '0613-36.05.92')).toBe(true)
+    expect(telephoneCorrespondRecherche(stocke, '0613 36 05 92')).toBe(true)
+  })
+
+  it('trouve par les 6 derniers chiffres seulement', () => {
+    expect(telephoneCorrespondRecherche(stocke, '360592')).toBe(true)
+  })
+
+  it('ne trouve pas avec moins de 6 chiffres — trop de faux positifs à l’échelle prévue', () => {
+    expect(telephoneCorrespondRecherche(stocke, '0592')).toBe(false)
+  })
+
+  it('ne trouve pas un autre numéro, y compris un suffixe qui ne correspond pas', () => {
+    expect(telephoneCorrespondRecherche(stocke, '999999')).toBe(false)
+    expect(telephoneCorrespondRecherche(stocke, '0699887766')).toBe(false)
+  })
+
+  it('une requête avec des lettres n’est pas une recherche téléphone — jamais une correspondance approximative', () => {
+    expect(telephoneCorrespondRecherche(stocke, 'abc592')).toBe(false)
+  })
+
+  it('reste sûre sur un numéro stocké encore dans l’ancien format, avant migration', () => {
+    // `telephoneCorrespondRecherche` ne dépend d'aucune hypothèse de format
+    // sur la valeur stockée : elle en extrait les chiffres, point final.
+    expect(telephoneCorrespondRecherche('0613360592', '360592')).toBe(true)
   })
 })
 

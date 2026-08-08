@@ -16,6 +16,7 @@
  */
 
 import { MAX_VERSEMENTS } from '../../domain/constants'
+import { telephoneCorrespondRecherche } from '../../domain/format'
 import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
 import { motifRefusVersement } from '../../domain/rules/payment'
 import { dernierVersement, restantDu, statutAffiche, totalPaye } from '../../domain/rules/receipt'
@@ -130,9 +131,14 @@ export function EcranRegistre({
 }: Proprietes) {
   const lignes = recus
     .filter((recu) => (afficherAnnules ? true : recu.statut !== 'ملغى'))
-    .filter((recu) =>
-      rechercheNom.trim() ? `${recu.prenom} ${recu.nom}`.includes(rechercheNom.trim()) : true,
-    )
+    .filter((recu) => {
+      const requete = rechercheNom.trim()
+      if (!requete) return true
+      // Même champ que le nom : numéro complet (brut ou mis en forme) ou 6
+      // derniers chiffres. Toutes les lignes correspondantes s'affichent,
+      // jamais un choix silencieux de la première (voir `telephoneCorrespondRecherche`).
+      return `${recu.prenom} ${recu.nom}`.includes(requete) || telephoneCorrespondRecherche(recu.telephone, requete)
+    })
     .filter((recu) =>
       rechercheNumero.trim() ? String(recu.numero).includes(rechercheNumero.trim()) : true,
     )

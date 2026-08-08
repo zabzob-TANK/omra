@@ -10,7 +10,7 @@
  */
 
 import { STATUT_ACTIF } from '../constants'
-import { chiffresTelephone } from '../format'
+import { telephoneNormalise } from '../format'
 import { dirhamsSaisisEnCentimes } from '../money'
 import type { OperationPartagee, Passeport, Tarif, Versement } from '../types'
 import {
@@ -116,10 +116,12 @@ export function preparerCreationRecu(
   if (!saisie.prenom.trim()) liste.push({ champ: 'prenom', code: 'prenom-obligatoire' })
   if (!saisie.nom.trim()) liste.push({ champ: 'nom', code: 'nom-obligatoire' })
 
-  // R-01, R-02
+  // R-01, R-02 — même normalisation, à la lettre, que la modification
+  // (`edit-sections.ts`) : c'est leur divergence qui produisait un numéro
+  // refusé à la modification alors qu'il avait été accepté à la création.
   if (!saisie.telephone.trim()) {
     liste.push({ champ: 'telephone', code: 'telephone-obligatoire' })
-  } else if (chiffresTelephone(saisie.telephone) !== 10) {
+  } else if (telephoneNormalise(saisie.telephone) === null) {
     liste.push({ champ: 'telephone', code: 'telephone-dix-chiffres' })
   }
 
@@ -243,7 +245,9 @@ export function preparerCreationRecu(
       clientId: contexte.clientId,
       prenom,
       nom,
-      telephone: saisie.telephone,
+      // Validé plus haut : jamais `null` ici. Seul format transmis à
+      // l'écriture — 10 chiffres bruts, aucune mise en forme.
+      telephone: telephoneNormalise(saisie.telephone)!,
       hotel: saisie.hotel,
       vol: saisie.vol,
       chambre: saisie.chambre,

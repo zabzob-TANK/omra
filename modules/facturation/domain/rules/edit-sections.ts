@@ -10,7 +10,7 @@
 
 import { NATURE_ESPECES, STATUT_ANNULE } from '../constants'
 import { dateFrValide } from '../dates'
-import { chiffresTelephone } from '../format'
+import { formaterTelephone, telephoneNormalise } from '../format'
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../money'
 import { natureNormalisee } from '../payment-method'
 import { depasseLeRestant, etatOperation } from './shared-payment'
@@ -251,13 +251,24 @@ export function preparerModification(
   }
 
   if (section === 'contact') {
+    // Même normalisation, à la lettre, que la création (`create-receipt.ts`) :
+    // c'était leur divergence qui refusait à la modification un numéro que
+    // la création avait accepté tel quel.
+    const telephoneValide = telephoneNormalise(saisie.telephone)
     if (!saisie.telephone.trim()) {
       liste.push({ champ: 'telephone', code: 'telephone-obligatoire' })
-    } else if (chiffresTelephone(saisie.telephone) !== 10) {
+    } else if (telephoneValide === null) {
       liste.push({ champ: 'telephone', code: 'telephone-dix-chiffres' })
     }
-    consignerChangement(changements, CHAMPS.telephone, recu.telephone, saisie.telephone)
-    champsModifies.telephone = saisie.telephone
+    // Historique lisible dans le même style que la valeur d'origine
+    // (`recu.telephone`, déjà mise en forme à la lecture) — jamais les 10
+    // chiffres bruts stockés. Écho de la saisie tel quel si elle est
+    // invalide : de toute façon écarté par `liste.length` plus bas.
+    const telephoneAffiche = telephoneValide ? formaterTelephone(telephoneValide) : saisie.telephone
+    consignerChangement(changements, CHAMPS.telephone, recu.telephone, telephoneAffiche)
+    // Validé plus haut si `liste` reste vide : seul format transmis à
+    // l'écriture — 10 chiffres bruts, aucune mise en forme.
+    champsModifies.telephone = telephoneValide ?? saisie.telephone
   }
 
   if (section === 'program') {
