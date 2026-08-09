@@ -613,6 +613,12 @@ export function creerSourceDemonstration(
         r.modifications.map((m) => ({
           id: m.id,
           recuNumero: r.numero,
+          prenom: r.prenom,
+          nom: r.nom,
+          sectionLibelle: m.sectionLibelle,
+          changements: m.changements,
+          motif: m.motif,
+          employe: m.employe,
           survenuLe: m.dateHeure,
         })),
       )

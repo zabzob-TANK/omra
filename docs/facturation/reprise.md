@@ -387,17 +387,40 @@ l'ancienne et la nouvelle valeur.
 > renvoyait toujours `modifications: []`, donc le compteur de modifications
 > du Suivi journalier affichait 0 en permanence (11 modifications réelles
 > jamais montrées), et le journal détaillé du reçu (fenêtre « Dossier
-> complet ») restait vide même pour un reçu réellement modifié. Corrigé
-> cette nuit en deux temps : le compteur par saison (`list_billing_season_modifications`,
-> migration `202608090003`), puis le détail par reçu (`list_billing_receipt_history`,
-> migration `202608090008`), chargé à la demande à l'ouverture du dossier.
-> **Reste partiel** : le détail par reçu montre qui/quand/motif, mais pas
-> encore l'ancienne/nouvelle valeur champ par champ décrite ci-dessus —
-> `before_data`/`after_data` (JSON) ont une forme différente par type
-> d'action, et une reconstruction générique du diff n'a pas été jugée sûre
-> à construire sans revue de jour. Voir `RAPPORT-NUIT.md`.
+> complet ») restait vide même pour un reçu réellement modifié. Corrigé le
+> même jour en trois temps : le compteur par saison
+> (`list_billing_season_modifications`, migration `202608090003`), le
+> détail par reçu (`list_billing_receipt_history`, migration `202608090008`),
+> puis — sur demande explicite du commanditaire, une fois le tableau des
+> modifications du Journal financier (R-60) spécifié — le diff champ par
+> champ lui-même (ancienne/nouvelle valeur, migration `202608090012`),
+> reconstruit par `modules/facturation/domain/rules/modification-history.ts`
+> (`changementsHistorique`) : une seule correspondance, branchée à la fois
+> au tableau du Journal financier et à la fiche du reçu, jamais dupliquée.
+>
+> Au passage, trois fonctions SQL distinctes (`list_billing_receipts`,
+> `get_billing_receipt_details`, `list_billing_season_modifications`)
+> répétaient chacune séparément la liste des types d'action comptant comme
+> une modification ; deux d'entre elles avaient été oubliées lors de
+> l'élargissement du compteur pour couvrir la correction de versement,
+> laissant ces corrections invisibles à leurs compteurs malgré une écriture
+> correcte. Centralisée dans `billing_receipt_modification_action_types()`
+> (migration `202608090011`) pour qu'un futur type d'action n'ait plus
+> qu'un seul endroit à toucher.
+>
+> **Reste sans correspondance** : `billing_receipt.dossier_updated`
+> (groupe/famille, §5.4) — son historique ne porte que des identifiants
+> techniques de dossier (`source_dossier_id` / `target_dossier_id`), sans
+> libellé lisible ; `changementsHistorique` ne produit donc aucune ligne de
+> détail pour ce type. Sans effet aujourd'hui : la section correspondante
+> est désactivée dans l'écran de modification depuis ce même jour, son
+> écriture étant de toute façon refusée (§5.4, modèle de dossier non
+> résolu). **À traiter avant de réactiver cette section** — stocker un
+> libellé lisible dans `before_data`/`after_data` à l'écriture, ou le
+> résoudre à la lecture.
 
-**Correction du premier versement :**
+**Correction d'un versement — n'importe lequel du reçu, désigné explicitement
+par l'utilisateur (2026-08-09, remplace « le premier versement » ci-dessous) :**
 
 | Élément | Qui peut le corriger |
 | --- | --- |

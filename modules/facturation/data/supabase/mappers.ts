@@ -17,6 +17,7 @@ import type {
 } from '@/lib/facturation/types'
 import type {
   AnomalieFinanciere,
+  ChangementChamp,
   EvenementModificationSaison,
   Modification,
   OperationPartagee,
@@ -38,6 +39,10 @@ import { dateSqlVersDateFr, isoVersDateFr, isoVersHeure, isoVersHorodatage } fro
 import { dhVersCentimes } from './dh'
 import { formaterTelephone } from '../../domain/format'
 import { LIBELLES_SECTIONS } from '../../domain/rules/edit-sections'
+import {
+  changementsHistorique,
+  type InstantaneHistorique,
+} from '../../domain/rules/modification-history'
 
 function porteeDepuisUsageKind(usageKind: string): PorteeVersement {
   if (usageKind === 'unique' || usageKind === 'shared') return usageKind
@@ -236,16 +241,84 @@ export function mapReceiptRowToRecuSaison(ligne: BillingReceiptRow): RecuSaison 
   }
 }
 
+function texteOptionnel(valeur: unknown): string | undefined {
+  return typeof valeur === 'string' ? valeur : undefined
+}
+
+function nombreOptionnel(valeur: unknown): number | undefined {
+  return typeof valeur === 'number' ? valeur : undefined
+}
+
+/**
+ * Reconstruit l'instantané avant/après d'un événement d'historique depuis le
+ * JSON brut de `before_data`/`after_data` (`facturation_action_history`),
+ * selon la forme propre à chaque type d'action (2026-08-09) — voir
+ * `modification-history.ts` pour la correspondance vers `ChangementChamp[]`.
+ * La date d'instrument est convertie ici (SQL → jj/mm/aaaa) : c'est la seule
+ * conversion propre à cette couche, `changementsHistorique` reste pur.
+ */
+function instantaneHistoriqueDepuisJson(
+  actionType: string,
+  donnees: Record<string, unknown> | null,
+): InstantaneHistorique {
+  if (!donnees) return {}
+
+  if (
+    actionType === 'billing_receipt.first_payment_method_corrected' ||
+    actionType === 'billing_receipt.payment_method_corrected'
+  ) {
+    const instrument =
+      donnees.instrument && typeof donnees.instrument === 'object'
+        ? (donnees.instrument as Record<string, unknown>)
+        : null
+    const dateInstrumentSql = instrument ? texteOptionnel(instrument.instrument_date) : undefined
+    return {
+      montantDh: nombreOptionnel(donnees.payment_amount_dh),
+      nature: texteOptionnel(donnees.payment_mode),
+      reference: instrument ? texteOptionnel(instrument.reference) : undefined,
+      banque: instrument ? texteOptionnel(instrument.bank_name) : undefined,
+      dateInstrument: dateInstrumentSql ? dateSqlVersDateFr(dateInstrumentSql) : undefined,
+      payeur: instrument ? texteOptionnel(instrument.payer_name) : undefined,
+    }
+  }
+
+  return {
+    prenom: texteOptionnel(donnees.first_name),
+    nom: texteOptionnel(donnees.last_name),
+    telephone: texteOptionnel(donnees.phone),
+    note: texteOptionnel(donnees.note),
+    hotel: texteOptionnel(donnees.hotel_name_snapshot),
+    vol: texteOptionnel(donnees.flight_label_snapshot),
+    chambre: texteOptionnel(donnees.room_label_snapshot),
+    tarifDh: nombreOptionnel(donnees.catalog_price_dh),
+    reductionDh: nombreOptionnel(donnees.discount_amount_dh),
+    convenuDh: nombreOptionnel(donnees.agreed_amount_dh),
+  }
+}
+
 /**
  * Construit un `EvenementModificationSaison` depuis une ligne de
- * `list_billing_season_modifications`.
+ * `list_billing_season_modifications`. Le détail champ par champ
+ * (`changements`) est ajouté le 2026-08-09 (202608090012) : jusque-là cette
+ * RPC n'exposait pas `before_data`/`after_data`.
  */
 export function mapModificationRowToEvenementSaison(
   ligne: BillingSeasonModificationRow,
 ): EvenementModificationSaison {
+  const section = sectionDepuisActionType(ligne.action_type)
   return {
     id: ligne.modification_id,
     recuNumero: ligne.receipt_number,
+    prenom: ligne.traveler_first_name_snapshot,
+    nom: ligne.traveler_last_name_snapshot,
+    sectionLibelle: LIBELLES_SECTIONS[section],
+    changements: changementsHistorique(
+      ligne.action_type,
+      instantaneHistoriqueDepuisJson(ligne.action_type, ligne.before_data),
+      instantaneHistoriqueDepuisJson(ligne.action_type, ligne.after_data),
+    ),
+    motif: ligne.reason || '—',
+    employe: ligne.actor_slot_label,
     survenuLe: isoVersHorodatage(ligne.occurred_at),
   }
 }
@@ -289,12 +362,10 @@ function sectionDepuisActionType(actionType: string): SectionModifiable {
  * accès au détail (date, auteur, motif) des modifications d'UN reçu — le
  * compteur (`Recu.nombreModifications`) existait déjà, jamais cette liste.
  *
- * `changements` reste vide : `before_data`/`after_data` sont des blobs JSON
- * dont la forme diffère par type d'action, et une reconstruction générique
- * du diff champ par champ n'est pas fiable sans une correspondance vérifiée
- * clé-par-clé pour chacun des 5 types — laissé pour un lot dédié plutôt que
- * risqué cette nuit. Chaque entrée reste honnête : date, auteur et motif
- * réels, jamais une valeur avant/après inventée.
+ * `changements` — vide jusqu'au 202608090012, qui ajoute `before_data`/
+ * `after_data` à cette RPC. Reconstruit désormais via `changementsHistorique`,
+ * la même correspondance que le tableau des modifications du Journal
+ * financier (`mapModificationRowToEvenementSaison`) — jamais dupliquée.
  */
 export function mapReceiptHistoryToModifications(
   lignes: readonly BillingReceiptHistoryRow[],
@@ -305,7 +376,11 @@ export function mapReceiptHistoryToModifications(
       id: ligne.history_id,
       section,
       sectionLibelle: LIBELLES_SECTIONS[section],
-      changements: [],
+      changements: changementsHistorique(
+        ligne.action_type,
+        instantaneHistoriqueDepuisJson(ligne.action_type, ligne.before_data),
+        instantaneHistoriqueDepuisJson(ligne.action_type, ligne.after_data),
+      ),
       motif: ligne.reason || '—',
       employe: ligne.actor_slot_label,
       dateHeure: isoVersHorodatage(ligne.occurred_at),

@@ -532,6 +532,85 @@
   border-inline-start: 3px solid #b24d43;
 }
 
+/* Demande du commanditaire (2026-08-09) : les modifications, en bleu, même
+   emplacement et même construction que les annulations ci-dessus (R-60). */
+.finance-modifications {
+  margin-top: 10px;
+  border: 1px solid #bcd0e3;
+  border-radius: 8px;
+}
+
+.finance-modifications-titre {
+  padding: 8px 10px 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #2c4a68;
+}
+
+/* Colonnes propres, pas les 18 du tableau principal — largeur libre plutôt
+   que la grille fixe des versements. */
+.finance-tableau-modifications {
+  table-layout: auto;
+  min-width: 0;
+}
+
+.finance-tableau tr.modifiee td {
+  background: #eaf1f8 !important;
+  color: #22344a !important;
+  vertical-align: top;
+}
+
+.finance-tableau tr.modifiee td:first-child {
+  border-inline-start: 3px solid #4a72a5;
+}
+
+/* Le détail peut porter plusieurs champs changés : la cellule s'étire en
+   hauteur plutôt que de tronquer, contrairement aux autres cellules denses. */
+.finance-changements-cellule {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  min-width: 260px;
+}
+
+.finance-changements-cellule .finance-changement:not(:last-child) {
+  margin-bottom: 3px;
+}
+
+.finance-changement {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 9.5px;
+}
+
+.finance-changement .champ {
+  font-weight: 700;
+  color: #2c4a68;
+}
+
+/* Même convention de couleur que la fiche du reçu (detail.tsx) : ancienne
+   valeur en rouge, nouvelle en vert — jamais réinventée. */
+.finance-changement .ancienne {
+  color: var(--danger);
+  background: #fff2f0;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.finance-changement .fleche {
+  color: #9fb3c6;
+}
+
+.finance-changement .nouvelle {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
 .finance-numero {
   font-weight: 700;
   color: #a3801f;
@@ -821,12 +900,24 @@
     break-inside: avoid;
   }
 
-  /* Les lignes annulées et les lignes en anomalie perdent leur couleur. */
+  /* Les lignes annulées, modifiées et les lignes en anomalie perdent leur couleur. */
   body.finance-impression .finance-tableau tr.annulee td,
+  body.finance-impression .finance-tableau tr.modifiee td,
   body.finance-impression .finance-tableau tr.anomalie td,
   body.finance-impression .finance-tableau tbody tr:nth-child(even) td {
     background: #fff !important;
     color: #000 !important;
+  }
+
+  /* Le détail avant/après (2026-08-09) suit la même règle : plus de rouge/vert
+     à l'impression, seulement la flèche pour distinguer les deux valeurs. */
+  body.finance-impression .finance-changement .champ,
+  body.finance-impression .finance-changement .ancienne,
+  body.finance-impression .finance-changement .fleche,
+  body.finance-impression .finance-changement .nouvelle {
+    background: transparent !important;
+    color: #000 !important;
+    padding: 0 !important;
   }
 
   body.finance-impression .finance-carte {
@@ -836,7 +927,8 @@
   }
 
   /* Le fichier garde le tableau des annulations d'un seul tenant. */
-  body.finance-impression .finance-annulations {
+  body.finance-impression .finance-annulations,
+  body.finance-impression .finance-modifications {
     break-inside: avoid;
     border-color: #000 !important;
   }

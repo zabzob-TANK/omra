@@ -60,13 +60,24 @@ export type BillingSeasonPaymentRow = {
   total_rows: number
 }
 
-/** Ligne brute de `list_billing_season_modifications` — un événement de modification, à plat. */
+/**
+ * Ligne brute de `list_billing_season_modifications` — un événement de
+ * modification, à plat. `before_data`/`after_data` et le nom du voyageur
+ * ajoutés le 2026-08-09 (202608090012) : le détail champ par champ pour le
+ * tableau du Journal financier (R-60) et le compteur du Suivi journalier
+ * partagent désormais la même source.
+ */
 export type BillingSeasonModificationRow = {
   modification_id: string
   receipt_id: string
   receipt_number: number
+  traveler_first_name_snapshot: string
+  traveler_last_name_snapshot: string
   action_type: string
   section_code: string | null
+  reason: string | null
+  before_data: Record<string, unknown> | null
+  after_data: Record<string, unknown> | null
   occurred_at: string
   actor_slot_label: string
   total_rows: number
@@ -76,11 +87,15 @@ export type BillingSeasonModificationRow = {
  * Ligne brute de `list_billing_receipt_history` — un événement de
  * modification pour UN reçu (câblage ajouté le 2026-08-09 : le compteur
  * existait déjà via `modification_count`, jamais le détail).
+ * `before_data`/`after_data` ajoutés le même jour (202608090012) pour le
+ * détail champ par champ, jusque-là absent de cette lecture.
  */
 export type BillingReceiptHistoryRow = {
   history_id: string
   action_type: string
   reason: string | null
+  before_data: Record<string, unknown> | null
+  after_data: Record<string, unknown> | null
   occurred_at: string
   actor_slot_label: string
 }

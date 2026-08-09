@@ -460,6 +460,59 @@ export function EcranFinance({
           </section>
         ) : null}
 
+        {/* Demande du commanditaire (2026-08-09) : les modifications, en
+            bleu, sous le principal — même emplacement que les annulations
+            (R-60). Colonnes propres : une modification n'a pas la forme
+            d'un versement (pas d'espèces/banque/convenu/restant/statut). */}
+        {journal.modificationsListe.length ? (
+          <section className="finance-carte finance-modifications">
+            <div className="finance-modifications-titre">{F.modifications}</div>
+            <div className="finance-defilement">
+              <table className="finance-tableau finance-tableau-modifications">
+                <tbody>
+                  {journal.modificationsListe.map((ligne) => (
+                    <tr key={ligne.id} className="modifiee">
+                      <td className="centre mono">{ligne.heure}</td>
+                      <td className="centre">
+                        <DateValeur>{ligne.date}</DateValeur>
+                      </td>
+                      <td className="centre">
+                        <span className="finance-numero">
+                          <Reference>{ligne.numeroRecu}</Reference>
+                        </span>
+                      </td>
+                      <td className="nom">
+                        <TexteArabe>{ligne.client}</TexteArabe>
+                      </td>
+                      <td className="mini">
+                        <TexteArabe>{ligne.sectionLibelle}</TexteArabe>
+                      </td>
+                      <td className="finance-changements-cellule">
+                        {ligne.changements.map((changement, index) => (
+                          <div className="finance-changement" key={index}>
+                            <span className="champ">
+                              <TexteArabe>{changement.champ}</TexteArabe>
+                            </span>
+                            <span className="ancienne">{changement.ancienne || '—'}</span>
+                            <span className="fleche">→</span>
+                            <span className="nouvelle">{changement.nouvelle || '—'}</span>
+                          </div>
+                        ))}
+                      </td>
+                      <td className="micro" title={ligne.motif}>
+                        <TexteArabe>{ligne.motif}</TexteArabe>
+                      </td>
+                      <td className="mini">
+                        <TexteArabe>{ligne.employe}</TexteArabe>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
         <div className="finance-pied">
           <span className="mono" dir="ltr">
             {journal.nombreImpressions ? String(journal.nombreImpressions).padStart(2, '0') : ''}

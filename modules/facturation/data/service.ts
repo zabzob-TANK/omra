@@ -88,6 +88,7 @@ import { estWeekEnd } from '../domain/dates'
 import { instrumentEnFrancais } from '../domain/payment-method'
 import type {
   Chambre,
+  ChangementChamp,
   EntreeAudit,
   Hotel,
   ImpressionFinance,
@@ -721,6 +722,24 @@ export interface LigneAnnulation {
   convenu: string
 }
 
+/**
+ * Une ligne de modification, présentée séparément — même emplacement que
+ * les annulations (R-60), sous le tableau principal. Demande du
+ * commanditaire (2026-08-09) : le détail (`changements`) doit être visible,
+ * pas seulement le fait qu'une modification a eu lieu.
+ */
+export interface LigneModification {
+  id: string
+  heure: string
+  date: string
+  numeroRecu: number
+  client: string
+  sectionLibelle: string
+  changements: ChangementChamp[]
+  motif: string
+  employe: string
+}
+
 export interface JournalFinancier {
   periode: PeriodeFinance
   libellePeriode: string
@@ -732,6 +751,8 @@ export interface JournalFinancier {
   dernierRecu: string
   chequesSansImage: number
   modifications: number
+  /** 2026-08-09 — le détail derrière le compte `modifications` ci-dessus. */
+  modificationsListe: LigneModification[]
   nombreAnnulations: number
   totalAnnule: string
   /** R-62 */
@@ -913,13 +934,25 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
     return retenus.some((m) => m.versement.operationPartageeId === operation.id)
   }).length
 
-  const modifications = modificationsSaison.filter((evenement) =>
+  const modificationsPeriode = modificationsSaison.filter((evenement) =>
     dansLaPeriode(
       cleJourDepuisDateFr(dateFrDepuisHorodatage(evenement.survenuLe)),
       periode,
       maintenant,
     ),
-  ).length
+  )
+  const modifications = modificationsPeriode.length
+  const modificationsListe: LigneModification[] = modificationsPeriode.map((evenement) => ({
+    id: evenement.id,
+    heure: heureDepuisHorodatage(evenement.survenuLe) || '—',
+    date: dateFrDepuisHorodatage(evenement.survenuLe) || '—',
+    numeroRecu: evenement.recuNumero,
+    client: `${evenement.prenom} ${evenement.nom}`,
+    sectionLibelle: evenement.sectionLibelle,
+    changements: evenement.changements,
+    motif: evenement.motif,
+    employe: evenement.employe,
+  }))
 
   const aujourdhui = cleJour(maintenant)
   const hier = decalerCleJour(aujourdhui, -1)
@@ -941,6 +974,7 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
       : '—',
     chequesSansImage,
     modifications,
+    modificationsListe,
     nombreAnnulations: annulees.length,
     // Bloc de synthèse : le fichier de référence y emploie `dhs()`, donc avec
     // la devise. Seules les cellules du tableau emploient `dh()`, sans devise.

@@ -491,14 +491,6 @@ export const T = {
     numeroFixe: 'رقم الوصل — ثابت',
     dateFixe: 'تاريخ التسجيل — ثابت',
     rabatteurFixe: 'الوسيط — غير قابل للتعديل',
-    premierMontantFixe: 'مبلغ الدفعة الأولى — ثابت',
-    /**
-     * §5.9 — remplace `premierMontantFixe` dans ce même bandeau lorsque
-     * l'utilisateur connecté est administrateur : pour lui seul, ce montant
-     * n'est pas fixe, il est modifiable plus bas dans la section « طريقة
-     * الدفعة الأولى ». Un employé (slots 2-6) continue de voir « ثابت ».
-     */
-    premierMontantAdmin: 'مبلغ الدفعة الأولى — قابل للتعديل من طرف المدير فقط',
     gabaritMotif: 'مثال: تصحيح خطأ في الإدخال',
     aucunPrix: 'لا يوجد ثمن محدد لهذه التركيبة.',
     operationCollective: 'عملية جماعية — شخص واحد يدفع عن عدة أشخاص',

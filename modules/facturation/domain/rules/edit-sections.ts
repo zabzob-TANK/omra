@@ -70,7 +70,12 @@ export const LIBELLES_SECTIONS: Record<SectionModifiable, string> = {
  * Noms de champs consignés dans l'historique, repris de `pushChange()`.
  * Ces libellés sont stockés dans les données : ils ne sont pas traduits.
  */
-const CHAMPS = {
+/**
+ * Exporté (2026-08-09) : réutilisé tel quel par `modification-history.ts`
+ * pour reconstruire l'historique détaillé (Suivi journalier, fiche du
+ * reçu) — décision du commanditaire de ne jamais dupliquer ces libellés.
+ */
+export const CHAMPS = {
   prenom: 'الاسم',
   nom: 'النسب',
   telephone: 'رقم الهاتف',
@@ -88,7 +93,10 @@ const CHAMPS = {
   banque: 'البنك',
   payeur: 'الدافع',
   montantOperation: 'قيمة العملية',
-  montant: 'مبلغ الدفعة الأولى',
+  // Décision du commanditaire (2026-08-09) : n'importe quel versement, plus
+  // seulement le premier — corrigé en même temps que le reste de ce libellé
+  // ailleurs dans le fichier (LIBELLES_SECTIONS, montantAdministrateur...).
+  montant: 'مبلغ الدفعة',
 } as const
 
 export interface SaisieModification {

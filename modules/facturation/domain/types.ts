@@ -414,6 +414,22 @@ export interface RecuSaison {
 export interface EvenementModificationSaison {
   id: string
   recuNumero: number
+  /** Valeur arabe. */
+  prenom: string
+  /** Valeur arabe. */
+  nom: string
+  /** Prototype absent — libellé de section, comme `Modification.sectionLibelle`. */
+  sectionLibelle: string
+  /**
+   * Détail champ par champ (2026-08-09) : reconstruit depuis
+   * `before_data`/`after_data` via `changementsHistorique` — alimente le
+   * tableau du Journal financier (R-60) et, un jour, un affichage
+   * équivalent ici même. Vide pour un type d'action sans correspondance
+   * (dossier/groupe — voir reprise.md).
+   */
+  changements: ChangementChamp[]
+  motif: string
+  employe: string
   survenuLe: string
 }
 

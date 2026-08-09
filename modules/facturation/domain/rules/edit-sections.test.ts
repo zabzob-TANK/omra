@@ -202,7 +202,7 @@ describe('R-53 — section premier versement', () => {
     expect(resultat.statut).toBe('ok')
     if (resultat.statut !== 'ok') return
     const champs = resultat.valeur.changements.map((c) => c.champ)
-    expect(champs).not.toContain('مبلغ الدفعة الأولى')
+    expect(champs).not.toContain('مبلغ الدفعة')
     expect(resultat.valeur.champsModifies).not.toHaveProperty('versements')
     expect(resultat.valeur.premierVersementCorrige?.versement.montantCentimes).toBe(
       recu.versements[0].montantCentimes,
