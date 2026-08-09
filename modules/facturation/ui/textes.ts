@@ -524,6 +524,13 @@ export const T = {
     montantInchange: 'المبلغ المدفوع يبقى كما هو',
     portePartagee:
       'بيانات العملية المشتركة تعدّل من سجل المدفوعات والتحويلات، وليس من الوصل.',
+    /**
+     * Trouvé le 2026-08-09 en testant le récapitulatif pour de vrai : cette
+     * section était sélectionnable alors que l'écriture la refuse toujours
+     * (modèle de dossier réel non encore aligné sur le tag libre du
+     * prototype, fusion.md §5.4). Désactivée pour ne plus induire en erreur.
+     */
+    groupeIndisponible: 'تعديل المجموعة غير متاح حاليًا في هذه النسخة.',
     noteFirstPayment:
       'هذا التعديل يخص طريقة وبيانات هذه الدفعة فقط. مبلغها والدفعات الأخرى لا تتغير.',
     /** §5.9 — pour l'administrateur, le montant est corrigeable depuis cette même section. */

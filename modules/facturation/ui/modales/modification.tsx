@@ -272,8 +272,19 @@ export function ModaleModification({
               // ouverte tant qu'au moins UN versement du reçu est
               // corrigeable — la liste de choix, plus bas, écarte ceux qui
               // ne le sont pas (opération partagée, R-53) individuellement.
+              //
+              // « group » reste désactivée : `appliquerModification` (write.ts)
+              // refuse encore systématiquement cette section — le modèle de
+              // dossier réel (`omra_dossiers`, un dossier technique par reçu)
+              // ne correspond pas au tag libre du prototype (fusion.md §5.4,
+              // non résolu — décision de modèle de données à trancher par le
+              // commanditaire, pas une implémentation manquante ordinaire).
+              // Trouvé le 2026-08-09 en testant le récapitulatif pour de vrai :
+              // le refus serveur était déjà correctement affiché, seul l'accès
+              // à une section vouée à l'échec restait trompeur.
               const bloquee =
-                cle === 'firstPayment' && !recu.versements.some((v) => versementModifiable(v))
+                (cle === 'firstPayment' && !recu.versements.some((v) => versementModifiable(v))) ||
+                cle === 'group'
               return (
                 <button
                   key={cle}
@@ -290,7 +301,13 @@ export function ModaleModification({
                   }}
                 >
                   <span className="titre">{LIBELLES_SECTIONS[cle]}</span>
-                  <small>{bloquee ? T.modification.portePartagee : DESCRIPTIONS[cle]}</small>
+                  <small>
+                    {cle === 'group'
+                      ? T.modification.groupeIndisponible
+                      : bloquee
+                        ? T.modification.portePartagee
+                        : DESCRIPTIONS[cle]}
+                  </small>
                 </button>
               )
             })}
