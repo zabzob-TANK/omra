@@ -1099,6 +1099,27 @@ input[type='number'] {
   vertical-align: middle;
 }
 
+/*
+ * Écran de chargement plein cadre (Finance, Suivi journalier, Paiements,
+ * registre au premier chargement) : centré horizontalement, ancré en haut du
+ * contenu (comme .omra-page) — jamais centré verticalement sur toute la
+ * hauteur de l'écran, qui le pousserait trop bas. Toujours la même position
+ * quel que soit l'écran qui l'affiche.
+ */
+.ecran-chargement {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.ecran-chargement h1 {
+  font-size: 23px;
+  font-weight: 700;
+}
+
 /* ------------------------------------------------------------ Formulaires */
 
 .omra-fields {
@@ -2617,6 +2638,21 @@ input.mono[inputmode='numeric'] {
   border-radius: 12px;
   padding: 12px 14px;
   background: #fdfcf9;
+}
+
+/* Chargement à la demande du détail des modifications (2026-08-09) : état
+   honnête, jamais un panneau vide en silence pendant/après l'appel. */
+.detail-modif-etat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 8px 2px;
+}
+
+.detail-modif-erreur {
+  color: var(--danger);
 }
 
 .detail-modif-tete {

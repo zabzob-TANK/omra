@@ -15,6 +15,7 @@ import { horloge, identifiants } from './ids'
 import { referentielsSupabase } from './referentiels'
 import {
   listerAnomaliesBase,
+  listerHistoriqueRecu,
   listerModificationsSaison,
   listerOperationsPartageesReutilisables,
   listerRecus,
@@ -64,12 +65,14 @@ export {
   listerAnomaliesBase,
   listerVersementsSaison,
   listerModificationsSaison,
+  listerHistoriqueRecu,
   type AnomalieBase,
 } from './read'
 
 const recusSupabase: RecusPort = {
   lister: listerRecus,
   listerLeger: listerRecusLeger,
+  historique: listerHistoriqueRecu,
   parId: recuParId,
   parNumero: recuParNumero,
   reserverNumero: reserverNumeroSupabase,

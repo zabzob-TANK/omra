@@ -595,6 +595,9 @@ export const T = {
     modifiePar: 'عدل بواسطة',
     dfpEnregistrees: 'الدفعات المسجلة',
     journalModifications: 'سجل التعديلات',
+    /** Chargement à la demande (2026-08-09) : jamais un panneau vide en silence. */
+    journalEnChargement: 'جارٍ تحميل السجل...',
+    journalErreur: 'تعذر تحميل تفاصيل السجل. أعد المحاولة.',
     motifPrefixe: 'السبب:',
     infosAnnulation: 'معلومات الإلغاء',
     motif: 'السبب',
@@ -632,7 +635,15 @@ export const T = {
 
   journal: {
     titre: 'سجل العمليات',
-    vide: 'لا توجد عمليات.',
+    // Honnête, pas « aucune opération » (2026-08-09) : la vraie source
+    // (facturation_action_history) existe et est bien alimentée par chaque
+    // écriture, mais ce journal global — un mécanisme antérieur, non
+    // reconnecté depuis la bascule vers cette source unique — n'y est pas
+    // encore branché. Voir le détail par reçu (fenêtre « Dossier complet »)
+    // pour un historique réel, déjà branché. Un lot dédié est nécessaire
+    // pour ce journal global (plusieurs types d'entités à agréger par
+    // saison), pas juste un branchement immédiat.
+    vide: 'هذا السجل العام غير موصول بعد بالبيانات الحقيقية. راجع سجل التعديلات داخل ملف كل وصل.',
   },
 
   depassement: {

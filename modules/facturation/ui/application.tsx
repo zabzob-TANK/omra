@@ -29,7 +29,7 @@ import { messageErreur } from '../domain/rules/errors'
 import type { SaisieVersement } from '../domain/rules/payment'
 import { restantDu } from '../domain/rules/receipt'
 import { centimesEnTexteDevise } from '../domain/money'
-import type { Recu, Utilisateur } from '../domain/types'
+import type { Modification, Recu, Utilisateur } from '../domain/types'
 import { cleJour, decalerCleJour } from '../domain/dates'
 import type {
   JournalFinancier,
@@ -137,6 +137,12 @@ export interface ActionsFacturation {
     confirme: boolean,
   ) => Promise<Resultat<null>>
   enregistrerImpression: (recuId: string) => Promise<Resultat<null>>
+  /**
+   * Câblage ajouté le 2026-08-09 : détail des modifications d'un reçu
+   * (date, auteur, motif) — appelé à la demande, seulement à l'ouverture de
+   * la fenêtre de détail.
+   */
+  historiqueRecu: (recuId: string) => Promise<Modification[]>
   journalFinancier: (periode: PeriodeFinance) => Promise<JournalFinancier>
   enregistrerImpressionFinance: (jour: string) => Promise<Resultat<{ numeroImpression: number }>>
   acquitterAnomalies: (jour: string) => Promise<Resultat<null>>
@@ -973,6 +979,7 @@ export function ApplicationFacturation({
                 saison={etat.saison}
                 portrait={etat.portraitsPasseport[recu.id]}
                 operations={etat.operations}
+                onChargerHistorique={actions.historiqueRecu}
                 onFermer={fermer}
                 onOuvrirRecu={() => {
                   setEcran({ nom: 'recu', recuId: recu.id })

@@ -9,15 +9,24 @@
  * tableau des versements, puis historique et annulation repliables.
  */
 
+import { useEffect, useState } from 'react'
+
 import { centimesEnTexteDevise } from '../../domain/money'
 import { codeCouleurNature, natureNormalisee } from '../../domain/payment-method'
-import { collecterOperationsBancaires } from '../../domain/rules/cheque-register'
+import { collecterOperationsBancaires, versementsSaisonDepuisRecu } from '../../domain/rules/cheque-register'
 import { motifRefusVersement } from '../../domain/rules/payment'
 import { restantDu, statutAffiche, totalPaye } from '../../domain/rules/receipt'
-import type { OperationPartagee, Recu, Saison } from '../../domain/types'
+import type { Modification, OperationPartagee, Recu, Saison } from '../../domain/types'
 import { Dialogue } from '../dialogue'
+import { IndicateurChargement } from '../spinner'
 import { DateValeur, Montant, Reference, Telephone, TexteArabe } from '../bidi'
 import { T } from '../textes'
+
+/** État honnête du chargement à la demande du détail des modifications (règle du 2026-08-09 : jamais de silence). */
+type EtatHistorique =
+  | { statut: 'chargement' }
+  | { statut: 'ok'; modifications: Modification[] }
+  | { statut: 'erreur' }
 
 function libelleNature(valeur: string): string {
   const nature = natureNormalisee(valeur)
@@ -84,6 +93,12 @@ interface Proprietes {
   portrait?: string
   /** R-73 — sert à retrouver l'opération bancaire portant l'image. */
   operations: OperationPartagee[]
+  /**
+   * Câblage ajouté le 2026-08-09 : détail des modifications (date, auteur,
+   * motif), chargé à la demande seulement à l'ouverture de cette fenêtre —
+   * jamais en bloc pour tout le registre.
+   */
+  onChargerHistorique: (recuId: string) => Promise<Modification[]>
   onFermer: () => void
   onOuvrirRecu: () => void
   /** Ouvre le détail de l'opération bancaire depuis la colonne « الوثيقة ». */
@@ -97,6 +112,7 @@ export function ModaleDetail({
   saison,
   portrait,
   operations,
+  onChargerHistorique,
   onFermer,
   onOuvrirRecu,
   onOuvrirInstrument,
@@ -109,13 +125,34 @@ export function ModaleDetail({
   // jamais `reste-a-payer` ni `justificatif-cheque-manquant` — hors périmètre.
   const anomalieTropPercu = recu.anomalies.find((anomalie) => anomalie.type === 'trop-percu')
   const nomComplet = `${recu.prenom} ${recu.nom}`
-  const modifie = recu.modifications.length > 0
+  // Le badge et « modifié N fois » s'appuient sur le compte réel déjà connu
+  // (nombreModifications, agrégat côté RPC). Le détail (qui/quand/motif),
+  // lui, est chargé à la demande — voir `historique` ci-dessous. Un compte
+  // non nul ne doit jamais rester silencieusement masqué pendant que ce
+  // chargement est en cours ou échoue (règle du 2026-08-09).
+  const modifie = recu.nombreModifications > 0
+  const [historique, setHistorique] = useState<EtatHistorique>({ statut: 'chargement' })
+  useEffect(() => {
+    if (!modifie) return
+    let annule = false
+    setHistorique({ statut: 'chargement' })
+    onChargerHistorique(recu.id)
+      .then((modifications) => {
+        if (!annule) setHistorique({ statut: 'ok', modifications })
+      })
+      .catch(() => {
+        if (!annule) setHistorique({ statut: 'erreur' })
+      })
+    return () => {
+      annule = true
+    }
+  }, [recu.id, modifie, onChargerHistorique])
   const versementImpossible = Boolean(motifRefusVersement(recu))
 
   // Le fichier relie chaque versement bancaire à son opération pour savoir s'il
   // porte déjà une image. On réutilise le regroupement du domaine.
   const parVersement = new Map<string, { cle: string; aImage: boolean }>()
-  for (const operation of collecterOperationsBancaires([recu], operations)) {
+  for (const operation of collecterOperationsBancaires(versementsSaisonDepuisRecu(recu, operations), operations)) {
     for (const attribution of operation.attributions) {
       parVersement.set(attribution.versementId, {
         cle: operation.cle,
@@ -144,7 +181,7 @@ export function ModaleDetail({
             </span>
           ) : null}
           <span className={`omra-pill${modifie ? ' modifie' : ''}`}>
-            {modifie ? T.detail.modifieNFois(recu.modifications.length) : T.detail.nonModifie}
+            {modifie ? T.detail.modifieNFois(recu.nombreModifications) : T.detail.nonModifie}
           </span>
         </>
       }
@@ -453,36 +490,47 @@ export function ModaleDetail({
               ↶
             </span>
             {T.detail.journalModifications}
-            <span className="detail-repli-compteur">{recu.modifications.length}</span>
+            <span className="detail-repli-compteur">{recu.nombreModifications}</span>
             <span className="detail-repli-aide">{T.detail.ouvrirHistorique}</span>
           </summary>
           <div className="detail-repli-corps">
-            {recu.modifications.map((modification) => (
-              <div className="detail-modif" key={modification.id}>
-                <div className="detail-modif-tete">
-                  <strong>{modification.sectionLibelle}</strong>
-                  <span className="mono">
-                    <DateValeur>{modification.dateHeure}</DateValeur>
-                  </span>
-                  <span>
-                    <TexteArabe>{modification.employe}</TexteArabe>
-                  </span>
-                </div>
-                <div className="detail-modif-motif">
-                  <span>{T.detail.motifPrefixe}</span> <b>{modification.motif}</b>
-                </div>
-                <div className="detail-modif-changements">
-                  {modification.changements.map((changement, index) => (
-                    <div className="detail-changement" key={index}>
-                      <span className="champ">{changement.champ}</span>
-                      <span className="ancienne">{changement.ancienne || '—'}</span>
-                      <span className="fleche">→</span>
-                      <span className="nouvelle">{changement.nouvelle || '—'}</span>
-                    </div>
-                  ))}
-                </div>
+            {historique.statut === 'chargement' ? (
+              <div className="detail-modif-etat">
+                <IndicateurChargement />
+                <span>{T.detail.journalEnChargement}</span>
               </div>
-            ))}
+            ) : historique.statut === 'erreur' ? (
+              <div className="detail-modif-etat detail-modif-erreur">
+                <span>{T.detail.journalErreur}</span>
+              </div>
+            ) : (
+              historique.modifications.map((modification) => (
+                <div className="detail-modif" key={modification.id}>
+                  <div className="detail-modif-tete">
+                    <strong>{modification.sectionLibelle}</strong>
+                    <span className="mono">
+                      <DateValeur>{modification.dateHeure}</DateValeur>
+                    </span>
+                    <span>
+                      <TexteArabe>{modification.employe}</TexteArabe>
+                    </span>
+                  </div>
+                  <div className="detail-modif-motif">
+                    <span>{T.detail.motifPrefixe}</span> <b>{modification.motif}</b>
+                  </div>
+                  <div className="detail-modif-changements">
+                    {modification.changements.map((changement, index) => (
+                      <div className="detail-changement" key={index}>
+                        <span className="champ">{changement.champ}</span>
+                        <span className="ancienne">{changement.ancienne || '—'}</span>
+                        <span className="fleche">→</span>
+                        <span className="nouvelle">{changement.nouvelle || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </details>
       ) : null}

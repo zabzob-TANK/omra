@@ -16,7 +16,7 @@ import type { SaisieModification } from '@/modules/facturation/domain/rules/edit
 import type { Resultat } from '@/modules/facturation/domain/rules/errors'
 import type { PeriodeFinance } from '@/modules/facturation/domain/rules/finance-day'
 import type { SaisieVersement } from '@/modules/facturation/domain/rules/payment'
-import type { Utilisateur } from '@/modules/facturation/domain/types'
+import type { Modification, Utilisateur } from '@/modules/facturation/domain/types'
 import {
   acquitterAnomalies,
   ajouterImageDernierVersement,
@@ -30,6 +30,7 @@ import {
   deconnecter,
   enregistrerImpressionFinance,
   enregistrerImpressionRecu,
+  historiqueRecu,
   journalFinancier,
   modifierRecu,
   registreBancaire,
@@ -111,6 +112,11 @@ export async function modifierRecuAction(
 export async function enregistrerImpressionAction(recuId: string): Promise<Resultat<null>> {
   await requireActiveAccount()
   return enregistrerImpressionRecu(recuId)
+}
+
+export async function historiqueRecuAction(recuId: string): Promise<Modification[]> {
+  await requireActiveAccount()
+  return historiqueRecu(recuId)
 }
 
 export async function journalFinancierAction(periode: PeriodeFinance): Promise<JournalFinancier> {

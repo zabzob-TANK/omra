@@ -72,6 +72,19 @@ export type BillingSeasonModificationRow = {
   total_rows: number
 }
 
+/**
+ * Ligne brute de `list_billing_receipt_history` — un événement de
+ * modification pour UN reçu (câblage ajouté le 2026-08-09 : le compteur
+ * existait déjà via `modification_count`, jamais le détail).
+ */
+export type BillingReceiptHistoryRow = {
+  history_id: string
+  action_type: string
+  reason: string | null
+  occurred_at: string
+  actor_slot_label: string
+}
+
 export type BillingReceiptRow = {
   receipt_id: string
   season_id: string

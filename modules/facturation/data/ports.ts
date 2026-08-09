@@ -172,6 +172,12 @@ export interface RecusPort {
    * écran qui a besoin des versements ou du détail complet.
    */
   listerLeger(filtre?: FiltreRecus): Promise<RecuSaison[]>
+  /**
+   * Câblage ajouté le 2026-08-09 : détail des modifications d'UN reçu (date,
+   * auteur, motif) — le compteur existait déjà (`Recu.nombreModifications`),
+   * jamais cette liste. Appelé à la demande, jamais en bloc avec `lister()`.
+   */
+  historique(recuId: string): Promise<Modification[]>
   parId(id: string): Promise<Recu | null>
   /**
    * reprise.md §5.3 — l'unicité réelle d'un reçu est saison + numéro, jamais

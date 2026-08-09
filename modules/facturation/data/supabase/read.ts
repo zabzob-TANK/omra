@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   BillingAnomaly,
   BillingReceiptDetail,
+  BillingReceiptHistoryRow,
   BillingReceiptPrintSummary,
   BillingReceiptRow,
   BillingSeasonModificationRow,
@@ -38,6 +39,7 @@ import type {
   AcquittementAnomalie,
   EvenementModificationSaison,
   ImpressionFinance,
+  Modification,
   MouvementCaisse,
   OperationPartagee,
   Recu,
@@ -47,6 +49,7 @@ import type {
 import {
   mapModificationRowToEvenementSaison,
   mapReceiptDetailToRecu,
+  mapReceiptHistoryToModifications,
   mapReceiptRowToRecuSaison,
   mapReusableOperationToOperationPartagee,
   mapSeasonPaymentRowToVersementSaison,
@@ -422,4 +425,19 @@ export async function listerModificationsSaison(seasonId: string): Promise<Evene
   }
 
   return modifications
+}
+
+/**
+ * Câblage ajouté le 2026-08-09 : détail des modifications d'UN reçu, jamais
+ * exposé jusqu'ici (`mapReceiptDetailToRecu` renvoyait toujours
+ * `modifications: []`). Appelé à la demande, seulement quand la fenêtre de
+ * détail d'un reçu s'ouvre — jamais en bloc avec `listerRecus()`, qui
+ * chargerait cet historique pour des reçus jamais consultés.
+ */
+export async function listerHistoriqueRecu(recuId: string): Promise<Modification[]> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('list_billing_receipt_history', { p_receipt_id: recuId })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const lignes = (resultat.data ?? []) as BillingReceiptHistoryRow[]
+  return mapReceiptHistoryToModifications(lignes)
 }

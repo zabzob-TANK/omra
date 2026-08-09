@@ -295,6 +295,13 @@ export function creerSourceDemonstration(
         ),
       )
     },
+    async historique(recuId) {
+      // Démonstration : `Recu.modifications` est déjà réellement peuplé en
+      // mémoire (contrairement à l'adaptateur Supabase, voir mappers.ts) —
+      // rien à recalculer, juste le renvoyer tel quel.
+      const trouve = recus.find((r) => r.id === recuId)
+      return trouve ? copier(trouve.modifications) : []
+    },
     async parId(id) {
       const trouve = recus.find((r) => r.id === id)
       return trouve ? copier(trouve) : null

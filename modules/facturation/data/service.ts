@@ -1621,3 +1621,14 @@ export async function urlPortraitPasseport(recuId: string): Promise<string> {
   const portrait = recu?.passeport?.imagePortrait
   return urlImage(source, portrait ?? null)
 }
+
+/**
+ * Câblage ajouté le 2026-08-09 : détail des modifications d'un reçu — le
+ * compteur (`Recu.nombreModifications`) existait déjà, jamais cette liste.
+ * Appelé à la demande, seulement à l'ouverture de la fenêtre de détail —
+ * jamais en bloc pour tous les reçus du registre.
+ */
+export async function historiqueRecu(recuId: string): Promise<Modification[]> {
+  const source = sourceDonnees()
+  return source.recus.historique(recuId)
+}
