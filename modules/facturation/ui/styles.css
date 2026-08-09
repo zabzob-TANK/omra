@@ -3236,41 +3236,160 @@ input.mono[inputmode='numeric'] {
 /* --------------------------------------------- Journal des opérations */
 
 .omra-modal.journal-coque {
-  width: min(760px, calc(100vw - 36px));
+  width: min(920px, calc(100vw - 36px));
   max-width: none;
 }
 
+/* Semaine à gauche, filtres à droite — reste en RTL naturel, contrairement
+   au sélecteur de jour du Journal financier (finance.tsx, direction: ltr
+   volontaire). Ne pas reproduire ce motif ici (demande explicite). */
+.journal-barre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.journal-semaine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.journal-fleche {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--accent-deep);
+}
+
+.journal-fleche:hover {
+  background: var(--accent-soft);
+}
+
+.journal-semaine-libelle {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.journal-filtres {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.journal-champ {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.journal-champ label {
+  color: var(--muted);
+}
+
+.journal-champ select {
+  font-size: 11.5px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
 .journal-liste {
-  max-height: 60vh;
+  max-height: 55vh;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-/* Une trace par ligne : horodatage, action, détail. */
+/* Une trace par ligne : en-tête horodatage/nature/reçu/client/employé, puis
+   le détail champ par champ (seulement pour une modification) et le motif. */
 .journal-ligne {
-  display: flex;
-  gap: 11px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
 }
 
+.journal-ligne-entete {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 11px;
+}
+
 .journal-heure {
-  flex: 0 0 118px;
+  flex: 0 0 auto;
   font-size: 11px;
   color: var(--muted);
-  text-align: end;
 }
 
 .journal-action {
-  flex: 0 0 100px;
+  flex: 0 0 auto;
   font-weight: 600;
+  min-width: 110px;
 }
 
-.journal-detail {
-  flex: 1;
+.journal-recu {
+  flex: 0 0 auto;
+}
+
+.journal-client {
+  flex: 1 1 auto;
+  min-width: 90px;
+}
+
+.journal-employe {
+  flex: 0 0 auto;
   color: var(--muted);
-  min-width: 0;
+  font-size: 11.5px;
+}
+
+/* Même construction que .finance-changements-cellule (Journal financier) :
+   la ligne s'étire en hauteur plutôt que de tronquer. */
+.journal-changements {
+  margin-top: 6px;
+  padding-inline-start: 4px;
+}
+
+.journal-changements .finance-changement:not(:last-child) {
+  margin-bottom: 3px;
+}
+
+.journal-motif {
+  margin-top: 4px;
+  padding-inline-start: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.journal-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.journal-pagination button {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.journal-pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .journal-vide {

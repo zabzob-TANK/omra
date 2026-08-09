@@ -16,6 +16,7 @@ import { referentielsSupabase } from './referentiels'
 import {
   listerAnomaliesBase,
   listerHistoriqueRecu,
+  listerJournalOperations,
   listerModificationsSaison,
   listerOperationsPartageesReutilisables,
   listerRecus,
@@ -98,6 +99,7 @@ export const sourceSupabase: SourceDonnees = {
   acquittementsAnomalie: acquittementsAnomalieSupabase,
   versementsSaison: { lister: listerVersementsSaison },
   modificationsSaison: { lister: listerModificationsSaison },
+  journalOperations: { lister: listerJournalOperations },
   audit: journalAuditSupabase,
   fichiers: stockageSupabase,
   lecteurPasseport: lecteurPasseportSupabase,

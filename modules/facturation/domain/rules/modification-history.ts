@@ -17,7 +17,7 @@
 import { centimesEnTexteDevise, dirhamsSaisisEnCentimes } from '../money'
 import { formaterTelephone } from '../format'
 import { natureNormalisee } from '../payment-method'
-import type { ChangementChamp } from '../types'
+import type { ChangementChamp, SectionModifiable } from '../types'
 import { CHAMPS, consignerChangement } from './edit-sections'
 
 /**
@@ -124,6 +124,41 @@ export function changementsHistorique(
   }
 
   return changements
+}
+
+/**
+ * Traduit `action_type` (`facturation_action_history`) vers la section
+ * modifiable correspondante. `section_code` existe en base mais ses valeurs
+ * ne correspondent pas de façon fiable à `SectionModifiable` selon la RPC
+ * d'origine (`'phone'` vs `'contact'`, `'commercial_data'` sans équivalent
+ * direct) — `action_type`, lui, est un des types déjà filtrés par
+ * `list_billing_receipt_history` et `list_billing_receipts.modification_count`.
+ *
+ * Déplacée ici depuis `data/supabase/mappers.ts` le 2026-08-09 : logique pure
+ * sans aucune IO, elle appartient au domaine comme `changementsHistorique`,
+ * qu'elle sert aussi (journal des opérations, poste 1 seul).
+ */
+export function sectionDepuisActionType(actionType: string): SectionModifiable {
+  switch (actionType) {
+    case 'billing_receipt.identity_updated':
+      return 'identity'
+    case 'billing_receipt.phone_updated':
+      return 'contact'
+    case 'billing_receipt.commercial_data_updated':
+      return 'program'
+    case 'billing_receipt.dossier_updated':
+      return 'group'
+    // Décision du commanditaire (2026-08-09) : correction de versement,
+    // désormais viable pour n'importe quel rang — l'ancien nom reste mappé
+    // pour les corrections déjà enregistrées avant 202608090009, jamais
+    // réécrites (historique append-only).
+    case 'billing_receipt.first_payment_method_corrected':
+    case 'billing_receipt.payment_method_corrected':
+      return 'firstPayment'
+    case 'billing_receipt.note_updated':
+    default:
+      return 'note'
+  }
 }
 
 function texteMontant(dh: number | undefined): string {

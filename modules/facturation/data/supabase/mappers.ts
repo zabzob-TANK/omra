@@ -8,6 +8,7 @@
 
 import type {
   BillingOperation,
+  BillingOperationsJournalRow,
   BillingReceiptDetail,
   BillingReceiptHistoryRow,
   BillingReceiptRow,
@@ -19,13 +20,13 @@ import type {
   AnomalieFinanciere,
   ChangementChamp,
   EvenementModificationSaison,
+  LigneJournalOperations,
   Modification,
   OperationPartagee,
   PorteeVersement,
   Recu,
   RecuSaison,
   ReferenceFichier,
-  SectionModifiable,
   TypeAnomalie,
   Versement,
   VersementSaison,
@@ -41,8 +42,10 @@ import { formaterTelephone } from '../../domain/format'
 import { LIBELLES_SECTIONS } from '../../domain/rules/edit-sections'
 import {
   changementsHistorique,
+  sectionDepuisActionType,
   type InstantaneHistorique,
 } from '../../domain/rules/modification-history'
+import { libelleActionJournal } from '../../domain/rules/operations-journal'
 
 function porteeDepuisUsageKind(usageKind: string): PorteeVersement {
   if (usageKind === 'unique' || usageKind === 'shared') return usageKind
@@ -324,40 +327,6 @@ export function mapModificationRowToEvenementSaison(
 }
 
 /**
- * Traduit `action_type` (`facturation_action_history`) vers la section
- * modifiable correspondante. `section_code` existe en base mais ses valeurs
- * ne correspondent pas de façon fiable à `SectionModifiable` selon la RPC
- * d'origine (`'phone'` vs `'contact'`, `'commercial_data'` sans équivalent
- * direct) — `action_type`, lui, est un des 5 exacts déjà filtrés par
- * `list_billing_receipt_history` et `list_billing_receipts.modification_count`.
- */
-function sectionDepuisActionType(actionType: string): SectionModifiable {
-  switch (actionType) {
-    case 'billing_receipt.identity_updated':
-      return 'identity'
-    case 'billing_receipt.phone_updated':
-      return 'contact'
-    case 'billing_receipt.commercial_data_updated':
-      return 'program'
-    case 'billing_receipt.dossier_updated':
-      return 'group'
-    // Décision du commanditaire (2026-08-09) : correction de versement,
-    // désormais viable pour n'importe quel rang — l'ancien nom reste mappé
-    // pour les corrections déjà enregistrées avant 202608090009, jamais
-    // réécrites (historique append-only). Voir aussi 202608090010, qui
-    // ajoute ces deux valeurs à `list_billing_receipt_history` : sans elle,
-    // ces lignes n'atteignaient jamais le client, ne serait-ce que pour
-    // tomber ici.
-    case 'billing_receipt.first_payment_method_corrected':
-    case 'billing_receipt.payment_method_corrected':
-      return 'firstPayment'
-    case 'billing_receipt.note_updated':
-    default:
-      return 'note'
-  }
-}
-
-/**
  * Câblage ajouté le 2026-08-09 : `list_billing_receipt_history` donne enfin
  * accès au détail (date, auteur, motif) des modifications d'UN reçu — le
  * compteur (`Recu.nombreModifications`) existait déjà, jamais cette liste.
@@ -386,6 +355,39 @@ export function mapReceiptHistoryToModifications(
       dateHeure: isoVersHorodatage(ligne.occurred_at),
     }
   })
+}
+
+/**
+ * Construit une `LigneJournalOperations` depuis `list_billing_operations_journal`
+ * (202608090013) — description complète du commanditaire (2026-08-09).
+ * `changementsHistorique` renvoie `[]` pour tout type d'action absent de son
+ * `switch` (création, versement, annulation, impression…) : pas de branche
+ * séparée ici, le même appel sert les sept types de modification et les huit
+ * autres, exactement comme pour `mapReceiptHistoryToModifications`.
+ */
+export function mapOperationsJournalRowToLigne(
+  ligne: BillingOperationsJournalRow,
+): LigneJournalOperations {
+  return {
+    id: ligne.id,
+    heure: isoVersHeure(ligne.occurred_at),
+    date: isoVersDateFr(ligne.occurred_at),
+    nature: libelleActionJournal(ligne.action_type),
+    typeAction: ligne.action_type,
+    numeroRecu: ligne.receipt_number ?? undefined,
+    client:
+      ligne.traveler_first_name_snapshot && ligne.traveler_last_name_snapshot
+        ? `${ligne.traveler_first_name_snapshot} ${ligne.traveler_last_name_snapshot}`
+        : undefined,
+    changements: changementsHistorique(
+      ligne.action_type,
+      instantaneHistoriqueDepuisJson(ligne.action_type, ligne.before_data),
+      instantaneHistoriqueDepuisJson(ligne.action_type, ligne.after_data),
+    ),
+    motif: ligne.reason ?? undefined,
+    employe: ligne.actor_slot_label,
+    employeSlot: ligne.actor_slot_number,
+  }
 }
 
 /**

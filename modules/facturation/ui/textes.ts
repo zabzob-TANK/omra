@@ -663,15 +663,19 @@ export const T = {
 
   journal: {
     titre: 'سجل العمليات',
-    // Honnête, pas « aucune opération » (2026-08-09) : la vraie source
-    // (facturation_action_history) existe et est bien alimentée par chaque
-    // écriture, mais ce journal global — un mécanisme antérieur, non
-    // reconnecté depuis la bascule vers cette source unique — n'y est pas
-    // encore branché. Voir le détail par reçu (fenêtre « Dossier complet »)
-    // pour un historique réel, déjà branché. Un lot dédié est nécessaire
-    // pour ce journal global (plusieurs types d'entités à agréger par
-    // saison), pas juste un branchement immédiat.
-    vide: 'هذا السجل العام غير موصول بعد بالبيانات الحقيقية. راجع سجل التعديلات داخل ملف كل وصل.',
+    // Branché le 2026-08-09 sur facturation_action_history (auparavant non
+    // connecté — voir l'historique git pour l'ancien message honnête à ce
+    // sujet). Réservé à l'administrateur (poste 1).
+    semainePrecedente: 'الأسبوع السابق',
+    semaineSuivante: 'الأسبوع التالي',
+    employe: 'الموظف',
+    typeOperation: 'نوع العملية',
+    tousLesEmployes: 'كل الموظفين',
+    tousLesTypes: 'كل الأنواع',
+    vide: 'لا توجد عمليات خلال هذا الأسبوع.',
+    erreur: 'تعذر تحميل السجل. حاول مجددًا.',
+    pagePrecedente: 'السابق',
+    pageSuivante: 'التالي',
   },
 
   depassement: {

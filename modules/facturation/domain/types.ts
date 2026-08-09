@@ -434,6 +434,54 @@ export interface EvenementModificationSaison {
 }
 
 /**
+ * Une ligne du journal des opérations (سجل العمليات) — fenêtre déjà présente
+ * dans l'écran (R-86), réservée à l'administrateur de facturation (poste 1).
+ * Une ligne par action enregistrée dans `facturation_action_history`, quel
+ * que soit son type : création de reçu, versement, annulation, modification,
+ * impression, confirmation de dépassement, acquittement d'anomalie —
+ * description complète du commanditaire (2026-08-09), qui remplace toute
+ * description antérieure de cet écran.
+ */
+export interface LigneJournalOperations {
+  id: string
+  heure: string
+  date: string
+  /**
+   * Libellé arabe de la nature de l'action — un type d'action générique, ou
+   * pour une modification, la section touchée (même libellé que
+   * `Modification.sectionLibelle`, jamais réinventé).
+   */
+  nature: string
+  /**
+   * `facturation_action_history.action_type` brut — sert uniquement au
+   * filtre par type ; jamais affiché tel quel (voir `nature`).
+   */
+  typeAction: string
+  /** Présents seulement quand l'action porte sur un reçu. */
+  numeroRecu?: number
+  /** Valeur arabe. */
+  client?: string
+  /** Détail champ par champ, seulement pour une modification. */
+  changements: ChangementChamp[]
+  motif?: string
+  employe: string
+  /** `account_slots.slot_number` de l'auteur — pour le filtre par employé, jamais affiché tel quel. */
+  employeSlot: number
+}
+
+/** Bornes lundi–dimanche (incluses) d'une semaine affichée dans le journal des opérations. */
+export interface SemaineJournal {
+  debut: CleJour
+  fin: CleJour
+}
+
+/** Page de résultats du journal des opérations, avec le total pour la pagination. */
+export interface PageJournalOperations {
+  lignes: LigneJournalOperations[]
+  totalLignes: number
+}
+
+/**
  * Instantané figé au moment du versement.
  *
  * C'est le mécanisme central du système : une modification ultérieure du reçu

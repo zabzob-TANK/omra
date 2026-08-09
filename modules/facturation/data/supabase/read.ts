@@ -20,6 +20,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import type {
   BillingAnomaly,
+  BillingOperationsJournalRow,
   BillingReceiptDetail,
   BillingReceiptHistoryRow,
   BillingReceiptPrintSummary,
@@ -34,7 +35,7 @@ import type {
 import { cleJourDepuisDateFr } from '../../domain/dates'
 import { dhVersCentimes } from './dh'
 import { isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
-import type { FiltreRecus } from '../ports'
+import type { FiltresJournalOperations, FiltreRecus } from '../ports'
 import type {
   AcquittementAnomalie,
   EvenementModificationSaison,
@@ -42,12 +43,14 @@ import type {
   Modification,
   MouvementCaisse,
   OperationPartagee,
+  PageJournalOperations,
   Recu,
   RecuSaison,
   VersementSaison,
 } from '../../domain/types'
 import {
   mapModificationRowToEvenementSaison,
+  mapOperationsJournalRowToLigne,
   mapReceiptDetailToRecu,
   mapReceiptHistoryToModifications,
   mapReceiptRowToRecuSaison,
@@ -440,4 +443,37 @@ export async function listerHistoriqueRecu(recuId: string): Promise<Modification
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const lignes = (resultat.data ?? []) as BillingReceiptHistoryRow[]
   return mapReceiptHistoryToModifications(lignes)
+}
+
+/**
+ * Journal des opérations (سجل العمليات), 202608090013 — description complète
+ * du commanditaire (2026-08-09). Réservé à l'administrateur (poste 1) : la
+ * RPC lève une exception explicite pour tout autre poste, revérifiée ici par
+ * `messageErreur` comme n'importe quel autre échec RPC — aucune vérification
+ * de rôle dupliquée côté client, l'écran se contente de ne pas ouvrir la
+ * fenêtre pour les postes 2 à 6 (`estAdministrateur`, `application.tsx`).
+ *
+ * Bornes de la semaine envoyées en heure locale, sans fuseau explicite : la
+ * fenêtre horaire réelle de l'activité de facturation est très éloignée de
+ * minuit, l'imprécision possible (session Postgres en UTC, Casablanca à
+ * UTC+0/UTC+1 selon la saison) n'a donc aucun effet pratique.
+ */
+export async function listerJournalOperations(
+  filtres: FiltresJournalOperations,
+): Promise<PageJournalOperations> {
+  const supabase = await createClient()
+  const resultat = await supabase.rpc('list_billing_operations_journal', {
+    p_date_from: `${filtres.semaine.debut}T00:00:00`,
+    p_date_to: `${filtres.semaine.fin}T23:59:59.999`,
+    p_actor_slot_number: filtres.employeSlot ?? null,
+    p_action_type: filtres.typeAction ?? null,
+    p_limit: filtres.limite ?? 200,
+    p_offset: filtres.decalage ?? 0,
+  })
+  if (resultat.error) throw new Error(messageErreur(resultat.error))
+  const lignes = (resultat.data ?? []) as BillingOperationsJournalRow[]
+  return {
+    lignes: lignes.map(mapOperationsJournalRowToLigne),
+    totalLignes: lignes[0]?.total_rows ?? 0,
+  }
 }

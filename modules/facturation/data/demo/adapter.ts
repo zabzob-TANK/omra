@@ -14,7 +14,7 @@
  * que les lots métier avancent sans dépendre d'un projet Supabase.
  */
 
-import { cleJour } from '../../domain/dates'
+import { cleJour, cleJourDepuisDateFr, dateFrDepuisHorodatage, heureDepuisHorodatage } from '../../domain/dates'
 import {
   HOTELS_DEMO,
   CHAMBRES_DEMO,
@@ -32,6 +32,7 @@ import type {
   EvenementModificationSaison,
   Hotel,
   ImpressionFinance,
+  LigneJournalOperations,
   ModeRemboursement,
   Modification,
   MouvementCaisse,
@@ -53,10 +54,12 @@ import type {
   ClientsPort,
   CreationRecu,
   FiltreRecus,
+  FiltresJournalOperations,
   HorlogePort,
   IdentifiantsPort,
   ImpressionsFinancePort,
   JournalAuditPort,
+  JournalOperationsPort,
   LecteurPasseportPort,
   ModificationsSaisonPort,
   MouvementsCaissePort,
@@ -626,6 +629,55 @@ export function creerSourceDemonstration(
     },
   }
 
+  /**
+   * Démonstration seulement — dérivé des modifications déjà présentes sur les
+   * reçus du jeu, comme `depotModificationsSaison` ci-dessus. Les huit autres
+   * types d'action du journal réel (création, versement, annulation,
+   * impression, dépassement, anomalie) n'ont pas de fixture dédiée dans ce
+   * jeu : rien à représenter pour eux ici, jamais une donnée inventée pour
+   * combler. Le filtre par employé n'est pas honoré : le jeu de démonstration
+   * ne porte qu'un nom sur chaque modification, jamais un numéro de poste.
+   */
+  const depotJournalOperations: JournalOperationsPort = {
+    async lister(filtres: FiltresJournalOperations) {
+      const toutes: LigneJournalOperations[] = recus.flatMap((r) =>
+        r.modifications.map((m) => ({
+          id: m.id,
+          heure: heureDepuisHorodatage(m.dateHeure) || '—',
+          date: dateFrDepuisHorodatage(m.dateHeure) || '—',
+          nature: m.sectionLibelle,
+          typeAction: m.section,
+          numeroRecu: r.numero,
+          client: `${r.prenom} ${r.nom}`,
+          changements: m.changements,
+          motif: m.motif,
+          employe: m.employe,
+          // Valeur fixe, jamais lue : le jeu de démonstration ne porte pas de
+          // numéro de poste sur ses modifications (voir commentaire plus haut).
+          employeSlot: 1,
+        })),
+      )
+
+      const dansLaSemaine = toutes.filter((ligne) => {
+        const cle = cleJourDepuisDateFr(ligne.date)
+        return cle >= filtres.semaine.debut && cle <= filtres.semaine.fin
+      })
+      const filtrees = filtres.typeAction
+        ? dansLaSemaine.filter((ligne) => ligne.typeAction === filtres.typeAction)
+        : dansLaSemaine
+
+      const cleTri = (ligne: LigneJournalOperations) => `${cleJourDepuisDateFr(ligne.date)}T${ligne.heure}`
+      const triees = [...filtrees].sort((a, b) => (cleTri(a) < cleTri(b) ? 1 : -1))
+
+      const decalage = filtres.decalage ?? 0
+      const limite = filtres.limite ?? 200
+      return {
+        lignes: copier(triees.slice(decalage, decalage + limite)),
+        totalLignes: triees.length,
+      }
+    },
+  }
+
   return {
     referentiels,
     session,
@@ -636,6 +688,7 @@ export function creerSourceDemonstration(
     impressionsFinance: depotImpressions,
     versementsSaison: depotVersementsSaison,
     modificationsSaison: depotModificationsSaison,
+    journalOperations: depotJournalOperations,
     acquittementsAnomalie: depotAcquittements,
     audit: journalAudit,
     fichiers: stockage,

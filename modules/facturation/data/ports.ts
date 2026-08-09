@@ -31,10 +31,12 @@ import type {
   EvenementModificationSaison,
   Hotel,
   ImpressionFinance,
+  LigneJournalOperations,
   ModeRemboursement,
   Modification,
   MouvementCaisse,
   OperationPartagee,
+  PageJournalOperations,
   Passeport,
   Rabatteur,
   Recu,
@@ -42,6 +44,7 @@ import type {
   ReferenceFichier,
   Saison,
   SectionModifiable,
+  SemaineJournal,
   Tarif,
   Utilisateur,
   Versement,
@@ -331,6 +334,28 @@ export interface ModificationsSaisonPort {
   lister(saisonId: string): Promise<EvenementModificationSaison[]>
 }
 
+export interface FiltresJournalOperations {
+  semaine: SemaineJournal
+  /** `account_slots.slot_number` — `null`/absent : tous les employés. */
+  employeSlot?: number | null
+  /** `facturation_action_history.action_type` — `null`/absent : tous les types. */
+  typeAction?: string | null
+  limite?: number
+  decalage?: number
+}
+
+/**
+ * Journal des opérations (سجل العمليات) — description complète du
+ * commanditaire (2026-08-09), qui remplace tout ce qui existait avant sur cet
+ * écran. Réservé à l'administrateur de facturation (poste 1) ; la RPC refuse
+ * tout autre poste. `JournalAuditPort` ci-dessous reste en place pour
+ * `tracer()`, mais n'alimente plus cette fenêtre depuis ce jour — deux
+ * mécanismes distincts, jamais mélangés.
+ */
+export interface JournalOperationsPort {
+  lister(filtres: FiltresJournalOperations): Promise<PageJournalOperations>
+}
+
 export interface JournalAuditPort {
   /** R-86 — Plus récente en tête. */
   lister(limite?: number): Promise<EntreeAudit[]>
@@ -416,6 +441,7 @@ export interface SourceDonnees {
   acquittementsAnomalie: AcquittementsAnomaliePort
   versementsSaison: VersementsSaisonPort
   modificationsSaison: ModificationsSaisonPort
+  journalOperations: JournalOperationsPort
   audit: JournalAuditPort
   fichiers: StockageFichiersPort
   lecteurPasseport: LecteurPasseportPort

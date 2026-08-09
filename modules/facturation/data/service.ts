@@ -95,6 +95,7 @@ import type {
   ReferenceFichier,
   Modification,
   OperationPartagee,
+  PageJournalOperations,
   Rabatteur,
   Recu,
   Saison,
@@ -104,6 +105,7 @@ import type {
 } from '../domain/types'
 import { modeDemonstration, sourceDonnees } from './index'
 import { FormatImageNonAccepteError, SaisonIndisponibleError, SectionIndisponibleError } from './ports'
+import type { FiltresJournalOperations } from './ports'
 import type { SourceDonnees } from './ports'
 
 /** Instantané complet servi à l'interface. */
@@ -1711,4 +1713,18 @@ export async function urlPortraitPasseport(recuId: string): Promise<string> {
 export async function historiqueRecu(recuId: string): Promise<Modification[]> {
   const source = sourceDonnees()
   return source.recus.historique(recuId)
+}
+
+/**
+ * Journal des opérations (سجل العمليات) — description complète du
+ * commanditaire (2026-08-09). Réservé à l'administrateur (poste 1) : la RPC
+ * (`require_facturation_admin`) refuse tout autre poste, revérifié ici par la
+ * même propagation d'erreur que le reste du service — aucun contrôle de rôle
+ * dupliqué dans cette fonction.
+ */
+export async function journalOperations(
+  filtres: FiltresJournalOperations,
+): Promise<PageJournalOperations> {
+  const source = sourceDonnees()
+  return source.journalOperations.lister(filtres)
 }

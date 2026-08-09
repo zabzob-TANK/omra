@@ -16,7 +16,7 @@ import type { ResultatModification, SaisieModification } from '@/modules/factura
 import type { Resultat } from '@/modules/facturation/domain/rules/errors'
 import type { PeriodeFinance } from '@/modules/facturation/domain/rules/finance-day'
 import type { SaisieVersement } from '@/modules/facturation/domain/rules/payment'
-import type { Modification, Recu, Utilisateur } from '@/modules/facturation/domain/types'
+import type { Modification, PageJournalOperations, Recu, Utilisateur } from '@/modules/facturation/domain/types'
 import {
   acquitterAnomalies,
   ajouterImageDernierVersement,
@@ -32,6 +32,7 @@ import {
   enregistrerImpressionRecu,
   historiqueRecu,
   journalFinancier,
+  journalOperations,
   modifierRecu,
   previsualiserModification,
   registreBancaire,
@@ -42,6 +43,7 @@ import {
   type RegistreBancaire,
   type SuiviJournalier,
 } from '@/modules/facturation/data/service'
+import type { FiltresJournalOperations } from '@/modules/facturation/data/ports'
 
 async function extraireFichier(
   donnees: FormData,
@@ -136,6 +138,19 @@ export async function historiqueRecuAction(recuId: string): Promise<Modification
 export async function journalFinancierAction(periode: PeriodeFinance): Promise<JournalFinancier> {
   await requireActiveAccount()
   return journalFinancier(periode)
+}
+
+/**
+ * Journal des opérations (سجل العمليات) — comme les autres actions de ce
+ * fichier, ne revérifie que la session omra active ; le refus des postes 2 à
+ * 6 est décidé par `require_facturation_admin()` côté RPC, jamais dupliqué
+ * ici.
+ */
+export async function journalOperationsAction(
+  filtres: FiltresJournalOperations,
+): Promise<PageJournalOperations> {
+  await requireActiveAccount()
+  return journalOperations(filtres)
 }
 
 export async function enregistrerImpressionFinanceAction(

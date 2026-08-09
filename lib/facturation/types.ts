@@ -100,6 +100,32 @@ export type BillingReceiptHistoryRow = {
   actor_slot_label: string
 }
 
+/**
+ * Ligne brute de `list_billing_operations_journal` (202608090013) — journal
+ * des opérations (سجل العمليات), réservé à l'administrateur de facturation.
+ * Une ligne par action de `facturation_action_history`, quel que soit son
+ * type — pas seulement une modification de reçu.
+ */
+export type BillingOperationsJournalRow = {
+  id: string
+  entity_type: string
+  action_type: string
+  section_code: string | null
+  reason: string | null
+  occurred_at: string
+  actor_slot_number: number
+  actor_slot_label: string
+  actor_login: string | null
+  before_data: Record<string, unknown> | null
+  after_data: Record<string, unknown> | null
+  correlation_id: string | null
+  receipt_id: string | null
+  receipt_number: number | null
+  traveler_first_name_snapshot: string | null
+  traveler_last_name_snapshot: string | null
+  total_rows: number
+}
+
 export type BillingReceiptRow = {
   receipt_id: string
   season_id: string

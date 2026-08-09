@@ -29,7 +29,7 @@ import { messageErreur } from '../domain/rules/errors'
 import type { SaisieVersement } from '../domain/rules/payment'
 import { restantDu } from '../domain/rules/receipt'
 import { centimesEnTexteDevise } from '../domain/money'
-import type { Modification, Recu, Utilisateur } from '../domain/types'
+import type { Modification, PageJournalOperations, Recu, Utilisateur } from '../domain/types'
 import { cleJour, decalerCleJour } from '../domain/dates'
 import type {
   JournalFinancier,
@@ -38,6 +38,7 @@ import type {
 } from '../data/service'
 import type { PeriodeFinance } from '../domain/rules/finance-day'
 import type { FiltresRegistre } from '../domain/rules/cheque-register'
+import type { FiltresJournalOperations } from '../data/ports'
 import {
   basculerSelection,
   basculerToutesVisibles,
@@ -153,6 +154,12 @@ export interface ActionsFacturation {
    */
   historiqueRecu: (recuId: string) => Promise<Modification[]>
   journalFinancier: (periode: PeriodeFinance) => Promise<JournalFinancier>
+  /**
+   * Journal des opérations (سجل العمليات) — réservé à l'administrateur
+   * (poste 1). Câblage ajouté le 2026-08-09, description complète du
+   * commanditaire.
+   */
+  journalOperations: (filtres: FiltresJournalOperations) => Promise<PageJournalOperations>
   enregistrerImpressionFinance: (jour: string) => Promise<Resultat<{ numeroImpression: number }>>
   acquitterAnomalies: (jour: string) => Promise<Resultat<null>>
   suiviJournalier: (options: {
@@ -524,25 +531,27 @@ export function ApplicationFacturation({
           </div>
         ) : null}
 
-        <button
-          className="omra-icon-btn"
-          title={T.navigation.journal}
-          onClick={() => setFenetre({ type: 'journal' })}
-        >
-          <svg
-            fill="none"
-            height="15"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            width="15"
-            aria-hidden="true"
+        {estAdministrateur ? (
+          <button
+            className="omra-icon-btn"
+            title={T.navigation.journal}
+            onClick={() => setFenetre({ type: 'journal' })}
           >
-            <path d="M12 8v4l3 2" />
-            <circle cx="12" cy="12" r="9" />
-          </svg>
-        </button>
+            <svg
+              fill="none"
+              height="15"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              width="15"
+              aria-hidden="true"
+            >
+              <path d="M12 8v4l3 2" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          </button>
+        ) : null}
 
         <div className="omra-user">
           <div className="omra-avatar">{utilisateur.initiales}</div>
@@ -1093,8 +1102,8 @@ export function ApplicationFacturation({
         />
       ) : null}
 
-      {fenetre.type === 'journal' ? (
-        <ModaleJournal entrees={etat.audit} onFermer={fermer} />
+      {fenetre.type === 'journal' && estAdministrateur ? (
+        <ModaleJournal onCharger={actions.journalOperations} onFermer={fermer} />
       ) : null}
 
       {notification ? (
