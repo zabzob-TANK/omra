@@ -590,11 +590,14 @@
   color: #2c4a68;
 }
 
-/* Même convention de couleur que la fiche du reçu (detail.tsx) : ancienne
-   valeur en rouge, nouvelle en vert — jamais réinventée. */
+/* Sur cet écran, le rouge est déjà pris par les annulations (tr.annulee
+   ci-dessus) : l'ancienne valeur ne peut pas aussi être rouge sans ambiguïté.
+   Barré + grisé au lieu d'une couleur (demande du commanditaire, 2026-08-09). */
 .finance-changement .ancienne {
-  color: var(--danger);
-  background: #fff2f0;
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--muted-2);
+  background: #eef0ea;
   padding: 1px 5px;
   border-radius: 4px;
 }
