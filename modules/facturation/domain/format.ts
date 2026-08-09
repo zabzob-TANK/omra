@@ -43,19 +43,24 @@ const SEPARATEURS_TELEPHONE = /[\s.\-()]/g
 
 /**
  * Normalise un téléphone saisi vers les 10 chiffres bruts, seul format
- * désormais stocké en base — l'affichage reformate à la lecture
- * (`formaterTelephone`), jamais la colonne elle-même. Même règle, à la
- * lettre, quel que soit l'écran appelant :
+ * désormais stocké en base (`^0[0-9]{9}$`) — l'affichage reformate à la
+ * lecture (`formaterTelephone`), jamais la colonne elle-même. Règle
+ * définitive du commanditaire (2026-08-09), à la lettre, quel que soit
+ * l'écran appelant :
  *
- *  - les séparateurs de présentation (espace, tiret, point, parenthèses)
- *    sont retirés, sous n'importe quelle disposition — `0612 34 56 78`,
- *    `0612.34.56.78` et `0612345678` sont le même numéro ;
- *  - toute autre lettre ou symbole restant après ce nettoyage invalide la
- *    saisie entière (`null`) — jamais retiré en silence, une faute de frappe
- *    ne doit jamais devenir un numéro valide sans que personne s'en aperçoive ;
- *  - le résultat doit faire exactement 10 chiffres (R-02) ; un numéro
- *    international (`+212...`) n'est pas traité pour l'instant et échoue
- *    donc cette règle comme n'importe quelle autre saisie invalide.
+ *  - le préfixe `0` est automatique : l'employé saisit normalement les 9
+ *    chiffres qui le suivent (`661234567` → `0661234567`) ;
+ *  - avant validation, seuls les séparateurs de présentation (espace, tiret,
+ *    point, parenthèses) sont retirés, sous n'importe quelle disposition ;
+ *  - un résultat de 10 chiffres commençant déjà par `0` est conservé tel
+ *    quel, sans doubler le préfixe ;
+ *  - toute autre longueur, ou tout caractère restant après ce nettoyage qui
+ *    ne serait pas un chiffre, invalide la saisie entière (`null`) — jamais
+ *    tronqué ni retiré en silence. En particulier : 9 chiffres commençant
+ *    déjà par `0` (`066123456`) et 10 chiffres ne commençant pas par `0`
+ *    (`6612345678`) sont tous les deux refusés, pas complétés ni corrigés ;
+ *  - un numéro international (`+212...`) n'est pas traité pour l'instant et
+ *    échoue donc cette règle comme n'importe quelle autre saisie invalide.
  *
  * Unique fonction de validation/normalisation du téléphone : la création et
  * la modification d'un reçu l'appellent toutes les deux, pour ne plus jamais
@@ -63,7 +68,10 @@ const SEPARATEURS_TELEPHONE = /[\s.\-()]/g
  */
 export function telephoneNormalise(saisie: string): string | null {
   const nettoye = saisie.trim().replace(SEPARATEURS_TELEPHONE, '')
-  return /^[0-9]{10}$/.test(nettoye) ? nettoye : null
+  if (!/^[0-9]+$/.test(nettoye)) return null
+  if (nettoye.length === 9) return nettoye[0] === '0' ? null : '0' + nettoye
+  if (nettoye.length === 10) return nettoye[0] === '0' ? nettoye : null
+  return null
 }
 
 /**

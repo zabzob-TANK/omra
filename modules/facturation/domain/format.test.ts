@@ -58,15 +58,35 @@ describe('téléphone — normalisation partagée création/modification', () =>
     expect(telephoneNormalise('  (0612) 34.56.78  ')).toBe('0612345678')
   })
 
+  it('ajoute le préfixe 0 automatique aux 9 chiffres saisis normalement', () => {
+    // Règle définitive du 2026-08-09 : l'employé tape les 9 chiffres qui
+    // suivent le 0, jamais le 0 lui-même.
+    expect(telephoneNormalise('661234567')).toBe('0661234567')
+  })
+
+  it('ne double jamais le préfixe sur un numéro déjà à dix chiffres', () => {
+    expect(telephoneNormalise('0661234567')).toBe('0661234567')
+  })
+
+  it('refuse neuf chiffres commençant déjà par 0 — ni complété ni corrigé', () => {
+    // 066123456 pourrait être une saisie tronquée : jamais deviné en
+    // silence, refusé comme n'importe quelle longueur invalide.
+    expect(telephoneNormalise('066123456')).toBeNull()
+  })
+
+  it('refuse dix chiffres ne commençant pas par 0', () => {
+    expect(telephoneNormalise('6612345678')).toBeNull()
+  })
+
   it('refuse une lettre au lieu de la retirer en silence', () => {
     // Une saisie fautive ne doit jamais devenir un numéro valide sans que
-    // personne ne s'en aperçoive — même avec 10 chiffres par ailleurs.
+    // personne ne s'en aperçoive — même avec dix caractères par ailleurs.
     expect(telephoneNormalise('061234567a')).toBeNull()
     expect(telephoneNormalise('06a1234567')).toBeNull()
   })
 
-  it('refuse un compte de chiffres différent de dix', () => {
-    expect(telephoneNormalise('061234567')).toBeNull() // 9
+  it('refuse un compte de chiffres qui ne correspond ni à neuf ni à dix', () => {
+    expect(telephoneNormalise('06123456')).toBeNull() // 8
     expect(telephoneNormalise('06123456789')).toBeNull() // 11
     expect(telephoneNormalise('')).toBeNull()
   })
