@@ -4,7 +4,11 @@ Document mis à jour au fil du travail. Ne pas se fier à une section tant
 qu'elle n'est pas marquée comme terminée avec un résultat de vérification
 réel (jamais « ça devrait marcher »).
 
-Statut global : **EN COURS**.
+Statut global : **TERMINÉ pour cette nuit** — 7 commits poussés et vérifiés
+(migrations SQL en production ; code applicatif construit avec succès mais
+en attente de promotion, voir l'encart juste en dessous). Aucune tâche
+laissée à moitié faite : chaque lot commencé a été soit terminé et vérifié,
+soit explicitement sauté et documenté (section 3).
 
 ## ⚠️ À faire par toi au réveil — bloqué par un garde-fou, pas par un choix
 
