@@ -49,6 +49,7 @@ import {
   MESSAGE_IMAGE_SUPPRIMEE,
   libellesInstrument,
 } from '../domain/rules/cheque-register'
+import { Dialogue } from './dialogue'
 import { EcranAVenir } from './ecrans/a-venir'
 import { EcranChargement } from './ecrans/chargement'
 import { EcranConnexion } from './ecrans/connexion'
@@ -94,6 +95,28 @@ type Fenetre =
   | { type: 'anomalieFinance' }
   | { type: 'paiementDetail'; cle: string }
   | { type: 'paiementImage'; cible: CiblePaiement }
+
+/**
+ * Règle absolue (2026-08-09) : un écran ne ment jamais. `recuParId()` peut ne
+ * rien trouver (course avec une annulation ailleurs, identifiant périmé) —
+ * avant cette correction, les fenêtres d'annulation/modification/détail se
+ * fermaient alors en silence (`return null`) sans jamais dire pourquoi, et
+ * l'écran d'impression du reçu retombait carrément sur un contenu vide
+ * (aucune des conditions de rendu principal ne correspond à `ecran.nom ===
+ * 'recu'`). Remplacé par un message honnête et une fermeture explicite,
+ * jamais un silence qui ressemble à un succès.
+ */
+function MessageRecuIntrouvable({ onFermer }: { onFermer: () => void }) {
+  return (
+    <Dialogue titre="Reçu introuvable" onFermer={onFermer} taille="small">
+      <p style={{ padding: '4px 0' }}>
+        Ce reçu n’a pas pu être retrouvé dans les données actuellement chargées.
+        Fermez cette fenêtre et réessayez depuis le registre ; si le problème
+        persiste, rechargez la page.
+      </p>
+    </Dialogue>
+  )
+}
 
 export interface ActionsFacturation {
   connecter: (identifiant: string, motDePasse: string) => Promise<Utilisateur | null>
@@ -157,6 +180,11 @@ export function ApplicationFacturation({
   const [fenetre, setFenetre] = useState<Fenetre>({ type: 'aucune' })
   // R-85 — un reçu ouvert juste après sa création est l'original ; rouvert
   // ensuite, le fichier de référence le marque « نسخة ».
+  // Vrai entre la connexion et la fin du premier `rafraichir()` qui suit :
+  // sans ce filet, `etat.recus` reste vide (état hérité de `etatAnonyme()`)
+  // le temps du chargement, et le registre affiche à tort « aucun reçu »
+  // avant que les vraies données n'arrivent quelques secondes plus tard.
+  const [chargementInitialRegistre, setChargementInitialRegistre] = useState(false)
   const [recuOriginal, setRecuOriginal] = useState<string | null>(null)
   const [journal, setJournal] = useState<JournalFinancier | null>(null)
   const [suivi, setSuivi] = useState<SuiviJournalier | null>(null)
@@ -341,7 +369,12 @@ export function ApplicationFacturation({
             const connecte = await actions.connecter(identifiant, motDePasse)
             if (connecte) {
               setUtilisateur(connecte)
-              await rafraichir()
+              setChargementInitialRegistre(true)
+              try {
+                await rafraichir()
+              } finally {
+                setChargementInitialRegistre(false)
+              }
             }
             return connecte
           }}
@@ -367,10 +400,34 @@ export function ApplicationFacturation({
               await actions.enregistrerImpression(recuAffiche.id)
               void rafraichir()
             }}
+            estAdministrateur={estAdministrateur}
           />
         </div>
       )
     }
+    // Règle absolue (2026-08-09) : cet écran n'affiche jamais un reçu
+    // incomplet et ne laisse jamais imprimer sans données réelles. Si le
+    // reçu n'est pas dans les données chargées, on le dit explicitement au
+    // lieu de retomber sur un contenu vide (aucun des blocs de rendu
+    // principal plus bas ne correspond à `ecran.nom === 'recu'`).
+    return (
+      <div className={classeRacine}>
+        <div className="omra-page">
+          <div className="omra-card">
+            <div className="omra-empty">
+              <strong>Reçu introuvable</strong>
+              <span>
+                Impossible de charger ce reçu pour l’impression. Aucun document
+                incomplet n’est affiché. Retournez au registre et réessayez.
+              </span>
+              <button className="omra-action primary" onClick={() => setEcran({ nom: 'registre' })}>
+                Retour au registre
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -401,7 +458,7 @@ export function ApplicationFacturation({
 
         <nav className="omra-nav" aria-label={T.navigation.recu}>
           <button
-            className={`omra-nav-item${ecran.nom === 'registre' || ecran.nom === 'recu' ? ' active' : ''}`}
+            className={`omra-nav-item${ecran.nom === 'registre' ? ' active' : ''}`}
             onClick={() => setEcran({ nom: 'registre' })}
           >
             {T.navigation.recu}
@@ -537,6 +594,7 @@ export function ApplicationFacturation({
       {ecran.nom === 'registre' && !aucuneSaison ? (
         <EcranRegistre
           recus={etat.recus}
+          chargement={chargementInitialRegistre}
           rechercheNom={rechercheNom}
           rechercheNumero={rechercheNumero}
           afficherAnnules={afficherAnnules}
@@ -858,7 +916,7 @@ export function ApplicationFacturation({
       {fenetre.type === 'annulation'
         ? (() => {
             const recu = recuParId(fenetre.recuId)
-            if (!recu) return null
+            if (!recu) return <MessageRecuIntrouvable onFermer={fermer} />
             return (
               <ModaleAnnulation
                 recu={recu}
@@ -880,7 +938,7 @@ export function ApplicationFacturation({
       {fenetre.type === 'modification'
         ? (() => {
             const recu = recuParId(fenetre.recuId)
-            if (!recu) return null
+            if (!recu) return <MessageRecuIntrouvable onFermer={fermer} />
             return (
               <ModaleModification
                 recu={recu}
@@ -908,7 +966,7 @@ export function ApplicationFacturation({
       {fenetre.type === 'detail'
         ? (() => {
             const recu = recuParId(fenetre.recuId)
-            if (!recu) return null
+            if (!recu) return <MessageRecuIntrouvable onFermer={fermer} />
             return (
               <ModaleDetail
                 recu={recu}
