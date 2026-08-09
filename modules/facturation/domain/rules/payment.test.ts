@@ -192,7 +192,7 @@ describe('instrument et opération partagée', () => {
         }),
       }),
       recuAvec(1),
-      { ...CONTEXTE, operations: [operation], recus: [] },
+      { ...CONTEXTE, operations: [operation], versements: [] },
     )
     expect(resultat.statut).toBe('confirmation-requise')
   })

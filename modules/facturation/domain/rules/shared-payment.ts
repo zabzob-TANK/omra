@@ -14,7 +14,18 @@
 
 import { centimesEnTexteDevise } from '../money'
 import { natureNormalisee } from '../payment-method'
-import type { OperationPartagee, Recu } from '../types'
+import type { OperationPartagee, Versement } from '../types'
+
+/**
+ * Décision de performance (2026-08-09) : ces trois fonctions n'ont jamais eu
+ * besoin que du couple `operationPartageeId`/`montantCentimes` d'un
+ * versement, jamais du reçu porteur — elles s'alimentaient d'un `Recu[]`
+ * complet uniquement parce qu'aucune source plus légère n'existait encore.
+ * `contexteCommun()` (service.ts) alimente désormais ce paramètre depuis
+ * `list_billing_season_payments`, jamais depuis un chargement complet de
+ * tous les reçus de la saison à chaque écriture.
+ */
+type VersementPourAllocation = Pick<Versement, 'operationPartageeId' | 'montantCentimes'>
 
 export interface EtatOperation {
   /** Montant total de l'opération, en centimes. */
@@ -34,12 +45,10 @@ export interface EtatOperation {
  * Les reçus annulés sont inclus, comme dans le fichier de référence : un
  * versement annulé reste rattaché à son opération.
  */
-export function totalAttribue(recus: readonly Recu[], operationId: string): number {
+export function totalAttribue(versements: readonly VersementPourAllocation[], operationId: string): number {
   let total = 0
-  for (const recu of recus) {
-    for (const versement of recu.versements) {
-      if (versement.operationPartageeId === operationId) total += versement.montantCentimes
-    }
+  for (const versement of versements) {
+    if (versement.operationPartageeId === operationId) total += versement.montantCentimes
   }
   return total
 }
@@ -50,10 +59,10 @@ export function totalAttribue(recus: readonly Recu[], operationId: string): numb
  */
 export function etatOperation(
   operation: Pick<OperationPartagee, 'id' | 'montantTotalCentimes'> | null,
-  recus: readonly Recu[],
+  versements: readonly VersementPourAllocation[],
 ): EtatOperation {
   const totalCentimes = operation ? operation.montantTotalCentimes : 0
-  const attribueCentimes = operation ? totalAttribue(recus, operation.id) : 0
+  const attribueCentimes = operation ? totalAttribue(versements, operation.id) : 0
   return {
     totalCentimes,
     attribueCentimes,
@@ -80,7 +89,7 @@ export interface OptionOperation {
  */
 export function optionsOperations(
   operations: readonly OperationPartagee[],
-  recus: readonly Recu[],
+  versements: readonly VersementPourAllocation[],
   nature: string,
   idSelectionne = '',
 ): OptionOperation[] {
@@ -89,7 +98,7 @@ export function optionsOperations(
   return operations
     .filter((operation) => natureNormalisee(operation.nature) === natureCible)
     .filter((operation) => operation.statut !== 'archived')
-    .map((operation) => ({ operation, etat: etatOperation(operation, recus) }))
+    .map((operation) => ({ operation, etat: etatOperation(operation, versements) }))
     .filter((x) => x.etat.restantCentimes > 0 || x.operation.id === idSelectionne)
     .sort((a, b) => String(b.operation.creeeLe).localeCompare(String(a.operation.creeeLe)))
     .map((x) => ({

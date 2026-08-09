@@ -21,6 +21,7 @@ import type {
   Recu,
   SectionModifiable,
   Tarif,
+  Versement,
 } from '../types'
 import {
   erreur,
@@ -170,7 +171,12 @@ export interface ContexteModification {
    * montant alloué.
    */
   operations: readonly OperationPartagee[]
-  recus: readonly Recu[]
+  /**
+   * Décision de performance (2026-08-09) : tous les versements de la saison,
+   * à plat — seul `operationPartageeId`/`montantCentimes` est nécessaire ici
+   * (`etatOperation`), jamais un `Recu[]` complet.
+   */
+  versements: readonly Pick<Versement, 'operationPartageeId' | 'montantCentimes'>[]
   /** R-32 — confirmation explicite d'un dépassement d'opération partagée. */
   depassementConfirme?: boolean
 }
@@ -444,7 +450,7 @@ export function preparerModification(
         const disponibleCentimes = dejaPartage
           ? (() => {
               const operation = contexte.operations.find((o) => o.id === operationPartageeId)
-              const restant = operation ? etatOperation(operation, contexte.recus).restantCentimes : 0
+              const restant = operation ? etatOperation(operation, contexte.versements).restantCentimes : 0
               return restant + premier.montantCentimes
             })()
           : montantOperationCentimes

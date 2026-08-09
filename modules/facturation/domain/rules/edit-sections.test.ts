@@ -22,7 +22,7 @@ const CONTEXTE = {
   horodatage: '03/08/2026 10:00',
   employe: 'موظف',
   operations: [],
-  recus: [],
+  versements: [],
 }
 
 const recu = unRecu({
@@ -336,7 +336,7 @@ describe('R-53 — section premier versement', () => {
       ...CONTEXTE,
       estAdministrateur: true,
       operations: [operation],
-      recus: [recuPartage],
+      versements: recuPartage.versements,
     }
 
     // Disponible avant correction : 1 200 000 - 1 000 000 (déjà alloué) = 200 000.

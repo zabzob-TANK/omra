@@ -95,11 +95,13 @@ export function BlocInstrument({
   // R-23
   const changerNature = (valeur: string) => onChange(instrumentPourNature(valeur))
 
-  // R-31
-  const options = optionsOperations(operations, recus, saisie.nature, saisie.operationId)
+  // R-31 — `optionsOperations` n'a besoin que des versements, jamais des
+  // reçus qui les portent (décision de performance du 2026-08-09).
+  const versements = recus.flatMap((r) => r.versements)
+  const options = optionsOperations(operations, versements, saisie.nature, saisie.operationId)
   const operationChoisie = operations.find((o) => o.id === saisie.operationId) ?? null
   const etatChoisi = operationChoisie
-    ? optionsOperations(operations, recus, saisie.nature, saisie.operationId).find(
+    ? optionsOperations(operations, versements, saisie.nature, saisie.operationId).find(
         (o) => o.id === saisie.operationId,
       )?.etat
     : null

@@ -8,7 +8,7 @@ import { NATURE_ESPECES } from '../constants'
 import { dateFrValide } from '../dates'
 import { dirhamsSaisisEnCentimes } from '../money'
 import { natureNormalisee } from '../payment-method'
-import type { OperationPartagee, Recu } from '../types'
+import type { OperationPartagee, Versement } from '../types'
 import type { ErreurValidation } from './errors'
 import { etatOperation } from './shared-payment'
 
@@ -109,7 +109,13 @@ export interface InstrumentPrepare {
 
 export interface ContextePreparation {
   operations: readonly OperationPartagee[]
-  recus: readonly Recu[]
+  /**
+   * Décision de performance (2026-08-09) : tous les versements de la saison,
+   * à plat (`list_billing_season_payments`) — seul le couple
+   * `operationPartageeId`/`montantCentimes` est nécessaire ici
+   * (`etatOperation`), jamais un `Recu[]` complet.
+   */
+  versements: readonly Pick<Versement, 'operationPartageeId' | 'montantCentimes'>[]
   /** Identifiant à donner à une nouvelle opération. */
   nouvelIdOperation: () => string
   /** Horodatage de création. */
@@ -149,7 +155,7 @@ export function preparerInstrument(
   if (saisie.sourceOperation === 'existing') {
     const operation = contexte.operations.find((o) => o.id === saisie.operationId)
     if (!operation) return null
-    const etat = etatOperation(operation, contexte.recus)
+    const etat = etatOperation(operation, contexte.versements)
     return {
       portee: 'shared',
       reference: operation.reference || '',

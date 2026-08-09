@@ -235,7 +235,7 @@ describe('R-32 — dépassement d’une opération partagée à la création', (
       ],
     }),
   ]
-  const contexte = { ...CONTEXTE, operations: [operation], recus }
+  const contexte = { ...CONTEXTE, operations: [operation], versements: recus.flatMap((r) => r.versements) }
   const avecOperation = saisie({
     premierVersement: '10000',
     instrument: saisieCheque({

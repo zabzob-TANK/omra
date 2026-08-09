@@ -122,7 +122,7 @@ describe('R-27 — rattachement à une opération existante', () => {
   it('reprend les données de l’opération et son restant comme disponible', () => {
     const instrument = preparerInstrument(
       saisieCheque({ portee: 'shared', sourceOperation: 'existing', operationId: operation.id }),
-      { ...CONTEXTE_PREPARATION, operations: [operation], recus },
+      { ...CONTEXTE_PREPARATION, operations: [operation], versements: recus.flatMap((r) => r.versements) },
     )!
     expect(instrument.reference).toBe(operation.reference)
     expect(instrument.banque).toBe(operation.banque)
@@ -135,7 +135,7 @@ describe('R-27 — rattachement à une opération existante', () => {
   it('renvoie null quand l’opération désignée n’existe pas', () => {
     const instrument = preparerInstrument(
       saisieCheque({ portee: 'shared', sourceOperation: 'existing', operationId: 'inconnue' }),
-      { ...CONTEXTE_PREPARATION, operations: [operation], recus },
+      { ...CONTEXTE_PREPARATION, operations: [operation], versements: recus.flatMap((r) => r.versements) },
     )
     expect(instrument).toBeNull()
   })

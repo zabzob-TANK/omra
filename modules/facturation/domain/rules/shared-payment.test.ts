@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { unRecu, uneOperation, unVersement } from './fixtures'
+import { unVersement, uneOperation } from './fixtures'
 import {
   depasseLeRestant,
   detecteLesDoublons,
@@ -11,40 +11,39 @@ import {
 
 const operation = uneOperation({ id: 'SOP-1', montantTotalCentimes: 5000000 })
 
-function recuAvecPart(id: string, montant: number, operationId = 'SOP-1') {
-  return unRecu({
-    id,
-    versements: [
-      unVersement({ id: `v-${id}`, montantCentimes: montant, portee: 'shared', operationPartageeId: operationId }),
-    ],
-  })
+/**
+ * Décision de performance (2026-08-09) : `totalAttribue`/`etatOperation`
+ * n'ont jamais eu besoin du reçu porteur, seulement du versement — ce
+ * constructeur ne fabrique donc plus qu'un versement, jamais un `Recu` entier.
+ */
+function versementPart(id: string, montant: number, operationId = 'SOP-1') {
+  return unVersement({ id: `v-${id}`, montantCentimes: montant, portee: 'shared', operationPartageeId: operationId })
 }
 
 describe('R-29 — total attribué à une opération', () => {
   it('additionne les parts de plusieurs reçus', () => {
-    const recus = [recuAvecPart('a', 2500000), recuAvecPart('b', 1500000)]
-    expect(totalAttribue(recus, 'SOP-1')).toBe(4000000)
+    const versements = [versementPart('a', 2500000), versementPart('b', 1500000)]
+    expect(totalAttribue(versements, 'SOP-1')).toBe(4000000)
   })
 
   it('ignore les versements rattachés à une autre opération', () => {
-    const recus = [recuAvecPart('a', 2500000), recuAvecPart('b', 1500000, 'SOP-2')]
-    expect(totalAttribue(recus, 'SOP-1')).toBe(2500000)
+    const versements = [versementPart('a', 2500000), versementPart('b', 1500000, 'SOP-2')]
+    expect(totalAttribue(versements, 'SOP-1')).toBe(2500000)
   })
 
   it('ignore les versements non partagés', () => {
-    const recus = [recuAvecPart('a', 2500000), unRecu({ id: 'c' })]
-    expect(totalAttribue(recus, 'SOP-1')).toBe(2500000)
+    const versements = [versementPart('a', 2500000), unVersement({ id: 'v-c', operationPartageeId: '' })]
+    expect(totalAttribue(versements, 'SOP-1')).toBe(2500000)
   })
 
-  it('inclut les parts d’un reçu annulé — elles restent rattachées', () => {
-    const annule = { ...recuAvecPart('a', 2500000), statut: 'ملغى' as const }
-    expect(totalAttribue([annule], 'SOP-1')).toBe(2500000)
+  it('inclut les parts d’un reçu annulé — elles restent rattachées (le versement ne porte pas le statut)', () => {
+    expect(totalAttribue([versementPart('a', 2500000)], 'SOP-1')).toBe(2500000)
   })
 })
 
 describe('R-30 — restant d’une opération', () => {
   it('vaut le total moins l’attribué', () => {
-    const etat = etatOperation(operation, [recuAvecPart('a', 2000000)])
+    const etat = etatOperation(operation, [versementPart('a', 2000000)])
     expect(etat.totalCentimes).toBe(5000000)
     expect(etat.attribueCentimes).toBe(2000000)
     expect(etat.restantCentimes).toBe(3000000)
@@ -55,7 +54,7 @@ describe('R-30 — restant d’une opération', () => {
   })
 
   it('devient négatif après un dépassement confirmé — l’écart est conservé', () => {
-    const etat = etatOperation(operation, [recuAvecPart('a', 6000000)])
+    const etat = etatOperation(operation, [versementPart('a', 6000000)])
     expect(etat.restantCentimes).toBe(-1000000)
   })
 
@@ -87,14 +86,14 @@ describe('R-31 — opérations proposées', () => {
   })
 
   it('exclut les opérations entièrement attribuées', () => {
-    const recus = [recuAvecPart('a', 5000000, 'V-1')]
-    const options = optionsOperations(toutes, recus, 'تحويل بنكي')
+    const versements = [versementPart('a', 5000000, 'V-1')]
+    const options = optionsOperations(toutes, versements, 'تحويل بنكي')
     expect(options.map((o) => o.id)).toEqual(['V-2'])
   })
 
   it('conserve l’opération déjà sélectionnée même sans restant', () => {
-    const recus = [recuAvecPart('a', 5000000, 'V-1')]
-    const options = optionsOperations(toutes, recus, 'تحويل بنكي', 'V-1')
+    const versements = [versementPart('a', 5000000, 'V-1')]
+    const options = optionsOperations(toutes, versements, 'تحويل بنكي', 'V-1')
     expect(options.map((o) => o.id)).toContain('V-1')
   })
 
