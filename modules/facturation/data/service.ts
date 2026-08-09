@@ -1215,6 +1215,8 @@ export interface LigneRegistre {
 }
 
 export interface AttributionAffichee {
+  /** Identifiant du versement — un reçu peut porter plusieurs versements attribués à la même opération partagée. */
+  versementId: string
   numeroRecu: number
   client: string
   montant: string
@@ -1416,6 +1418,7 @@ async function construireDetail(
     ajoutPossible: !operation.image,
     // R-76 — répartition entre les reçus, avec la situation de chacun.
     attributions: operation.attributions.map((attribution) => ({
+      versementId: attribution.versementId,
       numeroRecu: attribution.numeroRecu,
       client: attribution.client,
       montant: centimesEnTexteDevise(attribution.montantCentimes),

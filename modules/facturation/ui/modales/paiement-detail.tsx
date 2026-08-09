@@ -173,7 +173,7 @@ export function ModalePaiementDetail({
               </thead>
               <tbody>
                 {detail.attributions.map((attribution) => (
-                  <tr key={`${attribution.numeroRecu}-${attribution.client}`}>
+                  <tr key={attribution.versementId}>
                     <td className="mono-ltr">{attribution.numeroRecu}</td>
                     <td className="cheque-rtl">{attribution.client}</td>
                     <td className="cheque-montant">{attribution.montant}</td>
