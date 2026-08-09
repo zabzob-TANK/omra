@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import type { EtatFacturation } from '../data/service'
 import type { SaisieAnnulation } from '../domain/rules/cancellation'
 import type { SaisieNouveauRecu } from '../domain/rules/create-receipt'
-import type { SaisieModification } from '../domain/rules/edit-sections'
+import type { ResultatModification, SaisieModification } from '../domain/rules/edit-sections'
 import type { Resultat } from '../domain/rules/errors'
 import { messageErreur } from '../domain/rules/errors'
 import type { SaisieVersement } from '../domain/rules/payment'
@@ -136,6 +136,15 @@ export interface ActionsFacturation {
     saisie: SaisieModification,
     confirme: boolean,
   ) => Promise<Resultat<null>>
+  /**
+   * Précision du commanditaire (2026-08-09) : lecture fraîche pour la fiche
+   * avant/après (`ModaleRecapitulatif`) — n'écrit jamais.
+   */
+  previsualiserModification: (
+    recuId: string,
+    saisie: SaisieModification,
+    confirme: boolean,
+  ) => Promise<Resultat<{ avant: Recu; resultat: ResultatModification }>>
   enregistrerImpression: (recuId: string) => Promise<Resultat<null>>
   /**
    * Câblage ajouté le 2026-08-09 : détail des modifications d'un reçu
@@ -979,6 +988,9 @@ export function ApplicationFacturation({
                 }}
                 estAdministrateur={estAdministrateur}
                 onFermer={fermer}
+                onPrevisualiser={(saisie, confirme) =>
+                  actions.previsualiserModification(recu.id, saisie, confirme)
+                }
                 onEnregistrer={async (saisie, confirme) => {
                   const resultat = await actions.modifierRecu(recu.id, saisie, confirme)
                   if (resultat.statut === 'ok') {

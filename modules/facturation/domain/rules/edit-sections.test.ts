@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  apercuApresModification,
   CHAMPS_NON_MODIFIABLES,
   consignerChangement,
   LIBELLES_SECTIONS,
@@ -509,5 +510,56 @@ describe('sections identité, contact et groupe', () => {
       CONTEXTE,
     )
     expect(resultat.statut === 'ok' && resultat.valeur.champsModifies.groupe).toBe('')
+  })
+})
+
+describe('apercuApresModification — récapitulatif avant validation (2026-08-09)', () => {
+  it('applique les champs modifiés sur une copie du reçu, sans toucher le reçu avant', () => {
+    const resultat = preparerModification(
+      saisie({ section: 'identity', prenom: 'جديد', nom: 'اسم' }),
+      recu,
+      CONTEXTE,
+    )
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut !== 'ok') return
+    const apres = apercuApresModification(recu, resultat.valeur)
+    expect(apres.prenom).toBe('جديد')
+    expect(apres.nom).toBe('اسم')
+    // Le reçu source ne doit jamais être muté par l'aperçu.
+    expect(recu.prenom).not.toBe('جديد')
+    // Tout le reste de la fiche est repris à l'identique — pas seulement les
+    // champs touchés (précision du commanditaire : « toutes les informations,
+    // y compris celles qui ne changent pas »).
+    expect(apres.telephone).toBe(recu.telephone)
+    expect(apres.hotel).toBe(recu.hotel)
+    expect(apres.versements).toBe(recu.versements)
+  })
+
+  it('remplace uniquement le versement ciblé, laisse les autres strictement intacts', () => {
+    const recuDeuxVersements = unRecu({
+      convenuCentimes: 2600000,
+      versements: [
+        unVersement({ rang: 1, montantCentimes: 1000000 }),
+        unVersement({ rang: 2, montantCentimes: 500000 }),
+      ],
+    })
+    const resultat = preparerModification(
+      saisie({
+        section: 'firstPayment',
+        rangVersementCorrige: 2,
+        nature: 'نقد',
+        montant: '6000',
+      }),
+      recuDeuxVersements,
+      { ...CONTEXTE, estAdministrateur: true },
+    )
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut !== 'ok') return
+    const apres = apercuApresModification(recuDeuxVersements, resultat.valeur)
+    const versementDeux = apres.versements.find((v) => v.rang === 2)
+    const versementUn = apres.versements.find((v) => v.rang === 1)
+    expect(versementDeux?.montantCentimes).toBe(600000)
+    // Le versement 1 (non ciblé) reste le même objet, jamais reconstruit.
+    expect(versementUn).toBe(recuDeuxVersements.versements[0])
   })
 })

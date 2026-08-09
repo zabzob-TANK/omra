@@ -570,6 +570,44 @@ export function preparerModification(
 }
 
 /**
+ * Précision du commanditaire (2026-08-09) : avant d'enregistrer une
+ * modification, l'écran doit montrer la fiche complète du reçu telle
+ * qu'elle sera APRÈS — pas seulement la liste des champs touchés. Construit
+ * cet « après » en appliquant `ResultatModification` sur le reçu `avant`,
+ * sans écriture : pure fonction du domaine, réutilisable pour un aperçu côté
+ * client comme pour toute autre projection future.
+ *
+ * Pour `firstPayment`, seul le versement ciblé (`rang`) est remplacé — les
+ * autres versements et leur instantané figé restent strictement identiques,
+ * comme à l'écriture réelle (aucune cascade, voir la RPC correspondante).
+ */
+export function apercuApresModification(recu: Recu, resultat: ResultatModification): Recu {
+  if (resultat.premierVersementCorrige) {
+    const { versement } = resultat.premierVersementCorrige
+    return {
+      ...recu,
+      versements: recu.versements.map((courant) =>
+        courant.rang === versement.rang
+          ? {
+              ...courant,
+              montantCentimes: versement.montantCentimes,
+              nature: versement.nature,
+              referenceInstrument: versement.referenceInstrument,
+              dateInstrument: versement.dateInstrument,
+              banque: versement.banque,
+              portee: versement.portee,
+              operationPartageeId: versement.operationPartageeId,
+              payeur: versement.payeur,
+              montantOperationCentimes: versement.montantOperationCentimes,
+            }
+          : courant,
+      ),
+    }
+  }
+  return { ...recu, ...resultat.champsModifies }
+}
+
+/**
  * R-54, R-55 — Champs et versements jamais modifiables, quel que soit le rôle.
  *
  * Rendus explicites pour être testables et pour que l'interface les grise sans

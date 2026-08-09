@@ -12,11 +12,11 @@ import { requireActiveAccount } from '@/lib/admin-guard'
 import type { FiltresRegistre } from '@/modules/facturation/domain/rules/cheque-register'
 import type { SaisieAnnulation } from '@/modules/facturation/domain/rules/cancellation'
 import type { SaisieNouveauRecu } from '@/modules/facturation/domain/rules/create-receipt'
-import type { SaisieModification } from '@/modules/facturation/domain/rules/edit-sections'
+import type { ResultatModification, SaisieModification } from '@/modules/facturation/domain/rules/edit-sections'
 import type { Resultat } from '@/modules/facturation/domain/rules/errors'
 import type { PeriodeFinance } from '@/modules/facturation/domain/rules/finance-day'
 import type { SaisieVersement } from '@/modules/facturation/domain/rules/payment'
-import type { Modification, Utilisateur } from '@/modules/facturation/domain/types'
+import type { Modification, Recu, Utilisateur } from '@/modules/facturation/domain/types'
 import {
   acquitterAnomalies,
   ajouterImageDernierVersement,
@@ -33,6 +33,7 @@ import {
   historiqueRecu,
   journalFinancier,
   modifierRecu,
+  previsualiserModification,
   registreBancaire,
   suiviJournalier,
   supprimerImageOperation,
@@ -98,6 +99,19 @@ export async function ajouterVersementAction(
 export async function annulerRecuAction(recuId: string, saisie: SaisieAnnulation): Promise<Resultat<null>> {
   await requireActiveAccount()
   return annulerRecu(recuId, saisie)
+}
+
+/**
+ * Précision du commanditaire (2026-08-09) : lecture fraîche pour le
+ * récapitulatif avant/après (`ModaleRecapitulatif`) — n'écrit jamais.
+ */
+export async function previsualiserModificationAction(
+  recuId: string,
+  saisie: SaisieModification,
+  confirme = false,
+): Promise<Resultat<{ avant: Recu; resultat: ResultatModification }>> {
+  await requireActiveAccount()
+  return previsualiserModification(recuId, saisie, confirme)
 }
 
 export async function modifierRecuAction(

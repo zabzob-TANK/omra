@@ -81,7 +81,7 @@ import type { SaisieVersement } from '../domain/rules/payment'
 import { preparerVersement } from '../domain/rules/payment'
 import type { SaisieAnnulation } from '../domain/rules/cancellation'
 import { preparerAnnulation } from '../domain/rules/cancellation'
-import type { SaisieModification } from '../domain/rules/edit-sections'
+import type { ResultatModification, SaisieModification } from '../domain/rules/edit-sections'
 import { preparerModification } from '../domain/rules/edit-sections'
 import { centimesEnTexteDevise } from '../domain/money'
 import { estWeekEnd } from '../domain/dates'
@@ -528,12 +528,24 @@ export async function annulerRecu(
   return ok(null)
 }
 
-/** R-49 à R-55 — Modifie une seule section d'un reçu. */
-export async function modifierRecu(
+/**
+ * Partie commune à `previsualiserModification` et `modifierRecu` : lecture
+ * fraîche de la saison/du reçu (jamais l'état déjà en mémoire côté écran,
+ * qui peut dater de plusieurs secondes) puis validation pure du domaine.
+ * N'écrit jamais — `modifierRecu` seul poursuit vers l'écriture.
+ */
+async function construireApercuModification(
   recuId: string,
   saisie: SaisieModification,
-  depassementConfirme = false,
-): Promise<Resultat<null>> {
+  depassementConfirme: boolean,
+): Promise<
+  Resultat<{
+    source: SourceDonnees
+    base: Awaited<ReturnType<typeof contexteCommun>>
+    recu: Recu
+    resultat: ResultatModification
+  }>
+> {
   const source = sourceDonnees()
   let base: Awaited<ReturnType<typeof contexteCommun>>
   try {
@@ -562,8 +574,39 @@ export async function modifierRecu(
   })
   if (resultat.statut !== 'ok') return resultat
 
+  return ok({ source, base, recu, resultat: resultat.valeur })
+}
+
+/**
+ * Précision du commanditaire (2026-08-09) : avant d'enregistrer, l'écran
+ * doit montrer la fiche complète du reçu — avant/après, tous les champs, pas
+ * seulement ceux touchés. Lecture fraîche, exactement comme `modifierRecu` :
+ * l'aperçu ne peut jamais accepter quelque chose que l'écriture réelle
+ * refuserait. N'écrit jamais ; `apercuApresModification` (domaine) construit
+ * la fiche « après » à partir du reçu frais et du résultat validé.
+ */
+export async function previsualiserModification(
+  recuId: string,
+  saisie: SaisieModification,
+  depassementConfirme = false,
+): Promise<Resultat<{ avant: Recu; resultat: ResultatModification }>> {
+  const prepare = await construireApercuModification(recuId, saisie, depassementConfirme)
+  if (prepare.statut !== 'ok') return prepare
+  return ok({ avant: prepare.valeur.recu, resultat: prepare.valeur.resultat })
+}
+
+/** R-49 à R-55 — Modifie une seule section d'un reçu. */
+export async function modifierRecu(
+  recuId: string,
+  saisie: SaisieModification,
+  depassementConfirme = false,
+): Promise<Resultat<null>> {
+  const prepare = await construireApercuModification(recuId, saisie, depassementConfirme)
+  if (prepare.statut !== 'ok') return prepare
+  const { source, base, recu, resultat } = prepare.valeur
+
   const { section, sectionLibelle, motif, changements, champsModifies, premierVersementCorrige } =
-    resultat.valeur
+    resultat
 
   const modification: Modification = {
     id: source.identifiants.nouvelId('modification'),

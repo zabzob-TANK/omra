@@ -17,8 +17,10 @@ import { formaterDate, formaterMontant, formaterTelephone, nettoyerArabe } from 
 import { centimesEnDirhamsSaisis, dirhamsSaisisEnCentimes } from '../../domain/money'
 import type { ErreurValidation, Resultat } from '../../domain/rules/errors'
 import {
+  apercuApresModification,
   LIBELLES_SECTIONS,
   versementModifiable,
+  type ResultatModification,
   type SaisieModification,
 } from '../../domain/rules/edit-sections'
 import { totalPaye } from '../../domain/rules/receipt'
@@ -27,6 +29,7 @@ import type { Recu, SectionModifiable, Tarif, Versement } from '../../domain/typ
 import { CaseACocher, Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
 import { Dialogue } from '../dialogue'
 import { ModaleDepassement } from './depassement'
+import { ModaleRecapitulatif } from './recapitulatif'
 import { Montant, TexteArabe } from '../bidi'
 import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
@@ -52,6 +55,16 @@ interface Proprietes {
   /** §5.9 — seul un administrateur peut corriger le montant du 1er versement. */
   estAdministrateur: boolean
   onFermer: () => void
+  /**
+   * Précision du commanditaire (2026-08-09) : avant d'écrire, l'écran doit
+   * montrer la fiche complète avant/après (voir `ModaleRecapitulatif`) —
+   * jamais écrire directement depuis le formulaire. Lecture fraîche côté
+   * service, jamais l'état déjà en mémoire ici.
+   */
+  onPrevisualiser: (
+    saisie: SaisieModification,
+    confirme: boolean,
+  ) => Promise<Resultat<{ avant: Recu; resultat: ResultatModification }>>
   onEnregistrer: (saisie: SaisieModification, confirme: boolean) => Promise<Resultat<null>>
 }
 
@@ -109,6 +122,7 @@ export function ModaleModification({
   referentiels,
   estAdministrateur,
   onFermer,
+  onPrevisualiser,
   onEnregistrer,
 }: Proprietes) {
   const [saisie, setSaisie] = useState<SaisieModification>(saisieInitiale(recu))
@@ -117,6 +131,15 @@ export function ModaleModification({
   const [depassement, setDepassement] = useState<{ montant: number; disponible: number } | null>(
     null,
   )
+  // Précision du commanditaire (2026-08-09) : avant d'écrire, la fiche
+  // complète avant/après s'affiche pour validation. `apercu.avant` est la
+  // lecture fraîche renvoyée par le service (jamais `recu`, potentiellement
+  // périmé) ; `depassementConfirmePourEcriture` reprend, au moment d'écrire
+  // pour de vrai, le drapeau R-32 déjà confirmé pendant l'aperçu.
+  const [apercu, setApercu] = useState<{ avant: Recu; resultat: ResultatModification } | null>(
+    null,
+  )
+  const [depassementConfirmePourEcriture, setDepassementConfirmePourEcriture] = useState(false)
 
   const modifier = (patch: Partial<SaisieModification>) => setSaisie({ ...saisie, ...patch })
   const section = saisie.section
@@ -132,9 +155,9 @@ export function ModaleModification({
   const reductionCentimes = dirhamsSaisisEnCentimes(saisie.reduction)
   const convenu = tarif === null ? null : montantConvenu(tarif, reductionCentimes)
 
-  const soumettre = async (confirme: boolean) => {
+  const previsualiser = async (confirme: boolean) => {
     setEnvoi(true)
-    const resultat = await onEnregistrer(saisie, confirme)
+    const resultat = await onPrevisualiser(saisie, confirme)
     setEnvoi(false)
     if (resultat.statut === 'erreurs') {
       setErreurs(resultat.erreurs)
@@ -149,7 +172,10 @@ export function ModaleModification({
       })
       return
     }
-    onFermer()
+    setErreurs([])
+    setDepassement(null)
+    setDepassementConfirmePourEcriture(confirme)
+    setApercu(resultat.valeur)
   }
 
   if (depassement) {
@@ -158,7 +184,33 @@ export function ModaleModification({
         montantCentimes={depassement.montant}
         disponibleCentimes={depassement.disponible}
         onRetour={() => setDepassement(null)}
-        onConfirmer={() => soumettre(true)}
+        onConfirmer={() => previsualiser(true)}
+      />
+    )
+  }
+
+  if (apercu) {
+    return (
+      <ModaleRecapitulatif
+        avant={apercu.avant}
+        apres={apercuApresModification(apercu.avant, apercu.resultat)}
+        resultat={apercu.resultat}
+        onRetour={() => setApercu(null)}
+        onConfirmer={async () => {
+          const resultat = await onEnregistrer(saisie, depassementConfirmePourEcriture)
+          if (resultat.statut === 'ok') {
+            onFermer()
+            return resultat
+          }
+          if (resultat.statut === 'confirmation-requise') {
+            // N'est pas censé survenir : le dépassement a déjà été confirmé
+            // pendant l'aperçu (`depassementConfirmePourEcriture`). Un état a
+            // changé entre l'aperçu et l'écriture réelle (concurrence) —
+            // filet honnête plutôt qu'une confirmation ré-ouverte à ce stade.
+            return { statut: 'erreurs', erreurs: [{ champ: 'section', code: 'erreur-inattendue' }] }
+          }
+          return resultat
+        }}
       />
     )
   }
@@ -200,7 +252,7 @@ export function ModaleModification({
             {T.versement.annuler}
           </button>
           {section ? (
-            <button className="omra-btn primary" onClick={() => soumettre(false)} disabled={envoi}>
+            <button className="omra-btn primary" onClick={() => previsualiser(false)} disabled={envoi}>
               {envoi ? <IndicateurChargement /> : null}
               {T.modification.enregistrer}
             </button>

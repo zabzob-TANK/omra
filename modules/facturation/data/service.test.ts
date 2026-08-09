@@ -16,6 +16,7 @@ import {
   enregistrerImpressionFinance,
   journalFinancier,
   modifierRecu,
+  previsualiserModification,
   registreBancaire,
   suiviJournalier,
   ajouterImageOperation,
@@ -244,6 +245,71 @@ describe('R-86 — journal d’audit', () => {
     const etat = await chargerEtat()
     expect(etat.audit[0].action).toBe('تعديل')
     expect(etat.audit[0].detail).toContain('précision demandée')
+  })
+})
+
+describe('previsualiserModification — récapitulatif avant validation (2026-08-09)', () => {
+  it('renvoie la fiche complète avant/après sans rien écrire', async () => {
+    const cree = await creerRecu(nouveauRecu(), false)
+    if (cree.statut !== 'ok') throw new Error('création refusée')
+    const audit_avant = (await chargerEtat()).audit.length
+
+    const apercu = await previsualiserModification(cree.valeur.recuId, {
+      section: 'identity',
+      motif: 'correction orthographe',
+      prenom: 'منى',
+      nom: 'السوسي',
+      telephone: '0611-22.33.44',
+      hotel: 'منار الشروق',
+      vol: 'الخطوط السعودية',
+      chambre: '4',
+      reduction: '0',
+      groupeCoche: false,
+      groupe: '',
+      note: '',
+      nature: 'نقد',
+      reference: '',
+      dateInstrument: '',
+      banque: '',
+      operationPartagee: false,
+      payeur: '',
+      montantOperation: '',
+      montant: '',
+      rangVersementCorrige: 1,
+    })
+    expect(apercu.statut).toBe('ok')
+    if (apercu.statut !== 'ok') return
+    expect(apercu.valeur.avant.prenom).toBe('نورة')
+    expect(apercu.valeur.resultat.champsModifies.prenom).toBe('منى')
+
+    // Rien n'a été écrit : le reçu réel garde son prénom d'origine.
+    const etat = await chargerEtat()
+    const recu = etat.recus.find((r) => r.id === cree.valeur.recuId)
+    expect(recu?.prenom).toBe('نورة')
+    // Aucune nouvelle trace : l'aperçu n'a rien écrit.
+    expect(etat.audit).toHaveLength(audit_avant)
+  })
+
+  it('reflète, pour un versement ciblé, un aperçu cohérent avec ce que modifierRecu écrirait ensuite', async () => {
+    const cree = await creerRecu(nouveauRecu({ premierVersement: '12000' }), false)
+    if (cree.statut !== 'ok') throw new Error('création refusée')
+
+    await connecter('3', '3')
+    const apercu = await previsualiserModification(
+      cree.valeur.recuId,
+      saisieFirstPayment({ montant: '9000' }),
+    )
+    expect(apercu.statut).toBe('ok')
+    if (apercu.statut !== 'ok') return
+    const versementApres = apercu.valeur.resultat.premierVersementCorrige?.versement
+    expect(versementApres?.montantCentimes).toBe(900000)
+
+    // La même saisie, appliquée pour de vrai, produit le même résultat.
+    const resultat = await modifierRecu(cree.valeur.recuId, saisieFirstPayment({ montant: '9000' }))
+    expect(resultat.statut).toBe('ok')
+    const etat = await chargerEtat()
+    const recu = etat.recus.find((r) => r.id === cree.valeur.recuId)
+    expect(recu?.versements[0].montantCentimes).toBe(900000)
   })
 })
 

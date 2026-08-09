@@ -540,6 +540,25 @@ export const T = {
     changerVersement: 'تغيير الدفعة المختارة',
   },
 
+  /**
+   * Précision du commanditaire (2026-08-09) : avant d'enregistrer une
+   * modification, la fiche complète du reçu s'affiche deux fois côte à
+   * côte — état actuel et état après — plutôt qu'une simple liste des
+   * champs touchés. Vaut pour toutes les modifications sans exception.
+   */
+  recapitulatif: {
+    titre: 'مراجعة قبل الحفظ',
+    consigne: 'قارن الحالتين، ثم أكّد الحفظ أو ارجع لتعديل الإدخال.',
+    etatActuel: 'الحالة الحالية',
+    etatApres: 'بعد التعديل',
+    retour: 'رجوع للتعديل',
+    confirmer: 'تأكيد الحفظ',
+    prenom: 'الاسم',
+    nom: 'النسب',
+    montant: 'المبلغ',
+    aucun: '—',
+  },
+
   /** Bande « passeport lié » du formulaire de création. */
   /** Aperçu du prix dans le formulaire de création — texte exact du fichier. */
   prixIndefini: 'لا يوجد ثمن محدّد لهذا الاختيار في هذا الموسم.',
