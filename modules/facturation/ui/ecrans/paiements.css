@@ -420,6 +420,12 @@
   margin-bottom: 4px;
 }
 
+/* Référence connue en base mais fichier introuvable dans le stockage —
+   distinct visuellement de « aucune image » (jamais déposée). */
+.cheque-scene-erreur strong {
+  color: var(--danger, #b3261e);
+}
+
 .cheque-actions-image {
   display: flex;
   align-items: center;

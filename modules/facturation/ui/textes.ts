@@ -251,6 +251,14 @@ export const T = {
     sousTitre: (date: string) =>
       `Enregistré à l’agence le ${date} · l’heure reste utilisée uniquement pour le classement`,
     sansImage: 'Aucune image associée',
+    /**
+     * Distinct de `sansImage` : une référence existe en base (déposée le...,
+     * par...) mais le fichier est introuvable dans le stockage — jamais
+     * confondu avec « aucune image n'a jamais été déposée ». Seul un
+     * administrateur peut la supprimer pour libérer la place d'un nouvel
+     * envoi (le bouton Supprimer reste visible dans ce cas).
+     */
+    imageIntrouvable: 'Image introuvable — le fichier n’a pas pu être chargé depuis le stockage',
     ajouterImage: '+ Ajouter une image',
     imageAjoutee: (date: string, auteur: string) => `Image ajoutée le ${date} par ${auteur}`,
     supprimerImage: 'Supprimer l’image',

@@ -267,13 +267,13 @@ export async function chargerEtat(): Promise<EtatFacturation> {
 
   const imagesOperations: Record<string, string> = {}
   for (const operation of operations) {
-    if (operation.image) imagesOperations[operation.id] = await source.fichiers.url(operation.image)
+    if (operation.image) imagesOperations[operation.id] = await urlImage(source, operation.image)
   }
 
   const portraitsPasseport: Record<string, string> = {}
   for (const recu of recus) {
     const portrait = recu.passeport?.imagePortrait
-    if (portrait) portraitsPasseport[recu.id] = await source.fichiers.url(portrait)
+    if (portrait) portraitsPasseport[recu.id] = await urlImage(source, portrait)
   }
 
   return {
@@ -1243,6 +1243,14 @@ export interface DetailOperationBancaire {
   clients: string
   recus: string
   image: string
+  /**
+   * Vrai quand une référence d'image existe en base pour cette opération
+   * mais que le fichier n'a pas pu être chargé depuis le stockage — distinct
+   * de « aucune image » (jamais déposée). Seul un administrateur peut la
+   * supprimer (voir `suppressionPossible`, déjà indépendant de ce champ) pour
+   * libérer la place d'un nouvel envoi.
+   */
+  imageIntrouvable: boolean
   alternativeImage: string
   texteSansImage: string
   imageDeposeeLe: string
@@ -1274,12 +1282,26 @@ async function operationsBancaires(source: SourceDonnees): Promise<OperationBanc
   return collecterOperationsBancaires(versementsSaison, operations)
 }
 
+/**
+ * Résolution sûre d'une URL de justificatif : une image ORPHELINE (référence
+ * connue en base, fichier introuvable dans le stockage — bucket vidé,
+ * dépôt jamais finalisé, etc.) ne doit jamais faire planter l'écran qui
+ * l'affiche (règle absolue). `''` couvre alors deux cas distingués par
+ * l'appelant via la présence de la référence elle-même : « aucune image »
+ * (`image` était déjà `null`) et « image introuvable » (`image` existe mais
+ * ceci a échoué) — jamais confondus dans l'affichage.
+ */
 async function urlImage(
   source: SourceDonnees,
   image: ReferenceFichier | null,
 ): Promise<string> {
   if (!image) return ''
-  return source.fichiers.url(image)
+  try {
+    return await source.fichiers.url(image)
+  } catch (erreur) {
+    console.error('Image justificative introuvable dans le stockage :', erreur)
+    return ''
+  }
 }
 
 /** R-73 à R-77 — Construit le registre des chèques et virements. */
@@ -1362,6 +1384,7 @@ async function construireDetail(
   estAdministrateur: boolean,
 ): Promise<DetailOperationBancaire> {
   const libelles = libellesInstrument(operation.nature)
+  const imageUrl = await urlImage(source, operation.image)
   return {
     cle: operation.cle,
     entete: libelles.entete(operation.numero),
@@ -1383,7 +1406,8 @@ async function construireDetail(
     employe: operation.employe,
     clients: operation.clients.join(' · ') || '—',
     recus: operation.recus.join(' · ') || '—',
-    image: await urlImage(source, operation.image),
+    image: imageUrl,
+    imageIntrouvable: Boolean(operation.image) && !imageUrl,
     alternativeImage: libelles.alternativeImage,
     texteSansImage: libelles.sansImage,
     imageDeposeeLe: operation.image?.deposeLe || '—',
@@ -1595,5 +1619,5 @@ export async function urlPortraitPasseport(recuId: string): Promise<string> {
   const source = sourceDonnees()
   const recu = await source.recus.parId(recuId)
   const portrait = recu?.passeport?.imagePortrait
-  return portrait ? source.fichiers.url(portrait) : ''
+  return urlImage(source, portrait ?? null)
 }

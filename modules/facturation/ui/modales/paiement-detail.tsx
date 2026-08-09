@@ -66,6 +66,11 @@ export function ModalePaiementDetail({
             {detail.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={detail.image} alt={detail.alternativeImage} />
+            ) : detail.imageIntrouvable ? (
+              <div className="cheque-scene-vide cheque-scene-erreur">
+                <strong>{D.imageIntrouvable}</strong>
+                <span>{D.imageAjoutee(detail.imageDeposeeLe, detail.imageDeposeePar)}</span>
+              </div>
             ) : (
               <div className="cheque-scene-vide">
                 <strong>{D.sansImage}</strong>
