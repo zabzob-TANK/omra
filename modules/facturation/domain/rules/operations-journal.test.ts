@@ -44,6 +44,9 @@ describe('libelleActionJournal — un type, un seul libellé, jamais de vocabula
     expect(libelleActionJournal('facturation_finance_print.finance_journal_printed')).toBe(
       'طباعة السجل المالي',
     )
+    expect(libelleActionJournal('facturation_session.login_succeeded')).toBe('دخول')
+    expect(libelleActionJournal('facturation_session.login_failed')).toBe('محاولة دخول فاشلة')
+    expect(libelleActionJournal('facturation_session.logout')).toBe('خروج')
   })
 
   it('modification de reçu : libellé de la section touchée, comme le Journal financier', () => {

@@ -113,7 +113,8 @@ export type BillingOperationsJournalRow = {
   section_code: string | null
   reason: string | null
   occurred_at: string
-  actor_slot_number: number
+  /** `null` pour un échec de connexion (202608090014) : aucune session, donc aucun poste résolu. */
+  actor_slot_number: number | null
   actor_slot_label: string
   actor_login: string | null
   before_data: Record<string, unknown> | null

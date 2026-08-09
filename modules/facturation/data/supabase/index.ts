@@ -26,6 +26,7 @@ import {
   recuParNumero,
 } from './read'
 import { sessionSupabase } from './session'
+import { journalConnexionsSupabase } from './session-journal'
 import { stockageSupabase } from './storage'
 import {
   acquittementsAnomalieSupabase,
@@ -100,6 +101,7 @@ export const sourceSupabase: SourceDonnees = {
   versementsSaison: { lister: listerVersementsSaison },
   modificationsSaison: { lister: listerModificationsSaison },
   journalOperations: { lister: listerJournalOperations },
+  journalConnexions: journalConnexionsSupabase,
   audit: journalAuditSupabase,
   fichiers: stockageSupabase,
   lecteurPasseport: lecteurPasseportSupabase,

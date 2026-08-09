@@ -59,6 +59,7 @@ import type {
   IdentifiantsPort,
   ImpressionsFinancePort,
   JournalAuditPort,
+  JournalConnexionsPort,
   JournalOperationsPort,
   LecteurPasseportPort,
   ModificationsSaisonPort,
@@ -530,6 +531,19 @@ export function creerSourceDemonstration(
     },
   }
 
+  /**
+   * Démonstration seulement — le jeu ne modélise aucun événement de
+   * connexion (aucune vraie session Supabase Auth en démonstration). Non-op
+   * assumé, même choix que `journalAuditSupabase` côté réel pour la même
+   * raison inverse : ici rien à enregistrer, là une source unique déjà
+   * suffisante ailleurs.
+   */
+  const journalConnexions: JournalConnexionsPort = {
+    async enregistrerReussie() {},
+    async enregistrerEchouee() {},
+    async enregistrerDeconnexion() {},
+  }
+
   const stockage: StockageFichiersPort = {
     async deposer({ contenu, nomOrigine, typeMime, origine }) {
       const chemin = `demo/${identifiants.nouvelId('fichier')}`
@@ -689,6 +703,7 @@ export function creerSourceDemonstration(
     versementsSaison: depotVersementsSaison,
     modificationsSaison: depotModificationsSaison,
     journalOperations: depotJournalOperations,
+    journalConnexions: journalConnexions,
     acquittementsAnomalie: depotAcquittements,
     audit: journalAudit,
     fichiers: stockage,

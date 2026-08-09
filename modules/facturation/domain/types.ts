@@ -465,8 +465,12 @@ export interface LigneJournalOperations {
   changements: ChangementChamp[]
   motif?: string
   employe: string
-  /** `account_slots.slot_number` de l'auteur — pour le filtre par employé, jamais affiché tel quel. */
-  employeSlot: number
+  /**
+   * `account_slots.slot_number` de l'auteur — pour le filtre par employé,
+   * jamais affiché tel quel. `null` pour un échec de connexion : aucune
+   * session au moment de l'action, donc aucun poste à filtrer.
+   */
+  employeSlot: number | null
 }
 
 /** Bornes lundi–dimanche (incluses) d'une semaine affichée dans le journal des opérations. */

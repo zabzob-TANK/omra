@@ -53,6 +53,12 @@ const LIBELLES_ACTIONS_JOURNAL: Readonly<Record<string, string>> = {
   'payment_operation.over_allocation_confirmed': 'تجاوز المبلغ المتبقي للعملية',
   'facturation_finance_anomaly.anomaly_acknowledged': 'تأكيد مراجعة التنبيه',
   'facturation_finance_print.finance_journal_printed': 'طباعة السجل المالي',
+  // Connexions (2026-08-09, 202608090014) : دخول/خروج repris tels quels de
+  // service.ts::tracer() (déjà utilisés là, jamais réinventés). Échec de
+  // connexion : vocabulaire neuf, rien d'existant ne le couvrait.
+  'facturation_session.login_succeeded': 'دخول',
+  'facturation_session.login_failed': 'محاولة دخول فاشلة',
+  'facturation_session.logout': 'خروج',
 }
 
 /**

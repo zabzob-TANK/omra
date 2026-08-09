@@ -83,7 +83,11 @@ export function ModaleJournal({
   // la même semaine — limite mineure, jamais une donnée fausse.
   const employesDisponibles = useMemo(() => {
     const vus = new Map<number, string>()
-    for (const ligne of donnees?.lignes ?? []) vus.set(ligne.employeSlot, ligne.employe)
+    for (const ligne of donnees?.lignes ?? []) {
+      // Un échec de connexion n'a pas de poste (employeSlot null) : rien à
+      // proposer dans ce filtre pour cette ligne-là.
+      if (ligne.employeSlot !== null) vus.set(ligne.employeSlot, ligne.employe)
+    }
     return [...vus.entries()].sort((a, b) => a[0] - b[0])
   }, [donnees])
 

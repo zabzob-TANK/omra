@@ -356,6 +356,20 @@ export interface JournalOperationsPort {
   lister(filtres: FiltresJournalOperations): Promise<PageJournalOperations>
 }
 
+/**
+ * Connexions dans le journal des opérations — demande du commanditaire
+ * (2026-08-09) : connexion réussie, échec (identifiant tenté, jamais le mot
+ * de passe), déconnexion. Jamais `auth.audit_log_entries` (rétention hors de
+ * notre contrôle) — toujours `facturation_action_history`, comme le reste.
+ * Le changement de mot de passe est volontairement absent : aucun mécanisme
+ * ne le déclenche encore.
+ */
+export interface JournalConnexionsPort {
+  enregistrerReussie(): Promise<void>
+  enregistrerEchouee(identifiantTente: string): Promise<void>
+  enregistrerDeconnexion(): Promise<void>
+}
+
 export interface JournalAuditPort {
   /** R-86 — Plus récente en tête. */
   lister(limite?: number): Promise<EntreeAudit[]>
@@ -442,6 +456,7 @@ export interface SourceDonnees {
   versementsSaison: VersementsSaisonPort
   modificationsSaison: ModificationsSaisonPort
   journalOperations: JournalOperationsPort
+  journalConnexions: JournalConnexionsPort
   audit: JournalAuditPort
   fichiers: StockageFichiersPort
   lecteurPasseport: LecteurPasseportPort

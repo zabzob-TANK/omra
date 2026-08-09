@@ -187,6 +187,11 @@ async function tracer(
 /**
  * Écran de connexion du fichier de référence.
  * Renvoie `null` lorsque le couple identifiant / mot de passe est refusé.
+ *
+ * Connexions dans le journal des opérations (2026-08-09, demande du
+ * commanditaire) : réussite et échec, `.catch(() => {})` volontaire — un
+ * incident sur cette seule trace ne doit jamais empêcher une connexion par
+ * ailleurs valide, ni faire échouer un refus déjà décidé.
  */
 export async function connecter(
   identifiant: string,
@@ -194,7 +199,12 @@ export async function connecter(
 ): Promise<Utilisateur | null> {
   const source = sourceDonnees()
   const utilisateur = await source.session.connecter(identifiant, motDePasse)
-  if (utilisateur) await tracer(source, 'دخول', 'اتصال بالنظام', utilisateur)
+  if (utilisateur) {
+    await tracer(source, 'دخول', 'اتصال بالنظام', utilisateur)
+    await source.journalConnexions.enregistrerReussie().catch(() => {})
+  } else {
+    await source.journalConnexions.enregistrerEchouee(identifiant).catch(() => {})
+  }
   return utilisateur
 }
 
@@ -210,6 +220,9 @@ export async function deconnecter(): Promise<void> {
   const source = sourceDonnees()
   const utilisateur = await source.session.utilisateurCourant()
   await tracer(source, 'خروج', 'قطع الاتصال', utilisateur)
+  // Avant l'invalidation ci-dessous : la session doit encore être valide
+  // pour que la RPC résolve l'acteur (resolve_facturation_actor()).
+  await source.journalConnexions.enregistrerDeconnexion().catch(() => {})
   await source.session.deconnecter()
 }
 

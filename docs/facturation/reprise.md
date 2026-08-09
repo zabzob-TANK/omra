@@ -554,6 +554,21 @@ Rôle de l'Administration :
 - définir le programme : saisons, hôtels, vols, chambres, tarifs, rabatteurs ;
 - gérer les six emplacements de compte et leurs autorisations.
 
+### Traçage — décision du 2026-08-09, à revoir plus tard
+
+Le journal des opérations de la Facturation (سجل العمليات,
+`facturation_action_history`) ne couvre que la Facturation. Vérifié le
+2026-08-09 : aucune action d'Administration (saison, programme, hôtel, vol,
+chambre, tarif, rabatteur, compte) n'est tracée où que ce soit — ni auteur ni
+historique, seulement un `updated_at` muet sur chaque table.
+
+Décision du commanditaire : ne pas construire ce traçage maintenant.
+L'Administration est réservée au commanditaire seul (ci-dessus) — tant que
+c'est le cas, savoir « qui » a changé une donnée n'apporte rien, puisqu'il
+n'y a qu'une seule personne possible. Ce point redevient à traiter précisément
+le jour où quelqu'un d'autre que le commanditaire obtient un accès à
+l'Administration.
+
 Il n'y a pas de notion d'« administrateur de l'Administration » : c'est un
 espace personnel unique.
 
