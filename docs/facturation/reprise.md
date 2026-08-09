@@ -499,6 +499,48 @@ Masquer un bouton ne suffit pas : la séparation se fait par environnement.
 Les données de démonstration ne doivent jamais être mélangées aux lectures
 réelles ni écrites dans la base.
 
+### 5.14 Sauvegarde et restauration
+
+Aucune donnée réelle de client n'entre dans la base tant que deux conditions
+ne sont pas remplies : une sauvegarde effective de la base Postgres et des
+fichiers du Storage, et une restauration **réellement exécutée et vérifiée**
+depuis cette sauvegarde — pas une sauvegarde dont on suppose qu'elle
+fonctionne. C'est une condition de passage en exploitation avec une
+échéance précise, pas une tâche « à faire plus tard » : elle redevient
+bloquante au moment de créer la vraie saison et de saisir le premier vrai
+client.
+
+État vérifié le 2026-08-09 (`pnpm exec supabase backups list`, confirmé à
+deux reprises à quelques minutes d'écart) : `pitr_enabled: false`,
+`backups: []`. Le projet `omra-prototype` existe depuis le 2026-07-23 ;
+l'absence de toute sauvegarde après 17 jours exclut une formule avec
+sauvegardes quotidiennes automatiques actives. **Aucune sauvegarde Supabase
+n'existe donc à ce jour pour ce projet.** À revérifier au moment du passage
+en exploitation — la formule souscrite peut changer d'ici là.
+
+Même avec une formule payante incluant des sauvegardes automatiques,
+celles-ci ne couvrent que Postgres, jamais les fichiers du bucket Storage
+(`facturation-justificatifs` : justificatifs de chèques et virements). Leur
+sauvegarde restera toujours à construire séparément, quelle que soit la
+formule Supabase.
+
+Point découvert pendant cette vérification : les images de passeport
+n'existent pas réellement dans le Storage aujourd'hui.
+`definirImagesPasseportSupabase()`
+(`modules/facturation/data/supabase/write.ts`) est un stub qui lève toujours
+une erreur ; l'écran de scan passeport est une simulation, jamais branchée à
+un stockage réel. Tant que cette fonctionnalité reste un stub, il n'y a rien
+de réel à sauvegarder sur ce point — à revoir si elle est un jour implémentée
+pour de vrai.
+
+> À construire au moment du passage en exploitation, pas avant : dump complet
+> de la base (schéma + données), copie des fichiers Storage, restauration
+> réellement exécutée et vérifiée (comptage de lignes, comparaison de valeurs
+> connues), le tout documenté en procédure autonome exécutable sans Claude,
+> et stocké hors de la machine locale — l'incident de disque plein du
+> 2026-08-09 a montré pourquoi : une sauvegarde sur la même machine que la
+> donnée qu'elle protège partage le même risque de panne.
+
 ---
 
 ## 6. Module Administration
