@@ -196,8 +196,16 @@ export function ModaleJournal({
 
           <div className="journal-barre">
             <div className="journal-semaine">
+              {/* Retour du commanditaire (2026-08-09) : la position était bonne,
+                  le dessin du chevron ne l'était pas — le moteur de rendu
+                  applique le miroir bidi Unicode à ‹/› à l'intérieur d'un
+                  contexte RTL (comme les parenthèses). `dir="ltr"` isole
+                  chaque glyphe de ce contexte pour qu'il garde sa forme
+                  d'origine : › pointe vraiment vers la droite, ‹ vraiment
+                  vers la gauche. */}
               <button
                 type="button"
+                dir="ltr"
                 className="journal-fleche"
                 title={T.journal.semainePrecedente}
                 onClick={() => setSemaine((s) => semaineDecalee(s, -1))}
@@ -211,6 +219,7 @@ export function ModaleJournal({
               </span>
               <button
                 type="button"
+                dir="ltr"
                 className="journal-fleche"
                 title={T.journal.semaineSuivante}
                 onClick={() => setSemaine((s) => semaineDecalee(s, 1))}
