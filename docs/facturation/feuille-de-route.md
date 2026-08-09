@@ -106,6 +106,51 @@ ranger ici, pas à corriger dans l'urgence.
   `preparerModification()` directement, rien ne l'empêcherait de détacher un
   versement partagé. Identifié le 2026-08-06, non corrigé volontairement.
 
+## Performance — non urgent, gain de vitesse seulement
+
+Identifié le 2026-08-06 pendant une question de capacité (elle-même close :
+le volume réel — un seul compte le plus souvent, une trentaine de clients au
+moment du paiement final — ne pose aucun risque de quota Supabase Auth, voir
+`reprise.md`). Les deux points ci-dessous n'ont **aucun rapport avec la
+capacité** : ils ne réduiraient que le temps d'attente ressenti à chaque
+enregistrement.
+
+- **Doublon `getUser()` par action** — chaque action serveur de
+  `app/facturation/actions.ts` appelle `requireActiveAccount()` (un
+  `getUser()`), puis la fonction de `service.ts` qu'elle délègue appelle à son
+  tour `source.session.utilisateurCourant()` (un second `getUser()`) — deux
+  aller-retours réseau vers Supabase Auth pour la même identité, dans la même
+  requête. Calculer l'identité une seule fois et la faire circuler supprimerait
+  la moitié de ces appels, sans aucune conséquence de sécurité (l'identité ne
+  change pas en cours de requête).
+- **Rafraîchissement complet après un enregistrement** — après une création de
+  reçu ou un versement réussi, `rafraichir()` recharge tout `chargerEtat()`
+  (saison, hôtels, vols, chambres, rabatteurs, tarifs, **tous** les reçus,
+  opérations, audit) alors que seul le reçu concerné a changé. Une mise à jour
+  ciblée (ne remplacer que ce reçu dans l'état déjà en mémoire) éviterait de
+  retélécharger l'intégralité du registre à chaque sauvegarde.
+
+À faire quand un passage de finition sur la vitesse sera au programme, pas
+avant.
+
+> **Mise à jour du 2026-08-09** : ce chantier a fini par être mesuré (pas
+> seulement supposé) — 129 appels réseau / 1125 ms pour charger Paiements/
+> Journal financier/Suivi journalier sur 64 reçus, projeté à ~1001 appels à
+> 500 reçus. Traité depuis, dans cet ordre :
+> - **Fait et poussé** : Paiements, Journal financier et Suivi journalier
+>   migrés vers des RPC de saison à plat (`list_billing_season_payments`,
+>   `list_billing_season_modifications`) — plus de chargement complet des
+>   reçus pour ces trois écrans. Un second N+1, côté écriture cette fois
+>   (`contexteCommun()`, rechargeait tous les reçus à chaque création/
+>   versement/annulation/modification), trouvé et corrigé au passage.
+> - **Pas encore fait** : le registre (`etat.recus`) lui-même reste chargé
+>   en bloc (le point « Rafraîchissement complet après un enregistrement »
+>   ci-dessus reste donc entièrement d'actualité) — jugé trop risqué à
+>   faire sans revue de jour (voir `RAPPORT-NUIT.md`, section « Sauté
+>   volontairement »). Le doublon `getUser()` n'a pas été touché non plus.
+> - Voir `RAPPORT-NUIT.md` (racine du dépôt, 2026-08-09) pour le détail
+>   complet et l'état de déploiement réel de ce qui précède.
+
 ## Hébergement / coût (rappel)
 
 - Objectif : **0 DH/mois**, tenu par les offres gratuites (Vercel + Supabase).

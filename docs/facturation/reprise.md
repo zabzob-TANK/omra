@@ -10,6 +10,18 @@ le transfert vers le dépôt officiel.
 
 Dernière mise à jour : 2026-08-03.
 
+> **Note du 2026-08-09** : ce document date de la phase de reconstruction du
+> prototype (`clouddd`), avant le transfert vers le dépôt officiel `omra` —
+> plusieurs faits ci-dessous (branche de travail, gestionnaire de paquets,
+> nombre de tests, commandes) ne correspondent plus à l'état réel du dépôt
+> officiel. Les règles métier et l'architecture générale restent la
+> référence ; pour l'état technique courant (branche, backend réel, RPC
+> déployées, chantiers en cours), voir `RAPPORT-NUIT.md` (racine du dépôt,
+> le plus à jour) et le `CLAUDE.md` local. La ligne « État du dépôt »
+> ci-dessous a été corrigée a minima pour éviter la confusion la plus
+> immédiate (branche, gestionnaire de paquets) ; le reste du tableau garde
+> ses valeurs d'origine (phase `clouddd`), non vérifiées cette nuit.
+
 ---
 
 ## 1. Objet et périmètre
@@ -39,22 +51,25 @@ Ce qui n'est **pas** dans le périmètre de ce dépôt :
 
 ## 2. État du dépôt
 
-| Élément | Valeur |
+| Élément | Valeur (phase `clouddd`, non vérifiée cette nuit) |
 | --- | --- |
-| Branche de travail | `claude/facturation-reconstruction` |
-| Tests | 417, répartis sur 22 fichiers |
+| Branche de travail | ~~`claude/facturation-reconstruction`~~ — dans le dépôt officiel : `integration-facturation` |
+| Tests | 417, répartis sur 22 fichiers (phase `clouddd` ; 520 tests dans le dépôt officiel au 2026-08-09, `pnpm exec vitest run`) |
 | Build production | vérifié (`npm run build` puis `npm start`) |
 | Lots livrés | L0 à L6 (voir `docs/facturation/inventaire.md`) |
 
-### Commandes
+### Commandes (dépôt officiel `omra` — `pnpm`, pas `npm`)
 
 ```bash
-npm run test        # vitest run — 417 tests
-npm run couverture  # vérifie que chaque règle livrée est citée dans le code et les tests
-npm run verifier    # test + couverture + tsc --noEmit
-npm run build       # compilation de production
-npm run dev         # serveur de développement
+pnpm exec vitest run     # 520 tests au 2026-08-09
+pnpm exec tsc --noEmit   # typecheck
+pnpm run build           # compilation de production
+pnpm dev                 # serveur de développement
 ```
+
+Les commandes `npm run couverture`/`npm run verifier` ci-dessous
+appartiennent à la phase `clouddd` (script et `inventaire.md` propres à ce
+dépôt-là) ; non vérifiées comme existantes côté dépôt officiel.
 
 `npm run couverture` lit `docs/facturation/inventaire.md`. Ce fichier est
 analysé par un script : **ne pas changer la forme du tableau** (une ligne par
@@ -365,6 +380,22 @@ Jamais modifiables : le numéro, la date de création, le rabatteur.
 
 Chaque changement est consigné champ par champ dans l'historique, avec
 l'ancienne et la nouvelle valeur.
+
+> **Note du 2026-08-09** : côté adaptateur Supabase réel, cette règle n'a
+> longtemps été vraie qu'en base (`facturation_action_history`, alimentée
+> par chaque RPC d'écriture) — jamais exposée à l'écran. `mapReceiptDetailToRecu`
+> renvoyait toujours `modifications: []`, donc le compteur de modifications
+> du Suivi journalier affichait 0 en permanence (11 modifications réelles
+> jamais montrées), et le journal détaillé du reçu (fenêtre « Dossier
+> complet ») restait vide même pour un reçu réellement modifié. Corrigé
+> cette nuit en deux temps : le compteur par saison (`list_billing_season_modifications`,
+> migration `202608090003`), puis le détail par reçu (`list_billing_receipt_history`,
+> migration `202608090008`), chargé à la demande à l'ouverture du dossier.
+> **Reste partiel** : le détail par reçu montre qui/quand/motif, mais pas
+> encore l'ancienne/nouvelle valeur champ par champ décrite ci-dessus —
+> `before_data`/`after_data` (JSON) ont une forme différente par type
+> d'action, et une reconstruction générique du diff n'a pas été jugée sûre
+> à construire sans revue de jour. Voir `RAPPORT-NUIT.md`.
 
 **Correction du premier versement :**
 

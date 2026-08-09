@@ -1,5 +1,16 @@
 # Rapport de chantier local — pendant le test du site en ligne
 
+> **Périmé — instantané historique.** Ce rapport documente une phase
+> antérieure (branche `chantier-local`, avant intégration dans
+> `integration-facturation`) où rien n'avait encore été poussé ni déployé.
+> Ce n'est plus l'état réel : des migrations sont appliquées en production
+> depuis, du code a été poussé sur `integration-facturation`, et le
+> chantier de performance (RPC de saison, N+1) documenté dans
+> `RAPPORT-NUIT.md` (2026-08-09, racine du dépôt) a eu lieu depuis. Garder
+> ce fichier pour l'historique des bugs qu'il documente, mais ne plus s'y
+> fier pour l'état courant — voir `RAPPORT-NUIT.md` et
+> `docs/facturation/reprise.md` pour l'état réel au 2026-08-09.
+
 Branche : `chantier-local` (créée à partir de `integration-facturation`).
 Portée : code local uniquement. Aucun déploiement (`vercel --prod`), aucune
 migration appliquée à la base distante. Premiers tests interactifs faits en
