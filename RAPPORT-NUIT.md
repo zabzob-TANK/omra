@@ -4,11 +4,12 @@ Document mis à jour au fil du travail. Ne pas se fier à une section tant
 qu'elle n'est pas marquée comme terminée avec un résultat de vérification
 réel (jamais « ça devrait marcher »).
 
-Statut global : **TERMINÉ pour cette nuit** — 7 commits poussés et vérifiés
-(migrations SQL en production ; code applicatif construit avec succès mais
-en attente de promotion, voir l'encart juste en dessous). Aucune tâche
-laissée à moitié faite : chaque lot commencé a été soit terminé et vérifié,
-soit explicitement sauté et documenté (section 3).
+Statut global : **TERMINÉ pour cette nuit** — 8 commits poussés et vérifiés
+sur `integration-facturation` (migrations SQL en production ; code
+applicatif construit avec succès mais en attente de promotion, voir
+l'encart juste en dessous). Aucune tâche laissée à moitié faite : chaque
+lot commencé a été soit terminé et vérifié, soit explicitement sauté et
+documenté (section 3).
 
 ## ⚠️ À faire par toi au réveil — bloqué par un garde-fou, pas par un choix
 
@@ -293,13 +294,23 @@ N+1 côté écriture ne dépendent pas du registre léger.
   multi-entités par saison si tu veux que ce journal redevienne une
   fonctionnalité réelle plutôt qu'un message honnête renvoyant ailleurs.
 
-**Documentation** :
-- `docs/facturation/reprise.md`, `feuille-de-route.md`, `RAPPORT-CHANTIER.md`,
-  `CLAUDE.md`, `README.md` — mise à jour en cours au moment de la rédaction
-  de ce rapport (voir le dépôt directement pour l'état final ; si cette
-  ligne est encore présente au matin, la mise à jour n'a pas pu être
-  terminée cette nuit et le contenu documentaire ci-dessus reste la source
-  la plus à jour).
+**Documentation** — fait, notes datées ajoutées plutôt que réécriture
+complète (voir commit `00bd8ce`) :
+- `docs/facturation/reprise.md` — note en tête + note dans §5.9 sur le
+  compteur de modifications ; le reste du document (règles métier,
+  architecture) n'a pas été réaudité en entier cette nuit.
+- `docs/facturation/feuille-de-route.md` — section Performance mise à jour
+  avec l'état réel du chantier.
+- `RAPPORT-CHANTIER.md` — marqué périmé (bandeau en tête), gardé pour
+  l'historique des bugs qu'il documente.
+- `CLAUDE.md` (local, jamais commité — voir son propre en-tête) — sections
+  Migrations et État backend Facturation connu corrigées ; le reste du
+  fichier n'a pas été revérifié dans son ensemble depuis le 2026-08-03.
+- `README.md` — note ajoutée sur le mécanisme réel de déploiement
+  (préversion automatique vs promotion manuelle en production).
+- Reste à faire, si tu veux une passe plus complète : réaudit intégral de
+  `reprise.md` (beaucoup de contenu hérité de la phase `clouddd`, jamais
+  vérifié contre l'état réel du dépôt officiel `omra`).
 
 **Non touché cette nuit, trouvé en chemin, à ta discrétion** :
 - Un ensemble de changements non liés à cette nuit (atelier de calage
