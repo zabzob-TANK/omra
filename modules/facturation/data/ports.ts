@@ -28,6 +28,7 @@ import type {
   ChangementChamp,
   Client,
   EntreeAudit,
+  EvenementModificationSaison,
   Hotel,
   ImpressionFinance,
   ModeRemboursement,
@@ -37,12 +38,14 @@ import type {
   Passeport,
   Rabatteur,
   Recu,
+  RecuSaison,
   ReferenceFichier,
   Saison,
   SectionModifiable,
   Tarif,
   Utilisateur,
   Versement,
+  VersementSaison,
   Vol,
 } from '../domain/types'
 
@@ -162,6 +165,13 @@ export type CreationRecu = DonneesCreationRecu
 
 export interface RecusPort {
   lister(filtre?: FiltreRecus): Promise<Recu[]>
+  /**
+   * Décision de performance (2026-08-09) : reçus réduits aux champs agrégés
+   * (`list_billing_receipts`), sans détail ni versements — pour le compte
+   * par jour du Suivi journalier et du Journal financier, jamais pour un
+   * écran qui a besoin des versements ou du détail complet.
+   */
+  listerLeger(filtre?: FiltreRecus): Promise<RecuSaison[]>
   parId(id: string): Promise<Recu | null>
   /**
    * reprise.md §5.3 — l'unicité réelle d'un reçu est saison + numéro, jamais
@@ -297,6 +307,24 @@ export interface AcquittementsAnomaliePort {
   acquitter(acquittement: AcquittementAnomalie, saisonId?: string): Promise<void>
 }
 
+/**
+ * Décision de performance (2026-08-09) — voir `list_billing_season_payments` :
+ * les versements d'une saison à plat, jamais des `Recu` complets. Sert
+ * Paiements, le Journal financier et le Suivi journalier.
+ */
+export interface VersementsSaisonPort {
+  lister(saisonId: string): Promise<VersementSaison[]>
+}
+
+/**
+ * Décision de performance (2026-08-09) — voir
+ * `list_billing_season_modifications` : les événements de modification
+ * d'une saison à plat. Sert le compte par jour du Suivi journalier.
+ */
+export interface ModificationsSaisonPort {
+  lister(saisonId: string): Promise<EvenementModificationSaison[]>
+}
+
 export interface JournalAuditPort {
   /** R-86 — Plus récente en tête. */
   lister(limite?: number): Promise<EntreeAudit[]>
@@ -380,6 +408,8 @@ export interface SourceDonnees {
   mouvementsCaisse: MouvementsCaissePort
   impressionsFinance: ImpressionsFinancePort
   acquittementsAnomalie: AcquittementsAnomaliePort
+  versementsSaison: VersementsSaisonPort
+  modificationsSaison: ModificationsSaisonPort
   audit: JournalAuditPort
   fichiers: StockageFichiersPort
   lecteurPasseport: LecteurPasseportPort

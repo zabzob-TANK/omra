@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ImpressionFinance, MouvementCaisse } from '../types'
+import type { ImpressionFinance, MouvementCaisse, Recu } from '../types'
 import { unRecu, unVersement } from './fixtures'
+import { versementsSaisonDepuisRecu } from './cheque-register'
 import {
   anomaliesCandidates,
   anomaliesEnAttente,
@@ -31,6 +32,14 @@ const MAINTENANT = new Date(2026, 7, 1, 12, 0, 0)
 
 function recuAvec(versements: ReturnType<typeof unVersement>[], partiel = {}) {
   return unRecu({ versements, ...partiel })
+}
+
+/**
+ * `collecterMouvements` attend désormais des `VersementSaison[]` (décision
+ * de performance du 2026-08-09), jamais des `Recu[]`.
+ */
+function aVersements(recus: readonly Recu[]) {
+  return recus.flatMap((r) => versementsSaisonDepuisRecu(r, []))
 }
 
 describe('R-56 — sélection de la période', () => {
@@ -79,15 +88,15 @@ describe('collecte et tri des mouvements', () => {
   ])
 
   it('produit un mouvement par versement', () => {
-    expect(collecterMouvements([recu])).toHaveLength(2)
+    expect(collecterMouvements(aVersements([recu]))).toHaveLength(2)
   })
 
   it('reprend l’identifiant du versement', () => {
-    expect(identifiantMouvement(recu, recu.versements[0], 0)).toBe('v-1')
+    expect(identifiantMouvement(recu.id, recu.versements[0], 0)).toBe('v-1')
   })
 
   it('classe du plus récent au plus ancien', () => {
-    const tries = trierMouvements(collecterMouvements([recu]))
+    const tries = trierMouvements(collecterMouvements(aVersements([recu])))
     expect(tries[0].heure).toBe('14:00')
     expect(tries[1].heure).toBe('09:00')
   })
@@ -111,14 +120,14 @@ describe('collecte et tri des mouvements', () => {
         montantOperationCentimes: 5000000,
       }),
     ])
-    const mouvements = collecterMouvements([partage, autre])
+    const mouvements = collecterMouvements(aVersements([partage, autre]))
     expect(new Set(mouvements.map((m) => m.cleOperation)).size).toBe(1)
   })
 
   it('donne une clé distincte à chaque instrument unique', () => {
     const a = recuAvec([unVersement({ id: 'v-a', nature: 'شيك' })])
     const b = recuAvec([unVersement({ id: 'v-b', nature: 'شيك' })])
-    const mouvements = collecterMouvements([a, b])
+    const mouvements = collecterMouvements(aVersements([a, b]))
     expect(new Set(mouvements.map((m) => m.cleOperation)).size).toBe(2)
   })
 })
@@ -173,32 +182,32 @@ describe('R-34 — une opération partagée ne compte qu’une fois', () => {
   ]
 
   it('retient le montant de l’opération, pas la somme des parts', () => {
-    const mouvements = collecterMouvements([recuAvec([partagee[0]]), recuAvec([partagee[1]])])
+    const mouvements = collecterMouvements(aVersements([recuAvec([partagee[0]]), recuAvec([partagee[1]])]))
     expect(totalReelOperations(mouvements)).toBe(5000000)
   })
 
   it('retient la somme distribuée quand aucun montant d’opération n’est déclaré', () => {
-    const mouvements = collecterMouvements([
+    const mouvements = collecterMouvements(aVersements([
       recuAvec([unVersement({ id: 'x', nature: 'شيك', montantCentimes: 900000 })]),
-    ])
+    ]))
     expect(totalReelOperations(mouvements)).toBe(900000)
   })
 
   it('additionne deux opérations distinctes', () => {
-    const mouvements = collecterMouvements([
+    const mouvements = collecterMouvements(aVersements([
       recuAvec([unVersement({ id: 'x', nature: 'شيك', montantCentimes: 900000 })]),
       recuAvec([unVersement({ id: 'y', nature: 'شيك', montantCentimes: 100000 })]),
-    ])
+    ]))
     expect(totalReelOperations(mouvements)).toBe(1000000)
   })
 })
 
 describe('R-48, R-57 — totaux de la période', () => {
-  const mouvements = collecterMouvements([
+  const mouvements = collecterMouvements(aVersements([
     recuAvec([unVersement({ id: 'e1', nature: 'نقد', montantCentimes: 1000000 })]),
     recuAvec([unVersement({ id: 'c1', nature: 'شيك', montantCentimes: 500000 })]),
     recuAvec([unVersement({ id: 'v1', nature: 'تحويل بنكي', montantCentimes: 300000 })]),
-  ])
+  ]))
   const remboursement: MouvementCaisse = {
     id: 'r1',
     type: 'refund_cash',
@@ -224,7 +233,7 @@ describe('R-48, R-57 — totaux de la période', () => {
   })
 
   it('compte les opérations bancaires, pas les versements', () => {
-    const partage = collecterMouvements([
+    const partage = collecterMouvements(aVersements([
       recuAvec([
         unVersement({
           id: 'p1',
@@ -245,7 +254,7 @@ describe('R-48, R-57 — totaux de la période', () => {
           montantCentimes: 200000,
         }),
       ]),
-    ])
+    ]))
     expect(totauxFinance(partage, []).nombreOperationsCheque).toBe(1)
   })
 })

@@ -23,6 +23,8 @@ import type {
   BillingReceiptDetail,
   BillingReceiptPrintSummary,
   BillingReceiptRow,
+  BillingSeasonModificationRow,
+  BillingSeasonPaymentRow,
   CashRegisterRefundMovement,
   FinanceAnomalyAcknowledgement,
   FinancePrintEvent,
@@ -34,12 +36,21 @@ import { isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
 import type { FiltreRecus } from '../ports'
 import type {
   AcquittementAnomalie,
+  EvenementModificationSaison,
   ImpressionFinance,
   MouvementCaisse,
   OperationPartagee,
   Recu,
+  RecuSaison,
+  VersementSaison,
 } from '../../domain/types'
-import { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
+import {
+  mapModificationRowToEvenementSaison,
+  mapReceiptDetailToRecu,
+  mapReceiptRowToRecuSaison,
+  mapReusableOperationToOperationPartagee,
+  mapSeasonPaymentRowToVersementSaison,
+} from './mappers'
 
 type ClientSupabase = Awaited<ReturnType<typeof createClient>>
 
@@ -180,6 +191,17 @@ export async function listerRecus(filtre?: FiltreRecus): Promise<Recu[]> {
   }
 
   return recus
+}
+
+/**
+ * Décision de performance (2026-08-09) : reçus de la saison réduits aux
+ * champs agrégés déjà renvoyés par `list_billing_receipts` — sans détail ni
+ * versements. Sert le compte par jour du Suivi journalier et du Journal
+ * financier (nouvelles inscriptions, annulations).
+ */
+export async function listerRecusLeger(filtre?: FiltreRecus): Promise<RecuSaison[]> {
+  const lignes = await listerLignesRecus(filtre)
+  return lignes.map(mapReceiptRowToRecuSaison)
 }
 
 /** `RecusPort.parId` (partie lecture uniquement). */
@@ -351,4 +373,53 @@ export async function listerAnomaliesBase(seasonId: string | null = null): Promi
   }
 
   return anomalies
+}
+
+/**
+ * Décision de performance (2026-08-09) : tous les versements d'une saison,
+ * via `list_billing_season_payments` — remplace le chargement de tous les
+ * reçus complets pour Paiements, le Journal financier et le Suivi journalier.
+ */
+export async function listerVersementsSaison(seasonId: string): Promise<VersementSaison[]> {
+  const supabase = await createClient()
+  const versements: VersementSaison[] = []
+
+  for (let offset = 0; ; offset += TAILLE_PAGE) {
+    const resultat = await supabase.rpc('list_billing_season_payments', {
+      p_season_id: seasonId,
+      p_limit: TAILLE_PAGE,
+      p_offset: offset,
+    })
+    if (resultat.error) throw new Error(messageErreur(resultat.error))
+    const page = (resultat.data ?? []) as BillingSeasonPaymentRow[]
+    versements.push(...page.map(mapSeasonPaymentRowToVersementSaison))
+    if (page.length < TAILLE_PAGE) break
+  }
+
+  return versements
+}
+
+/**
+ * Décision de performance (2026-08-09) : tous les événements de modification
+ * d'une saison, via `list_billing_season_modifications` — remplace le
+ * parcours de `recu.modifications` (toujours vide côté adaptateur réel) sur
+ * tous les reçus pour le compte par jour du Suivi journalier.
+ */
+export async function listerModificationsSaison(seasonId: string): Promise<EvenementModificationSaison[]> {
+  const supabase = await createClient()
+  const modifications: EvenementModificationSaison[] = []
+
+  for (let offset = 0; ; offset += TAILLE_PAGE) {
+    const resultat = await supabase.rpc('list_billing_season_modifications', {
+      p_season_id: seasonId,
+      p_limit: TAILLE_PAGE,
+      p_offset: offset,
+    })
+    if (resultat.error) throw new Error(messageErreur(resultat.error))
+    const page = (resultat.data ?? []) as BillingSeasonModificationRow[]
+    modifications.push(...page.map(mapModificationRowToEvenementSaison))
+    if (page.length < TAILLE_PAGE) break
+  }
+
+  return modifications
 }

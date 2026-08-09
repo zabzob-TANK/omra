@@ -13,7 +13,16 @@ import type { RecusPort, SourceDonnees } from '../ports'
 import { clientsSupabase, operationsPartageesSupabase } from './clients-operations'
 import { horloge, identifiants } from './ids'
 import { referentielsSupabase } from './referentiels'
-import { listerAnomaliesBase, listerOperationsPartageesReutilisables, listerRecus, recuParId, recuParNumero } from './read'
+import {
+  listerAnomaliesBase,
+  listerModificationsSaison,
+  listerOperationsPartageesReutilisables,
+  listerRecus,
+  listerRecusLeger,
+  listerVersementsSaison,
+  recuParId,
+  recuParNumero,
+} from './read'
 import { sessionSupabase } from './session'
 import { stockageSupabase } from './storage'
 import {
@@ -48,15 +57,19 @@ export { isoVersDateFr, isoVersHeure, isoVersHorodatage, dateSqlVersDateFr } fro
 export { mapReceiptDetailToRecu, mapReusableOperationToOperationPartagee } from './mappers'
 export {
   listerRecus,
+  listerRecusLeger,
   recuParId,
   recuParNumero,
   listerOperationsPartageesReutilisables,
   listerAnomaliesBase,
+  listerVersementsSaison,
+  listerModificationsSaison,
   type AnomalieBase,
 } from './read'
 
 const recusSupabase: RecusPort = {
   lister: listerRecus,
+  listerLeger: listerRecusLeger,
   parId: recuParId,
   parNumero: recuParNumero,
   reserverNumero: reserverNumeroSupabase,
@@ -80,6 +93,8 @@ export const sourceSupabase: SourceDonnees = {
   mouvementsCaisse: mouvementsCaisseSupabase,
   impressionsFinance: impressionsFinanceSupabase,
   acquittementsAnomalie: acquittementsAnomalieSupabase,
+  versementsSaison: { lister: listerVersementsSaison },
+  modificationsSaison: { lister: listerModificationsSaison },
   audit: journalAuditSupabase,
   fichiers: stockageSupabase,
   lecteurPasseport: lecteurPasseportSupabase,

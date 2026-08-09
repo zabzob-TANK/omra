@@ -9,16 +9,22 @@
 import type {
   BillingOperation,
   BillingReceiptDetail,
+  BillingReceiptRow,
+  BillingSeasonModificationRow,
+  BillingSeasonPaymentRow,
   ReusablePaymentOperation,
 } from '@/lib/facturation/types'
 import type {
   AnomalieFinanciere,
+  EvenementModificationSaison,
   OperationPartagee,
   PorteeVersement,
   Recu,
+  RecuSaison,
   ReferenceFichier,
   TypeAnomalie,
   Versement,
+  VersementSaison,
 } from '../../domain/types'
 import {
   modeRemboursementDepuisRoute,
@@ -139,6 +145,108 @@ function mapVersement(
 }
 
 /**
+ * Construit un `VersementSaison` depuis une ligne de
+ * `list_billing_season_payments` — jamais depuis un `Recu` complet.
+ *
+ * Reproduit exactement le contrat de `mapVersement` pour les champs communs,
+ * sans `instantane` (non lu par les écrans consommateurs, voir
+ * `VersementSaison`). Pour un versement unique, l'image vient du
+ * justificatif actif de sa propre opération (mêmes colonnes que
+ * `mapImage`, portées à plat par la RPC) ; pour un versement partagé, elle
+ * reste `null` ici — `collecterOperationsBancaires` la lit depuis
+ * `operations`, chargé séparément et inchangé par ce lot.
+ */
+export function mapSeasonPaymentRowToVersementSaison(ligne: BillingSeasonPaymentRow): VersementSaison {
+  const portee = porteeDepuisUsageKind(ligne.usage_kind)
+  return {
+    versement: {
+      id: ligne.payment_id,
+      rang: ligne.payment_number,
+      montantCentimes: dhVersCentimes(ligne.amount_dh),
+      nature: natureDepuisModePaiement(ligne.payment_mode),
+      date: isoVersDateFr(ligne.payment_registered_at),
+      heure: isoVersHeure(ligne.payment_registered_at),
+      dateHeure: isoVersHorodatage(ligne.payment_registered_at),
+      enregistrePar: ligne.payment_created_by_slot_label,
+      referenceInstrument: ligne.instrument_reference ?? '',
+      dateInstrument: ligne.instrument_date ? dateSqlVersDateFr(ligne.instrument_date) : '',
+      banque: ligne.bank_name ?? '',
+      portee,
+      operationPartageeId: portee === 'shared' ? ligne.operation_id : '',
+      payeur: ligne.payer_name ?? '',
+      montantOperationCentimes: portee === 'shared' ? dhVersCentimes(ligne.operation_amount_dh) : 0,
+      image:
+        portee === 'unique' && ligne.image_storage_path
+          ? {
+              chemin: `${ligne.image_storage_bucket}/${ligne.image_storage_path}`,
+              nomOrigine: ligne.image_original_file_name ?? '',
+              origine: 'upload',
+              deposeLe: ligne.image_uploaded_at ? isoVersHorodatage(ligne.image_uploaded_at) : '',
+              deposePar: ligne.image_uploaded_by_slot_label ?? undefined,
+            }
+          : null,
+      // R-14, R-22 — instantané figé, jamais recalculé depuis l'état actuel.
+      instantane: {
+        client: ligne.snapshot_client_name,
+        hotel: ligne.snapshot_hotel_name,
+        chambre: ligne.snapshot_room_label,
+        vol: ligne.snapshot_flight_label,
+        programme: ligne.snapshot_program_label,
+        convenuCentimes: dhVersCentimes(ligne.snapshot_agreed_amount_dh),
+        rabatteur: ligne.snapshot_rabatteur_name ?? '',
+        restantApresCentimes: dhVersCentimes(ligne.snapshot_remaining_after_dh),
+        statutApres: ligne.snapshot_settled_after ? '✓' : '•',
+      },
+    },
+    operationEnregistreeLe: isoVersHorodatage(ligne.operation_registered_at),
+    recu: {
+      id: ligne.receipt_id,
+      numero: ligne.receipt_number,
+      prenom: ligne.traveler_first_name_snapshot,
+      nom: ligne.traveler_last_name_snapshot,
+      statut: statutDepuisLifecycle(ligne.lifecycle_status),
+      employe: ligne.receipt_created_by_slot_label,
+      hotel: ligne.registration_hotel_name,
+      chambre: ligne.registration_room_label,
+      vol: ligne.registration_flight_label,
+      rabatteur: ligne.registration_rabatteur_name ?? '',
+      convenuCentimes: dhVersCentimes(ligne.registration_agreed_amount_dh),
+    },
+  }
+}
+
+/**
+ * Construit un `RecuSaison` depuis une ligne de `list_billing_receipts` —
+ * pour le Suivi journalier et le Journal financier, jamais depuis un `Recu`
+ * complet. `totalPayeCentimes` reprend l'agrégat déjà calculé côté RPC
+ * (`total_paid_dh`), jamais resommé depuis des versements non chargés ici.
+ */
+export function mapReceiptRowToRecuSaison(ligne: BillingReceiptRow): RecuSaison {
+  return {
+    id: ligne.receipt_id,
+    numero: ligne.receipt_number,
+    date: isoVersDateFr(ligne.receipt_created_at),
+    statut: statutDepuisLifecycle(ligne.lifecycle_status),
+    annuleLe: ligne.cancelled_at ? isoVersHorodatage(ligne.cancelled_at) : undefined,
+    totalPayeCentimes: dhVersCentimes(ligne.total_paid_dh),
+  }
+}
+
+/**
+ * Construit un `EvenementModificationSaison` depuis une ligne de
+ * `list_billing_season_modifications`.
+ */
+export function mapModificationRowToEvenementSaison(
+  ligne: BillingSeasonModificationRow,
+): EvenementModificationSaison {
+  return {
+    id: ligne.modification_id,
+    recuNumero: ligne.receipt_number,
+    survenuLe: isoVersHorodatage(ligne.occurred_at),
+  }
+}
+
+/**
  * Construit un `Recu` complet à partir de `get_billing_receipt_details`.
  *
  * Champs volontairement incomplets ou approximatifs — voir le rapport de
@@ -146,16 +254,20 @@ function mapVersement(
  *  - `groupe` est renseigné depuis `dossier.label`, en attendant une décision
  *    sur la correspondance entre `omra_dossiers` et le tag groupe/famille du
  *    prototype (reprise.md §5.4, CLAUDE.md) ;
- *  - `impressions` vient de `get_billing_receipt_print_summary` (une RPC
- *    distincte de `get_billing_receipt_details`), passé en second paramètre
- *    — voir `chargerRecuParId` dans `read.ts`. `null` signifie que cette
- *    lecture a échoué, jamais « jamais imprimé » : ce mapper reporte tel quel
- *    ce que l'appelant lui donne, jamais un 0 par défaut ;
+ *  - `impressions` vient de `get_billing_receipt_print_summary` (migration
+ *    `202608040001`), passé en second paramètre — cette RPC est distincte de
+ *    `get_billing_receipt_details` et doit être appelée séparément par
+ *    l'appelant (voir `chargerRecuParId`, `read.ts`). `null` signifie que
+ *    cette lecture a échoué, jamais « jamais imprimé » — ce mapper ne fait
+ *    que reporter tel quel ce que l'appelant lui donne, jamais un 0 par
+ *    défaut ;
  *  - `modifications` est toujours vide : la forme stockée (`before_data`/
  *    `after_data` en JSON libre dans `history`) ne correspond pas à
  *    `ChangementChamp[]` (avant/après par champ nommé) attendu par le
  *    domaine — la traduire exige de décider quels champs diffuser et sous
- *    quels libellés, ce que cette étape ne tranche pas.
+ *    quels libellés, ce que cette étape ne tranche pas. `nombreModifications`
+ *    porte quand même le vrai compte (`detail.modifications.count`), qui ne
+ *    dépend pas de cette traduction.
  *
  * `versement.instantane` n'est plus une approximation : il est lu tel quel
  * depuis `receipt_payments.payment_snapshot_*` (migration `202608030001`),
@@ -233,6 +345,7 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions
     impressions,
     // Non disponible via ces 4 RPC sous la forme attendue — voir le commentaire de fonction.
     modifications: [],
+    nombreModifications: detail.modifications.count,
     derniereModification: dernierChangement ? isoVersHorodatage(dernierChangement.occurred_at) : undefined,
     modifiePar: dernierChangement
       ? dernierChangement.actor_login ?? dernierChangement.actor_slot_label

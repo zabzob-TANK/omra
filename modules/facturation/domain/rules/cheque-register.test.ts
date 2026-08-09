@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ReferenceFichier } from '../types'
+import type { OperationPartagee, Recu, ReferenceFichier } from '../types'
 import { unRecu, uneOperation, unVersement } from './fixtures'
 import {
   collecterOperationsBancaires,
@@ -18,7 +18,18 @@ import {
   peutSupprimerImage,
   refusOuvertureImage,
   restantNul,
+  versementsSaisonDepuisRecu,
 } from './cheque-register'
+
+/**
+ * `collecterOperationsBancaires` attend désormais des `VersementSaison[]`
+ * (décision de performance du 2026-08-09), jamais des `Recu[]` — ce test
+ * garde ses fixtures `Recu` inchangées et les convertit ici, exactement
+ * comme le fait `detail.tsx` pour le détail d'un seul reçu.
+ */
+function aVersements(recus: readonly Recu[], operations: readonly OperationPartagee[] = []) {
+  return recus.flatMap((r) => versementsSaisonDepuisRecu(r, operations))
+}
 
 const IMAGE: ReferenceFichier = {
   chemin: 'demo/1',
@@ -94,7 +105,7 @@ function jeu() {
 describe('R-73 — regroupement par opération', () => {
   it('rassemble les versements partagés sous une seule opération', () => {
     const { operation, recus } = jeu()
-    const operations = collecterOperationsBancaires(recus, [operation])
+    const operations = collecterOperationsBancaires(aVersements(recus, [operation]), [operation])
     expect(operations).toHaveLength(2)
 
     const partagee = operations.find((x) => x.partagee)!
@@ -106,7 +117,7 @@ describe('R-73 — regroupement par opération', () => {
 
   it('un instrument unique forme sa propre opération', () => {
     const { operation, recus } = jeu()
-    const unique = collecterOperationsBancaires(recus, [operation]).find((x) => !x.partagee)!
+    const unique = collecterOperationsBancaires(aVersements(recus, [operation]), [operation]).find((x) => !x.partagee)!
     expect(unique.cle).toBe('payment:v-cheque')
     expect(unique.type).toBe('Unique')
     expect(unique.attributions).toHaveLength(1)
@@ -114,7 +125,7 @@ describe('R-73 — regroupement par opération', () => {
 
   it('ignore les espèces', () => {
     const especes = unRecu({ versements: [unVersement({ nature: 'نقد' })] })
-    expect(collecterOperationsBancaires([especes], [])).toHaveLength(0)
+    expect(collecterOperationsBancaires(aVersements([especes]), [])).toHaveLength(0)
   })
 })
 
@@ -129,13 +140,13 @@ describe('R-75 — date et heure d’enregistrement', () => {
 
   it('une opération partagée porte la date de création de l’opération', () => {
     const { operation, recus } = jeu()
-    const partagee = collecterOperationsBancaires(recus, [operation]).find((x) => x.partagee)!
+    const partagee = collecterOperationsBancaires(aVersements(recus, [operation]), [operation]).find((x) => x.partagee)!
     expect(partagee.dateEnregistrement).toBe('31/07/2026')
   })
 
   it('trie de la plus récente à la plus ancienne, heure comprise', () => {
     const { operation, recus } = jeu()
-    const operations = collecterOperationsBancaires(recus, [operation])
+    const operations = collecterOperationsBancaires(aVersements(recus, [operation]), [operation])
     expect(operations.map((x) => x.dateEnregistrement)).toEqual(['31/07/2026', '30/07/2026'])
   })
 })
@@ -143,7 +154,7 @@ describe('R-75 — date et heure d’enregistrement', () => {
 describe('R-77 — attribué et restant', () => {
   it('calcule l’attribué et le restant par opération', () => {
     const { operation, recus } = jeu()
-    const partagee = collecterOperationsBancaires(recus, [operation]).find((x) => x.partagee)!
+    const partagee = collecterOperationsBancaires(aVersements(recus, [operation]), [operation]).find((x) => x.partagee)!
     expect(partagee.montantCentimes).toBe(5000000)
     expect(partagee.attribueCentimes).toBe(5000000)
     expect(partagee.restantCentimes).toBe(0)
@@ -163,14 +174,14 @@ describe('R-77 — attribué et restant', () => {
 
   it('additionne le montant global des opérations affichées', () => {
     const { operation, recus } = jeu()
-    const operations = collecterOperationsBancaires(recus, [operation])
+    const operations = collecterOperationsBancaires(aVersements(recus, [operation]), [operation])
     expect(montantGlobalCentimes(operations)).toBe(7000000)
   })
 })
 
 describe('R-74 — filtres du registre', () => {
   const { operation, recus } = jeu()
-  const toutes = collecterOperationsBancaires(recus, [operation])
+  const toutes = collecterOperationsBancaires(aVersements(recus, [operation]), [operation])
 
   it('filtre par journée d’enregistrement', () => {
     expect(
@@ -213,7 +224,7 @@ describe('R-74 — filtres du registre', () => {
 
 describe('R-35, R-36 — une seule image active', () => {
   const { operation, recus } = jeu()
-  const toutes = collecterOperationsBancaires(recus, [operation])
+  const toutes = collecterOperationsBancaires(aVersements(recus, [operation]), [operation])
 
   it('une opération sans image peut en recevoir une', () => {
     expect(peutRecevoirUneImage(toutes[0])).toBe(true)
@@ -242,7 +253,7 @@ describe('R-38 — l’image d’un partage appartient à l’opération', () =>
   it('l’image vient de l’opération, jamais du versement', () => {
     const { operation, recus } = jeu()
     const avecImage = { ...operation, image: IMAGE }
-    const partagee = collecterOperationsBancaires(recus, [avecImage]).find((x) => x.partagee)!
+    const partagee = collecterOperationsBancaires(aVersements(recus, [avecImage]), [avecImage]).find((x) => x.partagee)!
     expect(partagee.image).toEqual(IMAGE)
     // Une seule image pour les deux reçus : elle n'est pas dupliquée.
     expect(partagee.attributions).toHaveLength(2)
@@ -251,9 +262,10 @@ describe('R-38 — l’image d’un partage appartient à l’opération', () =>
 
 describe('R-39, R-40 — suppression réservée à l’administrateur', () => {
   const { operation, recus } = jeu()
-  const avec = collecterOperationsBancaires(recus, [{ ...operation, image: IMAGE }]).find(
-    (x) => x.partagee,
-  )!
+  const avec = collecterOperationsBancaires(
+    aVersements(recus, [{ ...operation, image: IMAGE }]),
+    [{ ...operation, image: IMAGE }],
+  ).find((x) => x.partagee)!
 
   it('un employé ne peut pas supprimer', () => {
     expect(peutSupprimerImage(avec, false)).toBe(false)
@@ -292,7 +304,7 @@ describe('R-76 — libellés selon l’instrument', () => {
   it('la répartition conserve la situation de chaque reçu', () => {
     const { operation, recus } = jeu()
     const annule = recus.map((r) => (r.id === 'r-b' ? { ...r, statut: 'ملغى' as const } : r))
-    const partagee = collecterOperationsBancaires(annule, [operation]).find((x) => x.partagee)!
+    const partagee = collecterOperationsBancaires(aVersements(annule, [operation]), [operation]).find((x) => x.partagee)!
     expect(partagee.attributions.map((a) => a.annule)).toEqual([false, true])
   })
 })

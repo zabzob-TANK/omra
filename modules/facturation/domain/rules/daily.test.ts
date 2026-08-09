@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ImpressionFinance, MouvementCaisse } from '../types'
+import type {
+  EvenementModificationSaison,
+  ImpressionFinance,
+  MouvementCaisse,
+  OperationPartagee,
+  Recu,
+  RecuSaison,
+} from '../types'
+import { versementsSaisonDepuisRecu } from './cheque-register'
 import { unRecu, uneOperation, unVersement } from './fixtures'
+import { totalPaye } from './receipt'
 import {
   basculerSelection,
   basculerToutesVisibles,
@@ -25,14 +34,38 @@ import {
 /** 5 août 2026, un mercredi. */
 const MAINTENANT = new Date(2026, 7, 5, 12, 0, 0)
 
-function source(partiel: Partial<SourceJournees> = {}): SourceJournees {
+/** Reconstitue les formes allégées (RPC) depuis un `Recu` complet de test. */
+function recuSaisonDepuis(recu: Recu): RecuSaison {
   return {
-    recus: [],
-    operations: [],
+    id: recu.id,
+    numero: recu.numero,
+    date: recu.date,
+    statut: recu.statut,
+    annuleLe: recu.annuleLe,
+    totalPayeCentimes: totalPaye(recu),
+  }
+}
+
+function modificationsSaisonDepuis(recus: readonly Recu[]): EvenementModificationSaison[] {
+  return recus.flatMap((r) =>
+    r.modifications.map((m) => ({ id: m.id, recuNumero: r.numero, survenuLe: m.dateHeure })),
+  )
+}
+
+function source(
+  partiel: Partial<{ recus: readonly Recu[]; operations: readonly OperationPartagee[] }> & Partial<SourceJournees> = {},
+): SourceJournees {
+  const { recus, ...reste } = partiel
+  const operations = reste.operations ?? []
+  return {
+    recusSaison: recus ? recus.map(recuSaisonDepuis) : [],
+    versementsSaison: recus ? recus.flatMap((r) => versementsSaisonDepuisRecu(r, operations)) : [],
+    modificationsSaison: recus ? modificationsSaisonDepuis(recus) : [],
+    operations,
     mouvementsCaisse: [],
     impressions: [],
     anomaliesEnAttente: () => 0,
-    ...partiel,
+    ...reste,
   }
 }
 
@@ -184,21 +217,38 @@ describe('R-72 — agrégats d’une journée', () => {
   })
 
   it('O-06 — l’annulation retient le remboursement s’il existe, le payé sinon', () => {
+    // Le remboursement réel provient de `list_cash_register_refund_movements`
+    // (un `MouvementCaisse` de type 'refund_cash'), pas d'un champ porté par le
+    // reçu léger — `RecuSaison` n'a pas de `montantRembourseCentimes`.
     const rembourse = unRecu({
       id: 'r-x',
+      numero: 260,
       statut: 'ملغى',
       annuleLe: '03/08/2026 17:40',
-      montantRembourseCentimes: 300000,
       versements: [unVersement({ montantCentimes: 800000 })],
     })
     const sansRemboursement = unRecu({
       id: 'r-y',
+      numero: 261,
       statut: 'ملغى',
       annuleLe: '03/08/2026 18:00',
-      montantRembourseCentimes: 0,
       versements: [unVersement({ id: 'v-2', montantCentimes: 900000 })],
     })
-    const resume = resumeJournee(jour, source({ recus: [rembourse, sansRemboursement] }))
+    const remboursement: MouvementCaisse = {
+      id: 'm-remb',
+      type: 'refund_cash',
+      jour,
+      date: '03/08/2026',
+      heure: '17:40',
+      montantCentimes: 300000,
+      recuNumero: 260,
+      client: 'x',
+      employe: 'y',
+    }
+    const resume = resumeJournee(
+      jour,
+      source({ recus: [rembourse, sansRemboursement], mouvementsCaisse: [remboursement] }),
+    )
     expect(resume.nombreAnnulations).toBe(2)
     expect(resume.annulationsCentimes).toBe(300000 + 900000)
   })

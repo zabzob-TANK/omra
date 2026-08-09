@@ -29,6 +29,7 @@ import type {
   Chambre,
   Client,
   EntreeAudit,
+  EvenementModificationSaison,
   Hotel,
   ImpressionFinance,
   ModeRemboursement,
@@ -38,11 +39,13 @@ import type {
   Passeport,
   Rabatteur,
   Recu,
+  RecuSaison,
   ReferenceFichier,
   Saison,
   Tarif,
   Utilisateur,
   Versement,
+  VersementSaison,
   Vol,
 } from '../../domain/types'
 import type {
@@ -55,6 +58,7 @@ import type {
   ImpressionsFinancePort,
   JournalAuditPort,
   LecteurPasseportPort,
+  ModificationsSaisonPort,
   MouvementsCaissePort,
   OperationsPartageesPort,
   RecusPort,
@@ -62,8 +66,11 @@ import type {
   SessionPort,
   SourceDonnees,
   StockageFichiersPort,
+  VersementsSaisonPort,
 } from '../ports'
 import { centimesEnTexteDevise } from '../../domain/money'
+import { versementsSaisonDepuisRecu } from '../../domain/rules/cheque-register'
+import { totalPaye } from '../../domain/rules/receipt'
 import { construireJeuDemonstration, type ScenarioDemonstration } from './dataset'
 
 /** Copie défensive : l'appelant ne doit jamais muter le contenu du dépôt. */
@@ -272,6 +279,22 @@ export function creerSourceDemonstration(
       }
       return copier(sortie)
     },
+    async listerLeger(filtre: FiltreRecus = {}) {
+      let sortie = recus
+      if (!filtre.inclureAnnules) sortie = sortie.filter((r) => r.statut !== 'ملغى')
+      return copier(
+        sortie.map(
+          (r): RecuSaison => ({
+            id: r.id,
+            numero: r.numero,
+            date: r.date,
+            statut: r.statut,
+            annuleLe: r.annuleLe,
+            totalPayeCentimes: totalPaye(r),
+          }),
+        ),
+      )
+    },
     async parId(id) {
       const trouve = recus.find((r) => r.id === id)
       return trouve ? copier(trouve) : null
@@ -320,6 +343,7 @@ export function creerSourceDemonstration(
         motifAnnulation: '',
         impressions: 0,
         modifications: [],
+        nombreModifications: 0,
         // Un reçu neuf ne peut pas naître en trop-perçu — R-21 empêche tout
         // surpaiement dès le premier versement.
         anomalies: [],
@@ -343,6 +367,7 @@ export function creerSourceDemonstration(
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
       Object.assign(recu, champsModifies)
       recu.modifications.unshift(modification)
+      recu.nombreModifications = recu.modifications.length
       recu.derniereModification = modification.dateHeure
       recu.modifiePar = modification.employe
       return copier(recu)
@@ -361,6 +386,7 @@ export function creerSourceDemonstration(
       if (nouvelleOperation) operations.push(nouvelleOperation)
       Object.assign(premier, versement)
       recu.modifications.unshift(modification)
+      recu.nombreModifications = recu.modifications.length
       recu.derniereModification = modification.dateHeure
       recu.modifiePar = modification.employe
       return copier(recu)
@@ -566,6 +592,25 @@ export function creerSourceDemonstration(
     }
   }
 
+  const depotVersementsSaison: VersementsSaisonPort = {
+    async lister() {
+      return copier(recus.flatMap((r) => versementsSaisonDepuisRecu(r, operations)))
+    },
+  }
+
+  const depotModificationsSaison: ModificationsSaisonPort = {
+    async lister() {
+      const evenements: EvenementModificationSaison[] = recus.flatMap((r) =>
+        r.modifications.map((m) => ({
+          id: m.id,
+          recuNumero: r.numero,
+          survenuLe: m.dateHeure,
+        })),
+      )
+      return copier(evenements)
+    },
+  }
+
   return {
     referentiels,
     session,
@@ -574,6 +619,8 @@ export function creerSourceDemonstration(
     operationsPartagees: depotOperations,
     mouvementsCaisse: depotMouvements,
     impressionsFinance: depotImpressions,
+    versementsSaison: depotVersementsSaison,
+    modificationsSaison: depotModificationsSaison,
     acquittementsAnomalie: depotAcquittements,
     audit: journalAudit,
     fichiers: stockage,

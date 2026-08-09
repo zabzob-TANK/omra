@@ -7,6 +7,71 @@ export type BillingAnomalyType =
   | 'overpayment'
   | 'cheque_missing_supporting_image'
 
+/**
+ * Ligne brute de `list_billing_season_payments` — un versement de la saison,
+ * à plat, avec sa date propre ET la date de l'opération dont il dépend (si
+ * partagée) séparées : ce ne sont pas toujours le même jour (voir le
+ * commentaire de la migration), et ce n'est délibérément pas à ce type de
+ * choisir laquelle utiliser.
+ */
+export type BillingSeasonPaymentRow = {
+  payment_id: string
+  receipt_id: string
+  receipt_number: number
+  lifecycle_status: ReceiptLifecycleStatus
+  traveler_first_name_snapshot: string
+  traveler_last_name_snapshot: string
+  receipt_created_by_slot_label: string
+  /** État actuel de l'inscription — filet quand l'instantané du versement est incomplet (lignes anciennes). */
+  registration_hotel_name: string
+  registration_room_label: string
+  registration_flight_label: string
+  registration_rabatteur_name: string | null
+  registration_agreed_amount_dh: number
+  payment_number: number
+  amount_dh: number
+  payment_registered_at: string
+  payment_created_by_slot_label: string
+  payment_mode: PaymentMode
+  usage_kind: PaymentUsage
+  operation_id: string
+  operation_registered_at: string
+  operation_amount_dh: number
+  instrument_reference: string | null
+  instrument_date: string | null
+  bank_name: string | null
+  payer_name: string | null
+  /** Justificatif actif de l'opération — lu seulement pour un versement unique. */
+  image_storage_bucket: string | null
+  image_storage_path: string | null
+  image_original_file_name: string | null
+  image_uploaded_at: string | null
+  image_uploaded_by_slot_label: string | null
+  /** Instantané figé du versement (R-14, R-22) — jamais recalculé. */
+  snapshot_client_name: string
+  snapshot_hotel_name: string
+  snapshot_room_label: string
+  snapshot_flight_label: string
+  snapshot_program_label: string
+  snapshot_agreed_amount_dh: number
+  snapshot_rabatteur_name: string | null
+  snapshot_remaining_after_dh: number
+  snapshot_settled_after: boolean
+  total_rows: number
+}
+
+/** Ligne brute de `list_billing_season_modifications` — un événement de modification, à plat. */
+export type BillingSeasonModificationRow = {
+  modification_id: string
+  receipt_id: string
+  receipt_number: number
+  action_type: string
+  section_code: string | null
+  occurred_at: string
+  actor_slot_label: string
+  total_rows: number
+}
+
 export type BillingReceiptRow = {
   receipt_id: string
   season_id: string

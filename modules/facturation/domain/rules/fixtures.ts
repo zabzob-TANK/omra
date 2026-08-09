@@ -67,6 +67,7 @@ export function unRecu(partiel: Partial<Recu> = {}): Recu {
     motifAnnulation: '',
     impressions: 0,
     modifications: [],
+    nombreModifications: 0,
     anomalies: [],
     versements: [unVersement()],
     ...partiel,
@@ -135,7 +136,7 @@ export function saisieCheque(partiel: Partial<SaisieInstrument> = {}): SaisieIns
 
 export const CONTEXTE_PREPARATION = {
   operations: [] as OperationPartagee[],
-  recus: [] as Recu[],
+  versements: [] as Versement[],
   nouvelIdOperation: () => 'SOP-NOUVELLE',
   horodatage: '01/08/2026 12:00',
   employe: 'سمير بنعلي',

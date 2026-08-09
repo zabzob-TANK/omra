@@ -306,7 +306,11 @@ async function contexteCommun(source: SourceDonnees) {
     tarifs: await source.referentiels.tarifs(saison.id),
     // reprise.md §5.3 — un écran ne mélange jamais les saisons.
     operations: await source.operationsPartagees.lister(saison.id),
-    recus: await source.recus.lister({ inclureAnnules: true, saisonId: saison.id }),
+    // Décision de performance (2026-08-09) : seuls les versements (à plat)
+    // servent à `etatOperation` (disponible d'une opération partagée) — plus
+    // jamais un chargement complet de tous les reçus de la saison à chaque
+    // écriture (création, versement, correction).
+    versements: (await source.versementsSaison.lister(saison.id)).map((v) => v.versement),
     horodatage: horodatage(maintenant),
     date: dateDuJour(maintenant),
     heure: heureCourante(maintenant),
@@ -332,7 +336,7 @@ export async function creerRecu(
 
   const contexte: ContexteCreation = {
     operations: base.operations,
-    recus: base.recus,
+    versements: base.versements,
     nouvelIdOperation: () => source.identifiants.nouvelId('SOP'),
     horodatage: base.horodatage,
     employe: base.employe,
@@ -423,7 +427,7 @@ export async function ajouterVersement(
 
   const resultat = preparerVersement(saisie, recu, {
     operations: base.operations,
-    recus: base.recus,
+    versements: base.versements,
     nouvelIdOperation: () => source.identifiants.nouvelId('SOP'),
     horodatage: base.horodatage,
     employe: base.employe,
@@ -553,7 +557,7 @@ export async function modifierRecu(
     horodatage: base.horodatage,
     employe: base.employe,
     operations: base.operations,
-    recus: base.recus,
+    versements: base.versements,
     depassementConfirme,
   })
   if (resultat.statut !== 'ok') return resultat
@@ -729,11 +733,12 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
   const saison = await source.referentiels.saisonActive()
 
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
-  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const versementsSaison = await source.versementsSaison.lister(saison.id)
+  const modificationsSaison = await source.modificationsSaison.lister(saison.id)
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
   const operations = await source.operationsPartagees.lister(saison.id)
 
-  const tous = collecterMouvements(recus)
+  const tous = collecterMouvements(versementsSaison)
   const retenus = trierMouvements(tous.filter((m) => dansLaPeriode(m.jour, periode, maintenant)))
 
   const remboursements = mouvementsCaisse.filter(
@@ -808,8 +813,16 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
     }
   })
 
-  // R-60 — lignes d'annulation.
-  const annulees = annulationsDeLaPeriode(recus, periode, maintenant)
+  // R-60 — lignes d'annulation. Les annulations sont rares (pas le volume
+  // qui pose problème, contrairement aux versements) : un chargement complet
+  // limité aux SEULS reçus annulés de la saison reste proportionné, jamais
+  // les 500 reçus pour n'en garder qu'une poignée.
+  const recusLeger = await source.recus.listerLeger({ inclureAnnules: true, saisonId: saison.id })
+  const idsAnnules = recusLeger.filter((r) => r.statut === 'ملغى').map((r) => r.id)
+  const recusAnnulesComplets = (
+    await Promise.all(idsAnnules.map((id) => source.recus.parId(id)))
+  ).filter((r): r is Recu => r !== null)
+  const annulees = annulationsDeLaPeriode(recusAnnulesComplets, periode, maintenant)
   const annulations: LigneAnnulation[] = annulees.map((recu) => {
     const natures = [...new Set(recu.versements.map((v) => natureNormalisee(v.nature)))]
     const especes = recu.versements
@@ -857,18 +870,13 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
     return retenus.some((m) => m.versement.operationPartageeId === operation.id)
   }).length
 
-  const modifications = recus.reduce(
-    (compte, recu) =>
-      compte +
-      recu.modifications.filter((modification) =>
-        dansLaPeriode(
-          cleJourDepuisDateFr(dateFrDepuisHorodatage(modification.dateHeure)),
-          periode,
-          maintenant,
-        ),
-      ).length,
-    0,
-  )
+  const modifications = modificationsSaison.filter((evenement) =>
+    dansLaPeriode(
+      cleJourDepuisDateFr(dateFrDepuisHorodatage(evenement.survenuLe)),
+      periode,
+      maintenant,
+    ),
+  ).length
 
   const aujourdhui = cleJour(maintenant)
   const hier = decalerCleJour(aujourdhui, -1)
@@ -934,12 +942,12 @@ export async function enregistrerImpressionFinance(
 
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const saison = await source.referentiels.saisonActive()
-  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const versementsSaison = await source.versementsSaison.lister(saison.id)
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
   const impressions = await source.impressionsFinance.listerParJour(jour, saison.id)
 
   const mouvementIds = [
-    ...collecterMouvements(recus)
+    ...collecterMouvements(versementsSaison)
       .filter((m) => m.jour === jour)
       .map((m) => m.id),
     ...mouvementsCaisse.filter((m) => m.jour === jour).map((m) => m.id),
@@ -1078,7 +1086,9 @@ export async function suiviJournalier(
 
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const saison = await source.referentiels.saisonActive()
-  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const recusSaison = await source.recus.listerLeger({ inclureAnnules: true, saisonId: saison.id })
+  const versementsSaison = await source.versementsSaison.lister(saison.id)
+  const modificationsSaison = await source.modificationsSaison.lister(saison.id)
   const operations = await source.operationsPartagees.lister(saison.id)
   const mouvementsCaisse = await source.mouvementsCaisse.lister(saison.id)
 
@@ -1087,7 +1097,7 @@ export async function suiviJournalier(
   const cles = joursDuMois(mois, maintenant)
   const impressionsParJour: ImpressionFinance[] = []
   const anomaliesParJour = new Map<string, number>()
-  const tousMouvements = collecterMouvements(recus)
+  const tousMouvements = collecterMouvements(versementsSaison)
 
   for (const cle of cles) {
     const impressions = await source.impressionsFinance.listerParJour(cle, saison.id)
@@ -1105,7 +1115,9 @@ export async function suiviJournalier(
   }
 
   const resumes = resumesDuMois(mois, maintenant, {
-    recus,
+    recusSaison,
+    versementsSaison,
+    modificationsSaison,
     operations,
     mouvementsCaisse,
     impressions: impressionsParJour,
@@ -1257,9 +1269,9 @@ export interface RegistreBancaire {
 async function operationsBancaires(source: SourceDonnees): Promise<OperationBancaire[]> {
   // reprise.md §5.3 — un écran ne mélange jamais les saisons.
   const saison = await source.referentiels.saisonActive()
-  const recus = await source.recus.lister({ inclureAnnules: true, saisonId: saison.id })
+  const versementsSaison = await source.versementsSaison.lister(saison.id)
   const operations = await source.operationsPartagees.lister(saison.id)
-  return collecterOperationsBancaires(recus, operations)
+  return collecterOperationsBancaires(versementsSaison, operations)
 }
 
 async function urlImage(

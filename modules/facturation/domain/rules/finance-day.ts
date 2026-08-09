@@ -19,8 +19,14 @@ import type {
   MouvementCaisse,
   Recu,
   Versement,
+  VersementSaison,
 } from '../types'
 import { totalPaye } from './receipt'
+
+/** Reçu allégé porté par un `VersementSaison` — jamais un `Recu` complet. */
+type RecuLeger = VersementSaison['recu']
+/** Versement porté par un `VersementSaison` — `Versement` complet, instantané compris. */
+type VersementLeger = VersementSaison['versement']
 
 /** R-56 — Filtres proposés par le fichier de référence. */
 export type FiltreFinance = 'day' | 'weekend' | 'custom' | 'all'
@@ -39,16 +45,18 @@ export interface PeriodeFinance {
  * Reproduit `financeMovementId()` : l'identifiant du versement, ou un identifiant
  * dérivé lorsque le versement n'en porte pas.
  */
-export function identifiantMouvement(recu: Recu, versement: Versement, index: number): string {
-  return String(versement.id || `pay_${recu.id}_${index}`)
+export function identifiantMouvement(recuId: string, versement: Pick<Versement, 'id'>, index: number): string {
+  return String(versement.id || `pay_${recuId}_${index}`)
 }
 
 /** Ligne brute du journal, avant mise en forme. */
 export interface MouvementFinance {
   id: string
-  recu: Recu
-  versement: Versement
-  /** Rang du versement dans le reçu, à partir de 0. */
+  recu: RecuLeger
+  versement: VersementLeger
+  /** Rang du versement dans le reçu, à partir de 0 — ici toujours 0 : les
+   * versements d'une saison arrivent déjà un par un, jamais regroupés par
+   * reçu comme avant (voir `collecterMouvements`). */
   index: number
   nature: string
   /** Clé de journée du versement. */
@@ -64,57 +72,66 @@ export interface MouvementFinance {
 }
 
 /**
- * Rassemble tous les mouvements financiers de tous les reçus.
- * Reproduit la construction de `allFinanceRows`.
+ * Rassemble tous les mouvements financiers de la saison.
+ * Reproduit la construction de `allFinanceRows` — depuis
+ * `list_billing_season_payments` (à plat), jamais depuis des `Recu` complets
+ * (décision de performance du 2026-08-09).
+ *
+ * Le jour retenu reste celui du versement (`versement.dateHeure`), jamais
+ * celui de l'opération partagée — Paiements est le seul à grouper par date
+ * d'opération (voir `cheque-register.ts`), ce module suit le versement.
  */
-export function collecterMouvements(recus: readonly Recu[]): MouvementFinance[] {
+export function collecterMouvements(versementsSaison: readonly VersementSaison[]): MouvementFinance[] {
   const mouvements: MouvementFinance[] = []
   let sequence = 0
 
-  for (const recu of recus) {
-    recu.versements.forEach((versement, index) => {
-      const nature = natureNormalisee(versement.nature)
-      const dateDepuisHorodatage = dateFrDepuisHorodatage(versement.dateHeure)
-      const jour = cleJourDepuisDateFr(versement.date || dateDepuisHorodatage)
+  versementsSaison.forEach(({ recu, versement }) => {
+    const nature = natureNormalisee(versement.nature)
+    const dateDepuisHorodatage = dateFrDepuisHorodatage(versement.dateHeure)
+    const jour = cleJourDepuisDateFr(versement.date || dateDepuisHorodatage)
 
-      let heure = String(versement.heure || '').trim()
-      if (!heure) heure = heureDepuisHorodatage(versement.dateHeure)
-      if (!heure && index === 0) heure = heureDepuisHorodatage(recu.creeLe)
+    let heure = String(versement.heure || '').trim()
+    if (!heure) heure = heureDepuisHorodatage(versement.dateHeure)
 
-      // R-34 — un chèque ou un virement partagé porte la clé de son opération ;
-      // un instrument unique reçoit une clé qui lui est propre.
-      let cleOperation = ''
-      if (nature === NATURE_CHEQUE || nature === NATURE_VIREMENT) {
-        if (versement.portee === 'shared' || versement.montantOperationCentimes > 0) {
-          cleOperation = String(
-            versement.operationPartageeId ||
-              identiteOperationPartagee(
-                versement.referenceInstrument,
-                versement.dateInstrument,
-                versement.banque,
-              ),
-          )
-        } else {
-          cleOperation =
-            (nature === NATURE_CHEQUE ? 'cheque|' : 'transfer|') +
-            identifiantMouvement(recu, versement, index)
-        }
+    // `rang` (1-indexé, R-11) remplace l'ancien index de position dans
+    // `recu.versements` (0-indexé) : `index === 0` désigne ici, comme avant,
+    // le premier versement du reçu (rang 1), jamais une position dans un
+    // tableau qui n'existe plus sous cette forme.
+    const index = versement.rang - 1
+
+    // R-34 — un chèque ou un virement partagé porte la clé de son opération ;
+    // un instrument unique reçoit une clé qui lui est propre.
+    let cleOperation = ''
+    if (nature === NATURE_CHEQUE || nature === NATURE_VIREMENT) {
+      if (versement.portee === 'shared' || versement.montantOperationCentimes > 0) {
+        cleOperation = String(
+          versement.operationPartageeId ||
+            identiteOperationPartagee(
+              versement.referenceInstrument,
+              versement.dateInstrument,
+              versement.banque,
+            ),
+        )
+      } else {
+        cleOperation =
+          (nature === NATURE_CHEQUE ? 'cheque|' : 'transfer|') +
+          identifiantMouvement(recu.id, versement, index)
       }
+    }
 
-      mouvements.push({
-        id: identifiantMouvement(recu, versement, index),
-        recu,
-        versement,
-        index,
-        nature,
-        jour,
-        heure: heure || '—',
-        cleOperation,
-        triDateHeure: `${jour || '0000-00-00'}T${heure || '00:00'}`,
-        sequence: sequence++,
-      })
+    mouvements.push({
+      id: identifiantMouvement(recu.id, versement, index),
+      recu,
+      versement,
+      index,
+      nature,
+      jour,
+      heure: heure || '—',
+      cleOperation,
+      triDateHeure: `${jour || '0000-00-00'}T${heure || '00:00'}`,
+      sequence: sequence++,
     })
-  }
+  })
 
   return mouvements
 }

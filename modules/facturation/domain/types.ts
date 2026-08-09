@@ -234,8 +234,18 @@ export interface Recu {
    * `chargerResumeImpressionRecu`).
    */
   impressions: number | null
-  /** Prototype : `r.modifications[]`, plus récente en tête. */
+  /**
+   * Prototype : `r.modifications[]`, plus récente en tête.
+   *
+   * Toujours vide pour l'instant — voir `mapReceiptDetailToRecu` dans
+   * `data/supabase/mappers.ts` : traduire le détail par champ (avant/après
+   * nommés) exige de décider quels champs diffuser et sous quels libellés,
+   * une décision pas encore prise. `nombreModifications` ci-dessous porte le
+   * vrai compte, indépendamment de cette liste encore vide.
+   */
   modifications: Modification[]
+  /** Nombre réel de modifications enregistrées — voir la note sur `modifications`. */
+  nombreModifications: number
   /** Prototype : `r.derniereModification`. */
   derniereModification?: string
   /** Prototype : `r.modifiePar`. */
@@ -328,6 +338,83 @@ export interface Versement {
 
   /** R-14, R-22 — instantané figé, jamais réécrit. */
   instantane: InstantaneVersement
+}
+
+/**
+ * Décision de performance (2026-08-09) : un versement de toute la saison,
+ * avec les seules infos de son reçu porteur nécessaires à Paiements, au
+ * Journal financier et au Suivi journalier — jamais un `Recu` complet.
+ *
+ * `versement.instantane` EST inclus (contrairement à une première version de
+ * cette décision) : le Journal financier construit chaque ligne affichée
+ * depuis l'instantané figé (client, programme, convenu, restant après CE
+ * versement, statut après) — l'omettre aurait cassé `journalFinancier` dans
+ * `service.ts`. `list_billing_season_payments` le porte via les colonnes
+ * `payment_snapshot_*` de `receipt_payments`, jamais recalculé.
+ *
+ * `operationEnregistreeLe` porte la date d'enregistrement de l'opération
+ * (chèque/virement partagé) — distincte de `versement.dateHeure`, qui reste
+ * la date de CE versement précis. Un chèque partagé peut avoir été enregistré
+ * un autre jour que certaines de ses attributions ; Paiements groupe par la
+ * première, le Journal financier et le Suivi journalier par la seconde —
+ * chacun garde sa règle actuelle, aucune des deux n'est perdue.
+ */
+export interface VersementSaison {
+  versement: Versement
+  operationEnregistreeLe: string
+  recu: {
+    id: string
+    numero: number
+    prenom: string
+    nom: string
+    statut: StatutRecu
+    employe: string
+    /**
+     * État ACTUEL de l'inscription (pas figé) — sert uniquement de filet
+     * pour `journalFinancier` quand `versement.instantane` n'a pas de
+     * valeur pour ce champ (lignes trop anciennes pour un instantané
+     * complet). Ne jamais utiliser à la place de l'instantané par défaut.
+     */
+    hotel: string
+    chambre: string
+    vol: string
+    rabatteur: string
+    convenuCentimes: number
+  }
+}
+
+/**
+ * Décision de performance (2026-08-09) : un reçu de la saison, réduit aux
+ * champs que le Suivi journalier et le Journal financier lisent pour compter
+ * les nouvelles inscriptions et les annulations par jour — jamais un `Recu`
+ * complet avec ses versements. `totalPayeCentimes` remplace `totalPaye(recu)`
+ * (déjà agrégé côté RPC, jamais resommé ici).
+ */
+export interface RecuSaison {
+  id: string
+  numero: number
+  /** Date d'inscription, `jj/mm/aaaa`. */
+  date: DateFr
+  statut: StatutRecu
+  /** Horodatage d'annulation, absent si le reçu est actif. */
+  annuleLe?: string
+  totalPayeCentimes: number
+}
+
+/**
+ * Décision de performance (2026-08-09) : un événement de modification de la
+ * saison, à plat — remplace le parcours de `recu.modifications` sur tous les
+ * reçus pour compter les modifications par jour. Corrige au passage un bug
+ * préexistant et distinct : `recu.modifications` vaut toujours `[]` côté
+ * adaptateur réel (voir `mapReceiptDetailToRecu`), donc ce compte était déjà
+ * toujours à zéro en production, quel que soit le nombre réel de
+ * modifications — vérifié en direct sur la vraie saison le 2026-08-09
+ * (11 événements réels contre 0 affichés).
+ */
+export interface EvenementModificationSaison {
+  id: string
+  recuNumero: number
+  survenuLe: string
 }
 
 /**

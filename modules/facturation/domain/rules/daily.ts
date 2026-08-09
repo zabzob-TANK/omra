@@ -13,9 +13,16 @@
 import { NATURE_CHEQUE, NATURE_ESPECES, NATURE_VIREMENT, STATUT_ANNULE } from '../constants'
 import { cleJour, cleJourDepuisDateFr, dateFrDepuisHorodatage } from '../dates'
 import { natureNormalisee, identiteOperationPartagee } from '../payment-method'
-import type { ImpressionFinance, MouvementCaisse, OperationPartagee, Recu } from '../types'
+import type {
+  EvenementModificationSaison,
+  ImpressionFinance,
+  MouvementCaisse,
+  OperationPartagee,
+  Recu,
+  RecuSaison,
+  VersementSaison,
+} from '../types'
 import { identifiantMouvement } from './finance-day'
-import { totalPaye } from './receipt'
 
 /** R-68 — Noms de jours du fichier, dimanche en tête. */
 export const NOMS_JOURS = [
@@ -98,10 +105,17 @@ function decomposerMois(mois: string): [number, number] {
   return [Number(parties[1]), Number(parties[2]) - 1]
 }
 
-/** Versement rattaché à sa journée, avec sa clé de regroupement bancaire. */
+/**
+ * Versement rattaché à sa journée, avec sa clé de regroupement bancaire.
+ *
+ * `recuId`/`versementId` remplacent `recu`/`index` (position dans
+ * `recu.versements`, qui n'existe plus sous cette forme depuis la décision
+ * de performance du 2026-08-09) — seul l'identifiant compte ici, jamais une
+ * relecture du reçu complet.
+ */
 interface VersementDate {
-  recu: Recu
-  index: number
+  recuId: string
+  versementId: string
   cle: string
   nature: string
   operationId: string
@@ -124,37 +138,38 @@ function cleCreationOperation(operation: OperationPartagee | null): string {
   return iso ? iso[1] : ''
 }
 
+/**
+ * Reproduit la construction de `VersementDate` — depuis
+ * `list_billing_season_payments` (à plat), jamais depuis des `Recu` complets
+ * (décision de performance du 2026-08-09).
+ */
 function collecterVersements(
-  recus: readonly Recu[],
+  versementsSaison: readonly VersementSaison[],
   operations: readonly OperationPartagee[],
 ): VersementDate[] {
   const parId = new Map(operations.map((o) => [String(o.id), o]))
-  const sortie: VersementDate[] = []
-  for (const recu of recus) {
-    recu.versements.forEach((versement, index) => {
-      const nature = natureNormalisee(versement.nature)
-      const operationId = String(versement.operationPartageeId || '')
-      const operation = operationId ? (parId.get(operationId) ?? null) : null
-      const estBancaire = nature === NATURE_CHEQUE || nature === NATURE_VIREMENT
-      const cleBancaire = estBancaire
-        ? operationId ||
-          (nature === NATURE_CHEQUE ? 'CH|' : 'TR|') +
-            identifiantMouvement(recu, versement, index)
-        : ''
-      sortie.push({
-        recu,
-        index,
-        cle: cleJourDepuisDateFr(versement.date),
-        nature,
-        operationId,
-        operation,
-        cleBancaire,
-        montantCentimes: versement.montantCentimes,
-        montantOperationCentimes: versement.montantOperationCentimes,
-      })
-    })
-  }
-  return sortie
+  return versementsSaison.map(({ recu, versement }) => {
+    const nature = natureNormalisee(versement.nature)
+    const operationId = String(versement.operationPartageeId || '')
+    const operation = operationId ? (parId.get(operationId) ?? null) : null
+    const estBancaire = nature === NATURE_CHEQUE || nature === NATURE_VIREMENT
+    const cleBancaire = estBancaire
+      ? operationId ||
+        (nature === NATURE_CHEQUE ? 'CH|' : 'TR|') +
+          identifiantMouvement(recu.id, versement, versement.rang - 1)
+      : ''
+    return {
+      recuId: recu.id,
+      versementId: versement.id,
+      cle: cleJourDepuisDateFr(versement.date),
+      nature,
+      operationId,
+      operation,
+      cleBancaire,
+      montantCentimes: versement.montantCentimes,
+      montantOperationCentimes: versement.montantOperationCentimes,
+    }
+  })
 }
 
 /**
@@ -174,7 +189,9 @@ function groupesInstrument(
       cleCreation = cleCreationOperation(versement.operation) || versement.cle
     }
     if (cleCreation !== cle) continue
-    const groupe = versement.cleBancaire || identifiantMouvement(versement.recu, versement.recu.versements[versement.index], versement.index)
+    const groupe =
+      versement.cleBancaire ||
+      identifiantMouvement(versement.recuId, { id: versement.versementId }, 0)
     const existant = groupes.get(groupe)
     if (existant) existant.push(versement)
     else groupes.set(groupe, [versement])
@@ -200,7 +217,10 @@ function totalReelGroupes(groupes: Map<string, VersementDate[]>): number {
 }
 
 export interface SourceJournees {
-  recus: readonly Recu[]
+  /** Reçus allégés de la saison — jamais des `Recu` complets (voir `RecuSaison`). */
+  recusSaison: readonly RecuSaison[]
+  versementsSaison: readonly VersementSaison[]
+  modificationsSaison: readonly EvenementModificationSaison[]
   operations: readonly OperationPartagee[]
   mouvementsCaisse: readonly MouvementCaisse[]
   impressions: readonly ImpressionFinance[]
@@ -210,7 +230,7 @@ export interface SourceJournees {
 
 /** R-69, R-72 — Agrégats d'une journée. Reproduit `dailySummaryFor()`. */
 export function resumeJournee(cle: string, source: SourceJournees): ResumeJournee {
-  const versements = collecterVersements(source.recus, source.operations)
+  const versements = collecterVersements(source.versementsSaison, source.operations)
   return resumeJourneeAvecVersements(cle, source, versements)
 }
 
@@ -232,8 +252,8 @@ function resumeJourneeAvecVersements(
   const cheques = groupesInstrument(versements, cle, NATURE_CHEQUE)
   const virements = groupesInstrument(versements, cle, NATURE_VIREMENT)
 
-  const nouveaux = source.recus.filter((r) => cleJourDepuisDateFr(r.date) === cle)
-  const annulations = source.recus.filter((r) => {
+  const nouveaux = source.recusSaison.filter((r) => cleJourDepuisDateFr(r.date) === cle)
+  const annulations = source.recusSaison.filter((r) => {
     if (r.statut !== STATUT_ANNULE) return false
     const date = dateFrDepuisHorodatage(r.annuleLe)
     return !!date && cleJourDepuisDateFr(date) === cle
@@ -241,21 +261,20 @@ function resumeJourneeAvecVersements(
 
   // O-06 — le suivi journalier retient le montant remboursé s'il existe, et le
   // total payé sinon. Le journal financier, lui, retient toujours le total
-  // payé. L'écart est conservé tel quel.
-  const annulationsCentimes = annulations.reduce(
-    (somme, r) => somme + (r.montantRembourseCentimes || totalPaye(r) || 0),
-    0,
-  )
-
-  const modifications = source.recus.reduce((compte, recu) => {
-    return (
-      compte +
-      recu.modifications.filter((m) => {
-        const date = dateFrDepuisHorodatage(m.dateHeure)
-        return !!date && cleJourDepuisDateFr(date) === cle
-      }).length
+  // payé. L'écart est conservé tel quel. Le remboursement est cherché dans
+  // les mouvements de caisse déjà chargés pour ce jour (`mouvements`,
+  // ci-dessus) par numéro de reçu — jamais un champ `Recu` complet.
+  const annulationsCentimes = annulations.reduce((somme, r) => {
+    const remboursement = mouvements.find(
+      (m) => m.type === 'refund_cash' && m.recuNumero === r.numero,
     )
+    return somme + (remboursement?.montantCentimes || r.totalPayeCentimes || 0)
   }, 0)
+
+  const modifications = source.modificationsSaison.filter((m) => {
+    const date = dateFrDepuisHorodatage(m.survenuLe)
+    return !!date && cleJourDepuisDateFr(date) === cle
+  }).length
 
   const impressions = source.impressions.filter((p) => p.jour === cle)
   const enAttente = impressions.length ? source.anomaliesEnAttente(cle) : 0
@@ -295,7 +314,7 @@ export function resumesDuMois(
   maintenant: Date,
   source: SourceJournees,
 ): ResumeJournee[] {
-  const versements = collecterVersements(source.recus, source.operations)
+  const versements = collecterVersements(source.versementsSaison, source.operations)
   return joursDuMois(mois, maintenant).map((cle) =>
     resumeJourneeAvecVersements(cle, source, versements),
   )
@@ -448,7 +467,7 @@ export function cleOperationBancaire(
     versement.portee === 'shared' ||
     !!versement.operationPartageeId ||
     versement.montantOperationCentimes > 0
-  if (!partagee) return `payment:${identifiantMouvement(recu, versement, index)}`
+  if (!partagee) return `payment:${identifiantMouvement(recu.id, versement, index)}`
   const identifiant =
     versement.operationPartageeId ||
     identiteOperationPartagee(

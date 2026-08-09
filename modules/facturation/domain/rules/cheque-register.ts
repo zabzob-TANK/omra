@@ -14,8 +14,47 @@
 import { NATURE_CHEQUE, NATURE_VIREMENT } from '../constants'
 import { cleJourDepuisDateFr } from '../dates'
 import { identiteOperationPartagee, instrumentEnFrancais, natureNormalisee } from '../payment-method'
-import type { OperationPartagee, Recu, ReferenceFichier, Versement } from '../types'
+import type { OperationPartagee, Recu, ReferenceFichier, Versement, VersementSaison } from '../types'
 import { identifiantMouvement } from './finance-day'
+
+/** Reçu allégé porté par un `VersementSaison` — jamais un `Recu` complet. */
+type RecuLeger = VersementSaison['recu']
+/** Versement porté par un `VersementSaison` — `Versement` complet, instantané compris. */
+type VersementLeger = VersementSaison['versement']
+
+/**
+ * Convertit les versements d'un `Recu` déjà chargé en entier (détail d'un
+ * reçu, `chargerRecuParId`) vers la forme `VersementSaison` attendue par
+ * `collecterOperationsBancaires` — pour le détail d'UN SEUL reçu, où le
+ * chargement complet est déjà fait et ne coûte rien de plus qu'avant. Jamais
+ * utilisé pour la liste de toute la saison (voir `list_billing_season_payments`).
+ */
+export function versementsSaisonDepuisRecu(
+  recu: Recu,
+  operations: readonly OperationPartagee[],
+): VersementSaison[] {
+  const parId = new Map(operations.map((o) => [String(o.id), o]))
+  return recu.versements.map((versement) => {
+    const operation = versement.operationPartageeId ? parId.get(versement.operationPartageeId) : undefined
+    return {
+      versement,
+      operationEnregistreeLe: operation?.creeeLe || versement.dateHeure,
+      recu: {
+        id: recu.id,
+        numero: recu.numero,
+        prenom: recu.prenom,
+        nom: recu.nom,
+        statut: recu.statut,
+        employe: recu.employe,
+        hotel: recu.hotel,
+        chambre: recu.chambre,
+        vol: recu.vol,
+        rabatteur: recu.rabatteur,
+        convenuCentimes: recu.convenuCentimes,
+      },
+    }
+  })
+}
 
 /** Part d'une opération attribuée à un reçu. */
 export interface AttributionOperation {
@@ -35,8 +74,8 @@ export interface OperationBancaire {
   nature: string
   partagee: boolean
   operation: OperationPartagee | null
-  premierRecu: Recu
-  premierVersement: Versement
+  premierRecu: RecuLeger
+  premierVersement: VersementLeger
   /** Date d'enregistrement à l'agence, format `jj/mm/aaaa`. */
   dateEnregistrement: string
   cleEnregistrement: string
@@ -82,98 +121,97 @@ export function heureDepuisTexte(texte: string | null | undefined, defaut: strin
  * propre opération. Reproduit `collectChequeOperations()`.
  */
 export function collecterOperationsBancaires(
-  recus: readonly Recu[],
+  versementsSaison: readonly VersementSaison[],
   operations: readonly OperationPartagee[],
 ): OperationBancaire[] {
   const parId = new Map(operations.map((o) => [String(o.id), o]))
   const groupes = new Map<string, OperationBancaire>()
 
-  for (const recu of recus) {
-    recu.versements.forEach((versement, index) => {
-      const nature = natureNormalisee(versement.nature)
-      if (nature !== NATURE_CHEQUE && nature !== NATURE_VIREMENT) return
+  versementsSaison.forEach(({ recu, versement, operationEnregistreeLe }) => {
+    const nature = natureNormalisee(versement.nature)
+    if (nature !== NATURE_CHEQUE && nature !== NATURE_VIREMENT) return
 
-      const partagee =
-        versement.portee === 'shared' ||
-        !!versement.operationPartageeId ||
-        versement.montantOperationCentimes > 0
-      const identifiantPartage = partagee
-        ? String(
-            versement.operationPartageeId ||
-              identiteOperationPartagee(
-                versement.referenceInstrument,
-                versement.dateInstrument,
-                versement.banque,
-              ),
-          )
-        : ''
-      const cle = partagee
-        ? `shared:${identifiantPartage}`
-        : `payment:${identifiantMouvement(recu, versement, index)}`
-
-      const operation = partagee ? (parId.get(identifiantPartage) ?? null) : null
-      let element = groupes.get(cle)
-
-      if (!element) {
-        const texteCreation = partagee && operation ? operation.creeeLe || versement.dateHeure : versement.dateHeure
-        const dateEnregistrement = dateDepuisTexte(
-          texteCreation,
-          versement.date || recu.date || '—',
+    const partagee =
+      versement.portee === 'shared' ||
+      !!versement.operationPartageeId ||
+      versement.montantOperationCentimes > 0
+    const identifiantPartage = partagee
+      ? String(
+          versement.operationPartageeId ||
+            identiteOperationPartagee(
+              versement.referenceInstrument,
+              versement.dateInstrument,
+              versement.banque,
+            ),
         )
-        const heure = heureDepuisTexte(texteCreation, versement.heure || '00:00')
-        const cleEnregistrement = cleJourDepuisDateFr(dateEnregistrement)
-        element = {
-          cle,
-          nature: natureNormalisee((operation && operation.nature) || nature),
-          partagee,
-          operation,
-          premierRecu: recu,
-          premierVersement: versement,
-          dateEnregistrement,
-          cleEnregistrement,
-          cleTri: `${cleEnregistrement || '0000-00-00'}T${heure}`,
-          montantCentimes: partagee
-            ? (operation?.montantTotalCentimes ?? 0) || versement.montantOperationCentimes
-            : versement.montantCentimes,
-          numero: (operation && operation.reference) || versement.referenceInstrument || '—',
-          banque: (operation && operation.banque) || versement.banque || '—',
-          dateInstrument:
-            (operation && operation.dateInstrument) || versement.dateInstrument || '—',
-          payeur:
-            (operation && operation.payeur) ||
-            versement.payeur ||
-            `${recu.prenom || ''} ${recu.nom || ''}`,
-          employe:
-            (operation && operation.creeePar) || versement.enregistrePar || recu.employe || '—',
-          image: partagee ? (operation?.image ?? null) : versement.image,
-          attributions: [],
-          attribueCentimes: 0,
-          restantCentimes: 0,
-          clients: [],
-          recus: [],
-          type: partagee ? 'Partagé' : 'Unique',
-        }
-        groupes.set(cle, element)
-      }
+      : ''
+    const cle = partagee
+      ? `shared:${identifiantPartage}`
+      : `payment:${identifiantMouvement(recu.id, versement, versement.rang - 1)}`
 
-      element.attributions.push({
-        numeroRecu: recu.numero,
-        recuId: recu.id,
-        client: `${recu.prenom || ''} ${recu.nom || ''}`,
-        montantCentimes: versement.montantCentimes,
-        annule: recu.statut === 'ملغى',
-        versementId: versement.id,
-      })
+    const operation = partagee ? (parId.get(identifiantPartage) ?? null) : null
+    let element = groupes.get(cle)
 
-      // R-38 — pour une opération partagée, le montant, l'image et la nature
-      // viennent toujours de l'opération, jamais du versement.
-      if (partagee && operation) {
-        element.montantCentimes = operation.montantTotalCentimes || element.montantCentimes
-        element.image = operation.image
-        element.nature = natureNormalisee(operation.nature || element.nature)
+    if (!element) {
+      // `operationEnregistreeLe` porte déjà, pour un versement partagé, la
+      // date de l'opération (sinon celle du versement lui-même) — exactement
+      // ce que `operation.creeeLe || versement.dateHeure` calculait avant,
+      // désormais réglé côté RPC (voir la migration).
+      const texteCreation = partagee ? operationEnregistreeLe : versement.dateHeure
+      const dateEnregistrement = dateDepuisTexte(texteCreation, versement.date || '—')
+      const heure = heureDepuisTexte(texteCreation, versement.heure || '00:00')
+      const cleEnregistrement = cleJourDepuisDateFr(dateEnregistrement)
+      element = {
+        cle,
+        nature: natureNormalisee((operation && operation.nature) || nature),
+        partagee,
+        operation,
+        premierRecu: recu,
+        premierVersement: versement,
+        dateEnregistrement,
+        cleEnregistrement,
+        cleTri: `${cleEnregistrement || '0000-00-00'}T${heure}`,
+        montantCentimes: partagee
+          ? (operation?.montantTotalCentimes ?? 0) || versement.montantOperationCentimes
+          : versement.montantCentimes,
+        numero: (operation && operation.reference) || versement.referenceInstrument || '—',
+        banque: (operation && operation.banque) || versement.banque || '—',
+        dateInstrument:
+          (operation && operation.dateInstrument) || versement.dateInstrument || '—',
+        payeur:
+          (operation && operation.payeur) ||
+          versement.payeur ||
+          `${recu.prenom || ''} ${recu.nom || ''}`,
+        employe:
+          (operation && operation.creeePar) || versement.enregistrePar || recu.employe || '—',
+        image: partagee ? (operation?.image ?? null) : versement.image,
+        attributions: [],
+        attribueCentimes: 0,
+        restantCentimes: 0,
+        clients: [],
+        recus: [],
+        type: partagee ? 'Partagé' : 'Unique',
       }
+      groupes.set(cle, element)
+    }
+
+    element.attributions.push({
+      numeroRecu: recu.numero,
+      recuId: recu.id,
+      client: `${recu.prenom || ''} ${recu.nom || ''}`,
+      montantCentimes: versement.montantCentimes,
+      annule: recu.statut === 'ملغى',
+      versementId: versement.id,
     })
-  }
+
+    // R-38 — pour une opération partagée, le montant, l'image et la nature
+    // viennent toujours de l'opération, jamais du versement.
+    if (partagee && operation) {
+      element.montantCentimes = operation.montantTotalCentimes || element.montantCentimes
+      element.image = operation.image
+      element.nature = natureNormalisee(operation.nature || element.nature)
+    }
+  })
 
   return [...groupes.values()]
     .map((element) => {
