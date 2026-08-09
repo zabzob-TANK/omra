@@ -15,11 +15,19 @@
  */
 
 import type { SuiviJournalier } from '../../data/service'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import './suivi-journalier.css'
 
 interface Proprietes {
   suivi: SuiviJournalier
+  /**
+   * Vrai pendant un rechargement qui suit un premier affichage réussi (ex. :
+   * retour sur cet écran après avoir enregistré un reçu ailleurs). Les
+   * valeurs déjà affichées restent visibles, seulement estompées — jamais
+   * remplacées par un écran vide (2026-08-09).
+   */
+  rafraichissement?: boolean
   onMois: (mois: string) => void
   onMoisActuel: () => void
   onBasculerJournee: (cle: string) => void
@@ -30,6 +38,7 @@ interface Proprietes {
 
 export function EcranSuiviJournalier({
   suivi,
+  rafraichissement,
   onMois,
   onMoisActuel,
   onBasculerJournee,
@@ -46,7 +55,14 @@ export function EcranSuiviJournalier({
       <main className="daily-principal">
         <div className="daily-entete">
           <div>
-            <h1>{S.titre}</h1>
+            <h1>
+              {S.titre}
+              {rafraichissement ? (
+                <span className="omra-badge-rafraichissement">
+                  <IndicateurChargement /> Mise à jour…
+                </span>
+              ) : null}
+            </h1>
             <p>{S.sousTitre}</p>
           </div>
           <div className="daily-mois">
@@ -75,6 +91,7 @@ export function EcranSuiviJournalier({
           </div>
         </div>
 
+        <div className={`daily-donnees${rafraichissement ? ' omra-rafraichissement' : ''}`}>
         <div className="daily-synthese-defilement">
           <div className="daily-synthese">
             <div className="daily-carte principale">
@@ -207,6 +224,7 @@ export function EcranSuiviJournalier({
             <span>{S.noteWeekEnd}</span>
           </div>
         </section>
+        </div>
       </main>
     </div>
   )

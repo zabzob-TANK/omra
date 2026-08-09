@@ -198,6 +198,14 @@ export function ApplicationFacturation({
   const [selectionJournees, setSelectionJournees] = useState<string[]>([])
   const [afficherJourneesVides, setAfficherJourneesVides] = useState(true)
   const [registre, setRegistre] = useState<RegistreBancaire | null>(null)
+  // Décision du commanditaire (2026-08-09) : une valeur affichée ne doit
+  // jamais être indiscernable entre « fraîche » et « en cours de mise à
+  // jour ». Vrai uniquement à partir du DEUXIÈME chargement de chaque écran
+  // (le premier reste couvert par l'écran de chargement plein déjà en
+  // place) — les anciennes valeurs restent affichées, seulement estompées.
+  const [rafraichissementJournal, setRafraichissementJournal] = useState(false)
+  const [rafraichissementSuivi, setRafraichissementSuivi] = useState(false)
+  const [rafraichissementRegistre, setRafraichissementRegistre] = useState(false)
   // Filet de sécurité générique pour Finance, Paiements et Suivi journalier :
   // vrai dès que l'un des trois chargements échoue (panne réseau, etc.),
   // affiche un « à venir » propre au lieu de laisser planter toute la page.
@@ -247,14 +255,20 @@ export function ApplicationFacturation({
     async (periode: PeriodeFinance) => {
       const resolue = periode.filtre === 'day' && !periode.jour ? { ...periode, jour: aujourdhui } : periode
       setPeriodeFinance(resolue)
+      // Le tout premier chargement reste couvert par l'écran de chargement
+      // plein (voir plus bas, `!journal`) — seuls les rechargements suivants
+      // affichent l'indication de rafraîchissement sur les anciennes valeurs.
+      if (journal) setRafraichissementJournal(true)
       try {
         setJournal(await actions.journalFinancier(resolue))
         setFinanceIndisponible(false)
       } catch {
         setFinanceIndisponible(true)
+      } finally {
+        setRafraichissementJournal(false)
       }
     },
-    [actions, aujourdhui],
+    [actions, aujourdhui, journal],
   )
 
   const chargerSuivi = useCallback(
@@ -263,26 +277,32 @@ export function ApplicationFacturation({
       selection?: readonly string[]
       afficherVides?: boolean
     }) => {
+      if (suivi) setRafraichissementSuivi(true)
       try {
         setSuivi(await actions.suiviJournalier(options))
         setFinanceIndisponible(false)
       } catch {
         setFinanceIndisponible(true)
+      } finally {
+        setRafraichissementSuivi(false)
       }
     },
-    [actions],
+    [actions, suivi],
   )
 
   const chargerRegistre = useCallback(
     async (filtres: Partial<FiltresRegistre>, cle: string | null = null) => {
+      if (registre) setRafraichissementRegistre(true)
       try {
         setRegistre(await actions.registreBancaire(filtres, cle))
         setFinanceIndisponible(false)
       } catch {
         setFinanceIndisponible(true)
+      } finally {
+        setRafraichissementRegistre(false)
       }
     },
-    [actions],
+    [actions, registre],
   )
 
   /**
@@ -650,6 +670,7 @@ export function ApplicationFacturation({
       {ecran.nom === 'finance' && !aucuneSaison && !financeIndisponible && journal ? (
         <EcranFinance
           journal={journal}
+          rafraichissement={rafraichissementJournal}
           aujourdhui={aujourdhui}
           hier={hier}
           onPeriode={(periode) => void chargerJournal(periode)}
@@ -734,6 +755,7 @@ export function ApplicationFacturation({
           />
           <EcranSuiviJournalier
             suivi={suivi}
+            rafraichissement={rafraichissementSuivi}
             onMois={(mois) => {
               setMoisSuivi(mois)
               void chargerSuivi({
@@ -841,6 +863,7 @@ export function ApplicationFacturation({
           />
           <EcranPaiements
             registre={registre}
+            rafraichissement={rafraichissementRegistre}
             aujourdhui={aujourdhui}
             onFiltres={(modification) => {
               const suivants = { ...filtresRegistre, ...modification }

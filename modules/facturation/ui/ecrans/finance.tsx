@@ -30,6 +30,12 @@ import './finance.css'
 
 interface Proprietes {
   journal: JournalFinancier
+  /**
+   * Vrai pendant un rechargement qui suit un premier affichage réussi — les
+   * valeurs déjà affichées restent visibles, seulement estompées, jamais
+   * remplacées par un écran vide (2026-08-09).
+   */
+  rafraichissement?: boolean
   onPeriode: (periode: PeriodeFinance) => void
   onImprimer: () => Promise<void>
   onAcquitter: () => void
@@ -43,6 +49,7 @@ interface Proprietes {
 
 export function EcranFinance({
   journal,
+  rafraichissement,
   onPeriode,
   onImprimer,
   onAcquitter,
@@ -135,8 +142,15 @@ export function EcranFinance({
               {F.tout}
             </button>
           </div>
+
+          {rafraichissement ? (
+            <span className="omra-badge-rafraichissement">
+              <IndicateurChargement /> جارٍ التحديث…
+            </span>
+          ) : null}
         </div>
 
+        <div className={rafraichissement ? 'omra-rafraichissement' : undefined}>
         {/*
           R-62, R-66, R-67 — bandeau supérieur visible uniquement à
           l'impression : code d'impression, état de la veille, compteur de
@@ -450,6 +464,7 @@ export function EcranFinance({
           <span className="mono" dir="ltr">
             {journal.nombreImpressions ? String(journal.nombreImpressions).padStart(2, '0') : ''}
           </span>
+        </div>
         </div>
       </main>
     </div>

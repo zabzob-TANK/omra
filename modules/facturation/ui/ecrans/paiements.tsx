@@ -16,11 +16,18 @@
 
 import type { RegistreBancaire } from '../../data/service'
 import type { FiltresRegistre } from '../../domain/rules/cheque-register'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import './paiements.css'
 
 interface Proprietes {
   registre: RegistreBancaire
+  /**
+   * Vrai pendant un rechargement qui suit un premier affichage réussi — les
+   * valeurs déjà affichées restent visibles, seulement estompées, jamais
+   * remplacées par un écran vide (2026-08-09).
+   */
+  rafraichissement?: boolean
   onFiltres: (filtres: Partial<FiltresRegistre>) => void
   onOuvrirDetail: (cle: string) => void
   onAjouterImage: (cle: string) => void
@@ -29,6 +36,7 @@ interface Proprietes {
 
 export function EcranPaiements({
   registre,
+  rafraichissement,
   onFiltres,
   onOuvrirDetail,
   onAjouterImage,
@@ -43,9 +51,16 @@ export function EcranPaiements({
       <main className="cheque-principal">
         <div className="cheque-titre">
           <div>
-            <h2>{P.titre}</h2>
+            <h2>
+              {P.titre}
+              {rafraichissement ? (
+                <span className="omra-badge-rafraichissement">
+                  <IndicateurChargement /> Mise à jour…
+                </span>
+              ) : null}
+            </h2>
           </div>
-          <div className="cheque-synthese">
+          <div className={`cheque-synthese${rafraichissement ? ' omra-rafraichissement' : ''}`}>
             <div className="cheque-carte principale">
               <span>{P.montantGlobal}</span>
               <b>{registre.montantGlobal}</b>
@@ -158,7 +173,7 @@ export function EcranPaiements({
           </div>
         </div>
 
-        <div className="cheque-carte-tableau">
+        <div className={`cheque-carte-tableau${rafraichissement ? ' omra-rafraichissement' : ''}`}>
           <div className="cheque-defilement">
             <table className="cheque-tableau">
               <thead>
