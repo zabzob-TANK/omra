@@ -676,6 +676,16 @@ export const T = {
     erreur: 'تعذر تحميل السجل. حاول مجددًا.',
     pagePrecedente: 'السابق',
     pageSuivante: 'التالي',
+    // Onglet Sessions (2026-08-09) : voir la connexion jusqu'à la
+    // déconnexion d'une même personne, demande du commanditaire.
+    ongletOperations: 'العمليات',
+    ongletSessions: 'الجلسات',
+    connexion: 'الدخول',
+    deconnexion: 'الخروج',
+    duree: 'المدة',
+    pasEncoreDeconnecte: 'لم يسجل خروج بعد',
+    connecteAvantLaSemaine: 'متصل من قبل بداية الأسبوع',
+    videSessions: 'لا توجد جلسات خلال هذا الأسبوع.',
   },
 
   depassement: {

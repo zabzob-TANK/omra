@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest'
 
-import { libelleActionJournal, limitesSemaine, semaineDecalee } from './operations-journal'
+import type { LigneJournalOperations } from '../types'
+import { apparierSessions, libelleActionJournal, limitesSemaine, semaineDecalee } from './operations-journal'
+
+function ligne(
+  id: string,
+  date: string,
+  heure: string,
+  employe: string,
+  employeSlot: number | null,
+  typeAction = 'facturation_session.login_succeeded',
+): LigneJournalOperations {
+  return {
+    id,
+    date,
+    heure,
+    nature: '',
+    typeAction,
+    changements: [],
+    employe,
+    employeSlot,
+  }
+}
 
 describe('limitesSemaine — bornes lundi–dimanche', () => {
   it('un lundi est déjà le début de sa semaine', () => {
@@ -58,5 +79,117 @@ describe('libelleActionJournal — un type, un seul libellé, jamais de vocabula
 
   it('type inconnu : ne lève jamais, retombe sur le libellé par défaut de sectionDepuisActionType', () => {
     expect(libelleActionJournal('quelque_chose_inconnu')).toBe('الملاحظة')
+  })
+})
+
+describe('apparierSessions — connexion à déconnexion, jamais deux lignes séparées', () => {
+  it('une connexion et sa déconnexion : appariées avec la durée exacte', () => {
+    const sessions = apparierSessions(
+      [ligne('c1', '09/08/2026', '08:00', 'Administrateur', 1)],
+      [ligne('d1', '09/08/2026', '10:30', 'Administrateur', 1)],
+    )
+    expect(sessions).toEqual([
+      {
+        id: 'c1',
+        employe: 'Administrateur',
+        employeSlot: 1,
+        connexionDate: '09/08/2026',
+        connexionHeure: '08:00',
+        deconnexionDate: '09/08/2026',
+        deconnexionHeure: '10:30',
+        dureeMinutes: 150,
+      },
+    ])
+  })
+
+  it('connexion sans déconnexion trouvée : reste ouverte, jamais de donnée inventée', () => {
+    const sessions = apparierSessions([ligne('c1', '09/08/2026', '08:00', 'Employé 1', 2)], [])
+    expect(sessions).toEqual([
+      {
+        id: 'c1',
+        employe: 'Employé 1',
+        employeSlot: 2,
+        connexionDate: '09/08/2026',
+        connexionHeure: '08:00',
+      },
+    ])
+  })
+
+  it('déconnexion sans connexion trouvée : connecté avant le début de la semaine affichée', () => {
+    const sessions = apparierSessions([], [ligne('d1', '03/08/2026', '09:00', 'Employé 1', 2)])
+    expect(sessions).toEqual([
+      {
+        id: 'd1',
+        employe: 'Employé 1',
+        employeSlot: 2,
+        deconnexionDate: '03/08/2026',
+        deconnexionHeure: '09:00',
+      },
+    ])
+  })
+
+  it('deux employés distincts : jamais mélangés entre eux', () => {
+    const sessions = apparierSessions(
+      [
+        ligne('c1', '09/08/2026', '08:00', 'Administrateur', 1),
+        ligne('c2', '09/08/2026', '08:05', 'Employé 1', 2),
+      ],
+      [
+        ligne('d1', '09/08/2026', '12:00', 'Administrateur', 1),
+        ligne('d2', '09/08/2026', '12:05', 'Employé 1', 2),
+      ],
+    )
+    expect(sessions).toHaveLength(2)
+    expect(sessions.find((s) => s.employeSlot === 1)?.dureeMinutes).toBe(240)
+    expect(sessions.find((s) => s.employeSlot === 2)?.dureeMinutes).toBe(240)
+  })
+
+  it('reconnexion sans déconnexion entre les deux : la première session reste ouverte', () => {
+    const sessions = apparierSessions(
+      [
+        ligne('c1', '09/08/2026', '08:00', 'Administrateur', 1),
+        ligne('c2', '09/08/2026', '09:00', 'Administrateur', 1),
+      ],
+      [ligne('d1', '09/08/2026', '10:00', 'Administrateur', 1)],
+    )
+    expect(sessions).toEqual([
+      // La plus récente en tête (R-86).
+      {
+        id: 'c2',
+        employe: 'Administrateur',
+        employeSlot: 1,
+        connexionDate: '09/08/2026',
+        connexionHeure: '09:00',
+        deconnexionDate: '09/08/2026',
+        deconnexionHeure: '10:00',
+        dureeMinutes: 60,
+      },
+      {
+        id: 'c1',
+        employe: 'Administrateur',
+        employeSlot: 1,
+        connexionDate: '09/08/2026',
+        connexionHeure: '08:00',
+      },
+    ])
+  })
+
+  it('ignore une ligne sans poste (echec de connexion, employeSlot null)', () => {
+    const sessions = apparierSessions([ligne('c1', '09/08/2026', '08:00', 'غير معروف', null)], [])
+    expect(sessions).toEqual([])
+  })
+
+  it('la plus récente session en tête, plusieurs jours', () => {
+    const sessions = apparierSessions(
+      [
+        ligne('c1', '03/08/2026', '08:00', 'Administrateur', 1),
+        ligne('c2', '05/08/2026', '08:00', 'Administrateur', 1),
+      ],
+      [
+        ligne('d1', '03/08/2026', '17:00', 'Administrateur', 1),
+        ligne('d2', '05/08/2026', '17:00', 'Administrateur', 1),
+      ],
+    )
+    expect(sessions.map((s) => s.connexionDate)).toEqual(['05/08/2026', '03/08/2026'])
   })
 })
