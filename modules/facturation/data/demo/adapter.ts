@@ -388,10 +388,12 @@ export function creerSourceDemonstration(
     ) {
       const recu = recus.find((r) => r.id === recuId)
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
-      const premier = recu.versements[0]
-      if (!premier) throw new Error(`Premier versement introuvable : ${recuId}`)
+      // Décision du commanditaire (2026-08-09) : le versement corrigé est
+      // désigné explicitement par son rang, plus toujours le premier.
+      const cible = recu.versements.find((v) => v.rang === versement.rang)
+      if (!cible) throw new Error(`Versement introuvable (rang ${versement.rang}) : ${recuId}`)
       if (nouvelleOperation) operations.push(nouvelleOperation)
-      Object.assign(premier, versement)
+      Object.assign(cible, versement)
       recu.modifications.unshift(modification)
       recu.nombreModifications = recu.modifications.length
       recu.derniereModification = modification.dateHeure

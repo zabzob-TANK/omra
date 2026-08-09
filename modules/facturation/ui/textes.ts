@@ -511,23 +511,33 @@ export const T = {
       group: { titre: 'المجموعة / العائلة', sousTitre: 'إضافة، تغيير أو حذف المجموعة' },
       note: { titre: 'الملاحظة', sousTitre: 'تعديل الملاحظة فقط' },
       firstPayment: {
-        titre: 'طريقة الدفعة الأولى',
+        titre: 'طريقة الدفعة',
         sousTitre: 'الطريقة وبيانات الشيك أو التحويل، دون تغيير المبلغ',
       },
     },
-    premiereDfpFixe: 'مبلغ الدفعة الأولى — لا يتغير',
+    /** Décision du commanditaire (2026-08-09) : n'importe quel versement, plus seulement le premier. */
+    premiereDfpFixe: 'مبلغ الدفعة — لا يتغير',
     /** §5.9 — correction du montant, réservée à l'administrateur. */
-    montantAdministrateur: 'تصحيح مبلغ الدفعة الأولى (المدير فقط)',
+    montantAdministrateur: 'تصحيح مبلغ الدفعة (المدير فقط)',
     nouveauPrix: 'الثمن الجديد',
     nouveauConvenu: 'المبلغ المتفق عليه الجديد',
     montantInchange: 'المبلغ المدفوع يبقى كما هو',
     portePartagee:
       'بيانات العملية المشتركة تعدّل من سجل المدفوعات والتحويلات، وليس من الوصل.',
     noteFirstPayment:
-      'هذا التعديل يخص طريقة وبيانات الدفعة الأولى فقط. مبلغها والدفعات التالية لا تتغير.',
+      'هذا التعديل يخص طريقة وبيانات هذه الدفعة فقط. مبلغها والدفعات الأخرى لا تتغير.',
     /** §5.9 — pour l'administrateur, le montant est corrigeable depuis cette même section. */
     noteFirstPaymentAdministrateur:
-      'بصفتك مديرًا، يمكنك تصحيح مبلغ الدفعة الأولى أعلاه إضافة إلى طريقتها وبياناتها. الدفعات التالية لا تتغير.',
+      'بصفتك مديرًا، يمكنك تصحيح مبلغ هذه الدفعة أعلاه إضافة إلى طريقتها وبياناتها. الدفعات الأخرى لا تتغير.',
+    /**
+     * Décision du commanditaire (2026-08-09) : la correction ne vise plus
+     * automatiquement la première dfp — l'utilisateur désigne explicitement
+     * le versement à corriger parmi ceux du reçu.
+     */
+    choisirVersement: 'اختر الدفعة المطلوب تصحيحها:',
+    versementNumero: (rang: number) => `الدفعة رقم ${rang}`,
+    corriger: 'تصحيح',
+    changerVersement: 'تغيير الدفعة المختارة',
   },
 
   /** Bande « passeport lié » du formulaire de création. */

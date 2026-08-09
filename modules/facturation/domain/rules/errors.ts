@@ -53,6 +53,8 @@ export type CodeErreur =
   | 'recu-deja-solde'
   | 'nombre-maximal-de-versements-atteint'
   | 'premier-versement-absent'
+  /** Décision du commanditaire (2026-08-09) : versement désigné pour correction introuvable. */
+  | 'versement-cible-introuvable'
   // Instrument bancaire
   | 'reference-instrument-obligatoire'
   | 'date-instrument-obligatoire'
@@ -73,6 +75,8 @@ export type CodeErreur =
   | 'section-obligatoire'
   | 'operation-partagee-non-modifiable-ici'
   | 'montant-premier-versement-reserve-administrateur'
+  /** Décision du commanditaire (2026-08-09) : jamais de trop-perçu créé par cette correction. */
+  | 'montant-depasse-le-convenu'
   // Journal financier
   | 'impression-hors-periode-autorisee'
   | 'acquittement-reserve-administrateur'
@@ -178,6 +182,7 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
   'nombre-maximal-de-versements-atteint': (p) =>
     `بلغ هذا الوصل الحد الأقصى: ${p?.maximum ?? ''} دفعات.`,
   'premier-versement-absent': () => 'لا توجد دفعة أولى مرتبطة بهذا الوصل.',
+  'versement-cible-introuvable': () => 'الدفعة المطلوب تصحيحها غير موجودة.',
 
   'reference-instrument-obligatoire': () => 'رقم الشيك أو مرجع التحويل إجباري.',
   'date-instrument-obligatoire': () => 'تاريخ العملية إجباري.',
@@ -199,7 +204,9 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
   'operation-partagee-non-modifiable-ici': () =>
     'بيانات العملية المشتركة تعدّل من سجل المدفوعات والتحويلات، وليس من الوصل.',
   'montant-premier-versement-reserve-administrateur': () =>
-    'تعديل مبلغ الدفعة الأولى متاح للمدير فقط.',
+    'تعديل مبلغ الدفعة متاح للمدير فقط.',
+  'montant-depasse-le-convenu': () =>
+    'هذا المبلغ يتجاوز المبلغ المتفق عليه بعد احتساب باقي الدفعات.',
 
   'impression-hors-periode-autorisee': () => 'يمكن للموظف طباعة اليوم أو أمس فقط.',
   'acquittement-reserve-administrateur': () => 'تأكيد مراجعة التنبيه متاح للمدير فقط.',

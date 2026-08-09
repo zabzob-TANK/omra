@@ -59,7 +59,11 @@ export const LIBELLES_SECTIONS: Record<SectionModifiable, string> = {
   program: 'البرنامج والسعر',
   group: 'المجموعة / العائلة',
   note: 'الملاحظة',
-  firstPayment: 'طريقة الدفعة الأولى',
+  // Décision du commanditaire (2026-08-09) : n'importe quel versement peut
+  // être visé, pas seulement le premier — le libellé générique reste correct
+  // dans tous les cas ; `preparerModification` précise le rang exact pour le
+  // journal d'historique (`sectionLibelle` du résultat).
+  firstPayment: 'طريقة الدفعة',
 }
 
 /**
@@ -106,7 +110,7 @@ export interface SaisieModification {
   groupe: string
   // Note
   note: string
-  // Premier versement — méthode et instrument
+  // Versement corrigé — méthode et instrument
   nature: string
   reference: string
   dateInstrument: string
@@ -116,14 +120,29 @@ export interface SaisieModification {
   /** Montant total de l'opération, saisi en dirhams. */
   montantOperation: string
   /**
-   * §5.9 — Nouveau montant du premier versement, saisi en dirhams.
+   * §5.9 — Nouveau montant du versement corrigé, saisi en dirhams.
    * Vide : aucune correction demandée. Réservé à l'administrateur.
    */
   montant: string
+  /**
+   * Décision du commanditaire (2026-08-09) : le versement corrigé n'est plus
+   * toujours le premier — l'utilisateur le désigne explicitement par son
+   * rang (1 à 6). `0` : aucun versement encore choisi.
+   */
+  rangVersementCorrige: number
 }
 
-/** P01, §5.9 — Nouvelles valeurs du premier versement après correction. */
+/**
+ * P01, §5.9 — Nouvelles valeurs d'un versement après correction.
+ *
+ * Décision du commanditaire (2026-08-09) : n'importe quel versement du
+ * reçu peut être corrigé, désigné explicitement par `rang` — plus
+ * seulement le premier. La correction du montant reste réservée à
+ * l'administrateur (règle inchangée).
+ */
 export interface CorrectionPremierVersement {
+  /** Rang (1 à 6) du versement corrigé — désigné explicitement, jamais déduit. */
+  rang: number
   montantCentimes: number
   nature: string
   referenceInstrument: string
@@ -212,12 +231,15 @@ export function consignerChangement(
  * R-53 — Une opération partagée ne se modifie pas depuis le reçu.
  *
  * Reproduit le refus de `editFirstPayment()` : les données d'une opération
- * mutualisée appartiennent au registre des paiements, pas à un reçu particulier.
+ * mutualisée appartiennent au registre des paiements, pas à un reçu
+ * particulier. Décision du commanditaire (2026-08-09) : s'applique à
+ * n'importe quel versement du reçu, désigné explicitement — jamais
+ * seulement au premier. Un versement partagé reste correctible ailleurs
+ * (registre des paiements) ; ce contrôle porte uniquement sur la fenêtre
+ * de modification du reçu.
  */
-export function premierVersementModifiable(recu: Recu): boolean {
-  const premier = recu.versements[0]
-  if (!premier) return true
-  return !(premier.portee === 'shared' || premier.operationPartageeId)
+export function versementModifiable(versement: Pick<Versement, 'portee' | 'operationPartageeId'>): boolean {
+  return !(versement.portee === 'shared' || versement.operationPartageeId)
 }
 
 /**
@@ -355,9 +377,13 @@ export function preparerModification(
   let premierVersementCorrige: ResultatModification['premierVersementCorrige']
 
   if (section === 'firstPayment') {
-    const premier = recu.versements[0]
+    // Décision du commanditaire (2026-08-09) : le versement corrigé n'est
+    // plus toujours le premier — désigné explicitement par son rang, jamais
+    // déduit. `0` : aucun versement encore choisi dans l'écran (ne devrait
+    // pas arriver si l'interface impose un choix avant la saisie).
+    const premier = recu.versements.find((v) => v.rang === saisie.rangVersementCorrige)
     if (!premier) {
-      liste.push({ champ: 'nature', code: 'premier-versement-absent' })
+      liste.push({ champ: 'nature', code: 'versement-cible-introuvable' })
     }
 
     const espece = natureNormalisee(saisie.nature) === NATURE_ESPECES
@@ -389,6 +415,22 @@ export function preparerModification(
           liste.push({ champ: 'montant', code: 'montant-premier-versement-reserve-administrateur' })
         } else if (nouveauMontant <= 0) {
           liste.push({ champ: 'montant', code: 'montant-doit-etre-positif' })
+        } else if (premier) {
+          // Décision du commanditaire (2026-08-09) : cette correction ne
+          // doit jamais créer de trop-perçu — comparé au vrai disponible
+          // (convenu − somme des AUTRES versements), jamais au seul convenu
+          // total. Avec plusieurs versements déjà enregistrés, comparer au
+          // convenu total laisserait passer un dépassement réel. La RPC
+          // revalide ce même plafond côté serveur, source d'autorité finale.
+          const autresVersementsCentimes = recu.versements
+            .filter((v) => v.rang !== premier.rang)
+            .reduce((somme, v) => somme + v.montantCentimes, 0)
+          const disponibleCentimes = recu.convenuCentimes - autresVersementsCentimes
+          if (nouveauMontant > disponibleCentimes) {
+            liste.push({ champ: 'montant', code: 'montant-depasse-le-convenu' })
+          } else {
+            montantCentimes = nouveauMontant
+          }
         } else {
           montantCentimes = nouveauMontant
         }
@@ -467,6 +509,7 @@ export function preparerModification(
 
       premierVersementCorrige = {
         versement: {
+          rang: premier.rang,
           montantCentimes,
           nature: saisie.nature,
           referenceInstrument: reference,
@@ -507,9 +550,18 @@ export function preparerModification(
 
   if (liste.length) return erreurs(liste)
 
+  // Décision du commanditaire (2026-08-09) : le journal d'historique doit
+  // dire précisément quel versement a été corrigé, pas seulement « la
+  // méthode de la dfp » — sinon une correction du 3ᵉ versement se lit comme
+  // une correction du premier dans le récapitulatif du reçu.
+  const sectionLibelle =
+    section === 'firstPayment' && premierVersementCorrige
+      ? `${LIBELLES_SECTIONS[section]} — الدفعة رقم ${premierVersementCorrige.versement.rang}`
+      : LIBELLES_SECTIONS[section]
+
   return ok({
     section,
-    sectionLibelle: LIBELLES_SECTIONS[section],
+    sectionLibelle,
     motif: saisie.motif.trim(),
     changements,
     champsModifies,
@@ -533,8 +585,3 @@ export function preparerModification(
  * verrouillé pour tout le monde sans exception.
  */
 export const CHAMPS_NON_MODIFIABLES = ['numero', 'date', 'rabatteur'] as const
-
-/** R-55 — Seul le premier versement est concerné par une modification. */
-export function versementModifiable(rang: number): boolean {
-  return rang === 1
-}

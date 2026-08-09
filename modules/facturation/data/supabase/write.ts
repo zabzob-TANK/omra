@@ -394,11 +394,15 @@ export async function appliquerModificationSupabase(
 /**
  * `RecusPort.corrigerPremierVersement` — reprise fusion.md §4.2 / étape 8.
  *
- * `correct_billing_receipt_first_payment_method` (migration 202608030006,
- * déployée) remplace `202608020004` évoquée dans une version antérieure de ce
- * commentaire : elle plafonne déjà la correction au montant convenu et
- * réserve le changement de montant à l'administrateur côté base, en plus du
- * contrôle déjà fait par le domaine (`preparerModification`, §5.9).
+ * `correct_billing_receipt_payment_amount` (migration 202608090009,
+ * déployée) remplace `correct_billing_receipt_first_payment_method`
+ * (202608030006) : décision du commanditaire (2026-08-09) — n'importe quel
+ * versement du reçu (1 à 6) peut désormais être visé, désigné explicitement
+ * par `versement.rang`, plus seulement le premier. Elle plafonne toujours la
+ * correction au montant réellement disponible (convenu moins les AUTRES
+ * versements) et réserve le changement de montant à l'administrateur côté
+ * base, en plus du contrôle déjà fait par le domaine (`preparerModification`,
+ * §5.9).
  *
  * `nouvelleOperation` n'est jamais créée séparément ici : comme pour
  * `creerRecuSupabase`/`ajouterVersementSupabase`, c'est la RPC elle-même qui
@@ -413,7 +417,7 @@ export async function corrigerPremierVersementSupabase(
   confirmeDepassement: boolean,
 ): Promise<Recu> {
   const detail = await chargerDetailRecuBrut(recuId)
-  if (!detail) throw new Error('Reçu introuvable pour la correction du premier versement.')
+  if (!detail) throw new Error('Reçu introuvable pour la correction du versement.')
 
   // Le payeur par défaut d'un instrument unique doit rester stable : repris
   // de l'opération déjà enregistrée, jamais recalculé depuis l'identité
@@ -421,9 +425,9 @@ export async function corrigerPremierVersementSupabase(
   // fait paraître « la méthode a changé » à la RPC (qui compare le payeur
   // transmis à celui déjà stocké) et crée une opération neuve, orpheline de
   // son justificatif — confirmé en conditions réelles (RAPPORT-CHANTIER.md).
-  const premierPaiement = detail.payments.find((p) => p.payment_number === 1)
-  const operationActuelle = premierPaiement
-    ? detail.operations.find((o) => o.id === premierPaiement.payment_operation_id)
+  const paiementCible = detail.payments.find((p) => p.payment_number === versement.rang)
+  const operationActuelle = paiementCible
+    ? detail.operations.find((o) => o.id === paiementCible.payment_operation_id)
     : undefined
   const nomPayeurParDefaut =
     operationActuelle?.instrument?.payer_name ||
@@ -431,8 +435,9 @@ export async function corrigerPremierVersementSupabase(
   const instrument = resoudreParametresInstrument(versement, nomPayeurParDefaut)
 
   const supabase = await createClient()
-  const { error } = await supabase.rpc('correct_billing_receipt_first_payment_method', {
+  const { error } = await supabase.rpc('correct_billing_receipt_payment_amount', {
     p_receipt_id: recuId,
+    p_payment_number: versement.rang,
     p_reason: modification.motif,
     p_new_amount_dh: centimesVersDh(versement.montantCentimes),
     p_payment_mode: instrument.p_payment_mode,
@@ -444,15 +449,15 @@ export async function corrigerPremierVersementSupabase(
     p_instrument_date: instrument.p_instrument_date,
     p_payer_name: instrument.p_payer_name,
     // R-32 — durcissement : voir le commentaire équivalent dans
-    // `creerRecuSupabase` ci-dessus. `correct_billing_receipt_first_payment_method`
-    // (202608030006) recalcule elle-même `v_over_allocation`/`v_over_allocation_confirmed`
+    // `creerRecuSupabase` ci-dessus. `correct_billing_receipt_payment_amount`
+    // (202608090009) recalcule elle-même `v_over_allocation`/`v_over_allocation_confirmed`
     // et rejette l'appel si un dépassement existe sans confirmation.
     p_confirm_over_allocation: confirmeDepassement,
   })
   if (error) throw new Error(messageErreur(error))
 
   const recu = await recuParId(recuId)
-  if (!recu) throw new Error('Reçu introuvable après correction du premier versement.')
+  if (!recu) throw new Error('Reçu introuvable après correction du versement.')
   return recu
 }
 

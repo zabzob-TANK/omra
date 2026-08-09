@@ -5,7 +5,6 @@ import {
   consignerChangement,
   LIBELLES_SECTIONS,
   memeValeur,
-  premierVersementModifiable,
   preparerModification,
   SECTIONS_MODIFIABLES,
   versementModifiable,
@@ -52,6 +51,7 @@ function saisie(partiel: Partial<SaisieModification> = {}): SaisieModification {
     payeur: '',
     montantOperation: '',
     montant: '',
+    rangVersementCorrige: 1,
     ...partiel,
   }
 }
@@ -93,7 +93,11 @@ describe('R-49 — une seule section à la fois', () => {
   it('reprend les libellés de section du fichier de référence', () => {
     // Ces libellés sont enregistrés dans l'historique : ils ne sont pas traduits.
     expect(LIBELLES_SECTIONS.program).toBe('البرنامج والسعر')
-    expect(LIBELLES_SECTIONS.firstPayment).toBe('طريقة الدفعة الأولى')
+    // firstPayment n'est pas repris du fichier de référence (extension du
+    // commanditaire, §5.9) : décision du 2026-08-09, le libellé générique
+    // reste correct quel que soit le versement visé — voir sectionLibelle
+    // dans preparerModification pour le rang exact.
+    expect(LIBELLES_SECTIONS.firstPayment).toBe('طريقة الدفعة')
   })
 })
 
@@ -413,13 +417,13 @@ describe('R-53 — section premier versement', () => {
     const partage = unRecu({
       versements: [unVersement({ portee: 'shared', operationPartageeId: 'SOP-1' })],
     })
-    expect(premierVersementModifiable(partage)).toBe(false)
-    expect(premierVersementModifiable(recu)).toBe(true)
+    expect(versementModifiable(partage.versements[0])).toBe(false)
+    expect(versementModifiable(recu.versements[0])).toBe(true)
   })
 
-  it('signale un reçu sans premier versement', () => {
+  it('signale un reçu sans le versement ciblé', () => {
     const vide = unRecu({ versements: [] })
-    expect(codes(saisie({ section: 'firstPayment' }), vide)).toContain('premier-versement-absent')
+    expect(codes(saisie({ section: 'firstPayment' }), vide)).toContain('versement-cible-introuvable')
   })
 })
 
@@ -438,10 +442,14 @@ describe('R-54, R-55 — champs et versements non modifiables', () => {
     expect(CHAMPS_NON_MODIFIABLES).not.toContain('montantPremierVersement')
   })
 
-  it('n’autorise la modification que du premier versement', () => {
-    expect(versementModifiable(1)).toBe(true)
-    expect(versementModifiable(2)).toBe(false)
-    expect(versementModifiable(6)).toBe(false)
+  it('n’autorise la modification que d’un versement non partagé — n’importe lequel, désigné explicitement (2026-08-09)', () => {
+    expect(versementModifiable(unVersement({ portee: 'unique', operationPartageeId: '' }))).toBe(true)
+    expect(versementModifiable(unVersement({ portee: 'shared', operationPartageeId: 'SOP-1' }))).toBe(
+      false,
+    )
+    expect(versementModifiable(unVersement({ portee: 'unique', operationPartageeId: 'SOP-2' }))).toBe(
+      false,
+    )
   })
 
   it('ne place jamais le rabatteur parmi les champs modifiés', () => {

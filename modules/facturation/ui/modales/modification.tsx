@@ -18,12 +18,12 @@ import { centimesEnDirhamsSaisis, dirhamsSaisisEnCentimes } from '../../domain/m
 import type { ErreurValidation, Resultat } from '../../domain/rules/errors'
 import {
   LIBELLES_SECTIONS,
-  premierVersementModifiable,
+  versementModifiable,
   type SaisieModification,
 } from '../../domain/rules/edit-sections'
 import { totalPaye } from '../../domain/rules/receipt'
 import { construireGrille, montantConvenu } from '../../domain/rules/tarif'
-import type { Recu, SectionModifiable, Tarif } from '../../domain/types'
+import type { Recu, SectionModifiable, Tarif, Versement } from '../../domain/types'
 import { CaseACocher, Champ, enErreur, ListeErreurs, Saisie, Selection, Zone } from '../champs'
 import { Dialogue } from '../dialogue'
 import { ModaleDepassement } from './depassement'
@@ -79,6 +79,28 @@ function saisieInitiale(recu: Recu): SaisieModification {
     montantOperation: premier ? centimesEnDirhamsSaisis(premier.montantOperationCentimes) : '',
     // §5.9 — vide : aucune correction du montant demandée.
     montant: '',
+    // Décision du commanditaire (2026-08-09) : 0 tant qu'aucun versement
+    // n'est encore désigné — l'utilisateur choisit explicitement lequel.
+    rangVersementCorrige: 0,
+  }
+}
+
+/**
+ * Champs de saisie repris du versement désigné, une fois choisi dans la
+ * liste (2026-08-09). Reproduit exactement ce que `saisieInitiale` faisait
+ * pour `recu.versements[0]`, appliqué à n'importe quel versement.
+ */
+function champsPourVersement(versement: Versement): Partial<SaisieModification> {
+  return {
+    rangVersementCorrige: versement.rang,
+    nature: versement.nature,
+    reference: versement.referenceInstrument,
+    dateInstrument: versement.dateInstrument,
+    banque: versement.banque,
+    operationPartagee: versement.portee === 'shared',
+    payeur: versement.payeur,
+    montantOperation: centimesEnDirhamsSaisis(versement.montantOperationCentimes),
+    montant: '',
   }
 }
 
@@ -98,8 +120,10 @@ export function ModaleModification({
 
   const modifier = (patch: Partial<SaisieModification>) => setSaisie({ ...saisie, ...patch })
   const section = saisie.section
-  const versementPartage = !premierVersementModifiable(recu)
-  const premierVersement = recu.versements[0]
+  // Décision du commanditaire (2026-08-09) : le versement corrigé est
+  // désigné explicitement par l'utilisateur, plus seulement le premier.
+  const versementCible = recu.versements.find((v) => v.rang === saisie.rangVersementCorrige) ?? null
+  const choisirVersement = (versement: Versement) => modifier(champsPourVersement(versement))
 
   // Récapitulatif de la section « programme » : le fichier recalcule le prix à
   // chaque changement et rappelle que le montant déjà payé ne bouge pas.
@@ -145,10 +169,11 @@ export function ModaleModification({
       onFermer={onFermer}
       classeCoque="modif-coque"
       bandeau={
-        // R-54, R-55 — rappel des valeurs que la modification ne touche jamais
-        // pour tout le monde. §5.9 — le montant du premier versement en est
-        // délibérément exclu pour un administrateur, pour qui il n'est pas
-        // fixe : `premierMontantAdmin` le dit, au lieu de `premierMontantFixe`.
+        // R-54, R-55 — rappel des valeurs que la modification ne touche
+        // jamais pour tout le monde. Décision du commanditaire (2026-08-09) :
+        // le montant d'un versement n'est plus rattaché à « le premier » de
+        // façon fixe dans ce bandeau — quel versement est corrigeable dépend
+        // désormais du choix fait dans la section elle-même, montré là-bas.
         <div className="modif-fixes">
           <div>
             <div className="etiquette">{T.modification.numeroFixe}</div>
@@ -164,14 +189,6 @@ export function ModaleModification({
             <div className="etiquette">{T.modification.rabatteurFixe}</div>
             <div className="valeur">
               <TexteArabe>{recu.rabatteur || '—'}</TexteArabe>
-            </div>
-          </div>
-          <div>
-            <div className="etiquette">
-              {estAdministrateur ? T.modification.premierMontantAdmin : T.modification.premierMontantFixe}
-            </div>
-            <div className="valeur mono" dir="ltr">
-              {premierVersement ? <Montant centimes={premierVersement.montantCentimes} /> : '—'}
             </div>
           </div>
         </div>
@@ -199,13 +216,26 @@ export function ModaleModification({
           {/* Le fichier présente les six sections sur deux colonnes. */}
           <div className="modif-sections">
             {(Object.keys(LIBELLES_SECTIONS) as SectionModifiable[]).map((cle) => {
-              const bloquee = cle === 'firstPayment' && versementPartage
+              // Décision du commanditaire (2026-08-09) : la section reste
+              // ouverte tant qu'au moins UN versement du reçu est
+              // corrigeable — la liste de choix, plus bas, écarte ceux qui
+              // ne le sont pas (opération partagée, R-53) individuellement.
+              const bloquee =
+                cle === 'firstPayment' && !recu.versements.some((v) => versementModifiable(v))
               return (
                 <button
                   key={cle}
                   className="modif-section"
                   disabled={bloquee}
-                  onClick={() => setSaisie({ ...saisie, section: cle })}
+                  onClick={() => {
+                    // Un seul versement : le choisir directement, sans passer
+                    // par la liste — comportement identique à l'ancien écran.
+                    const patch =
+                      cle === 'firstPayment' && recu.versements.length === 1
+                        ? champsPourVersement(recu.versements[0])
+                        : {}
+                    setSaisie({ ...saisie, ...patch, section: cle })
+                  }}
                 >
                   <span className="titre">{LIBELLES_SECTIONS[cle]}</span>
                   <small>{bloquee ? T.modification.portePartagee : DESCRIPTIONS[cle]}</small>
@@ -383,8 +413,59 @@ export function ModaleModification({
               </div>
             ) : null}
 
-            {section === 'firstPayment' ? (
+            {section === 'firstPayment' && !versementCible ? (
+              // Décision du commanditaire (2026-08-09) : plusieurs versements
+              // et aucun encore désigné — l'utilisateur choisit explicitement
+              // celui à corriger, jamais deviné. Un versement déjà rattaché à
+              // une opération partagée (R-53) reste écarté ici.
+              <div className="modif-choix-versement">
+                <p className="omra-hint">{T.modification.choisirVersement}</p>
+                <div className="modif-liste-versements">
+                  {recu.versements.map((v) => {
+                    const correctible = versementModifiable(v)
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className="modif-versement-ligne"
+                        disabled={!correctible}
+                        onClick={() => choisirVersement(v)}
+                      >
+                        <span className="rang">{T.modification.versementNumero(v.rang)}</span>
+                        <span className="montant mono" dir="ltr">
+                          <Montant centimes={v.montantCentimes} />
+                        </span>
+                        <span className="nature">
+                          {v.nature === NATURE_ESPECES
+                            ? T.methodes.especes
+                            : v.nature === NATURE_CHEQUE
+                              ? T.methodes.cheque
+                              : v.nature === NATURE_VIREMENT
+                                ? T.methodes.virement
+                                : v.nature}
+                        </span>
+                        <span className="etat">
+                          {correctible ? T.modification.corriger : T.modification.portePartagee}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {section === 'firstPayment' && versementCible ? (
               <>
+                {recu.versements.length > 1 ? (
+                  <button
+                    type="button"
+                    className="modif-retour-versement"
+                    onClick={() => modifier({ rangVersementCorrige: 0 })}
+                  >
+                    {T.modification.versementNumero(versementCible.rang)} — {T.modification.changerVersement}
+                  </button>
+                ) : null}
+
                 {/* R-55 : figé pour un employé. §5.9 : éditable pour un administrateur. */}
                 {estAdministrateur ? (
                   <div className="omra-fields">
@@ -393,11 +474,7 @@ export function ModaleModification({
                         valeur={saisie.montant}
                         onChange={(v) => modifier({ montant: formaterMontant(v) })}
                         invalide={enErreur(erreurs, 'montant')}
-                        placeholder={
-                          premierVersement
-                            ? centimesEnDirhamsSaisis(premierVersement.montantCentimes)
-                            : ''
-                        }
+                        placeholder={centimesEnDirhamsSaisis(versementCible.montantCentimes)}
                         mono
                         inputMode="numeric"
                       />
@@ -407,11 +484,7 @@ export function ModaleModification({
                   <div className="modif-montant-fixe">
                     <span>{T.modification.premiereDfpFixe}</span>
                     <span className="valeur mono" dir="ltr">
-                      {premierVersement ? (
-                        <Montant centimes={premierVersement.montantCentimes} />
-                      ) : (
-                        '—'
-                      )}
+                      <Montant centimes={versementCible.montantCentimes} />
                     </span>
                   </div>
                 )}

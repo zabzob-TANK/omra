@@ -239,6 +239,7 @@ describe('R-86 — journal d’audit', () => {
       payeur: '',
       montantOperation: '',
       montant: '',
+      rangVersementCorrige: 1,
     })
     const etat = await chargerEtat()
     expect(etat.audit[0].action).toBe('تعديل')
@@ -268,6 +269,7 @@ function saisieFirstPayment(partiel: Partial<SaisieModification> = {}): SaisieMo
     payeur: '',
     montantOperation: '',
     montant: '',
+    rangVersementCorrige: 1,
     ...partiel,
   }
 }

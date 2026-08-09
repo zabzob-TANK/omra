@@ -2953,6 +2953,72 @@ input.mono[inputmode='numeric'] {
   margin: 10px 0 14px;
 }
 
+/* Choix du versement à corriger (2026-08-09) : liste avant le formulaire. */
+.modif-choix-versement {
+  margin-bottom: 14px;
+}
+
+.modif-liste-versements {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.modif-versement-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  text-align: start;
+  font-size: 13px;
+}
+
+.modif-versement-ligne:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: #c8cebe;
+}
+
+.modif-versement-ligne:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modif-versement-ligne .rang {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.modif-versement-ligne .montant {
+  margin-inline-start: auto;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.modif-versement-ligne .nature {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modif-versement-ligne .etat {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.modif-retour-versement {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.modif-retour-versement:hover {
+  color: var(--accent);
+}
+
 .modif-motif {
   margin-top: 15px;
   padding-top: 14px;

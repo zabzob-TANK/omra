@@ -268,6 +268,16 @@ function sectionDepuisActionType(actionType: string): SectionModifiable {
       return 'program'
     case 'billing_receipt.dossier_updated':
       return 'group'
+    // Décision du commanditaire (2026-08-09) : correction de versement,
+    // désormais viable pour n'importe quel rang — l'ancien nom reste mappé
+    // pour les corrections déjà enregistrées avant 202608090009, jamais
+    // réécrites (historique append-only). Voir aussi 202608090010, qui
+    // ajoute ces deux valeurs à `list_billing_receipt_history` : sans elle,
+    // ces lignes n'atteignaient jamais le client, ne serait-ce que pour
+    // tomber ici.
+    case 'billing_receipt.first_payment_method_corrected':
+    case 'billing_receipt.payment_method_corrected':
+      return 'firstPayment'
     case 'billing_receipt.note_updated':
     default:
       return 'note'
