@@ -77,26 +77,80 @@ function lireEnvLocal(fichier: string): Record<string, string> {
   return valeurs
 }
 
-/** Jeton d'accès réel, extrait du profil Chrome persistant déjà connecté. */
-async function extraireJetonSession(): Promise<string> {
-  const contexte = await chromium.launchPersistentContext(PROFILE_DIR, {
-    executablePath: CHROME_PATH,
-    headless: true,
-  })
-  const page = contexte.pages()[0] || (await contexte.newPage())
-  await page.goto(`${PROD_URL}/facturation`, { waitUntil: 'networkidle' })
-  const cookies = await contexte.cookies()
-  const cookieAuth = cookies.find((c) => c.name === AUTH_COOKIE)
-  await contexte.close()
-  if (!cookieAuth) {
+/**
+ * Jeton d'accès, extrait du profil Chrome persistant déjà connecté.
+ * `null` — jamais une exception — quand ce chemin n'a pas de session valide :
+ * `obtenirJetonSession()` juge s'il faut basculer sur le repli.
+ */
+async function extraireJetonViaProfilPersistant(): Promise<string | null> {
+  try {
+    const contexte = await chromium.launchPersistentContext(PROFILE_DIR, {
+      executablePath: CHROME_PATH,
+      headless: true,
+    })
+    const page = contexte.pages()[0] || (await contexte.newPage())
+    await page.goto(`${PROD_URL}/facturation`, { waitUntil: 'networkidle', timeout: 20_000 })
+    const cookies = await contexte.cookies()
+    // Filtré par domaine : ce même profil sert aussi des vérifications locales
+    // (127.0.0.1) et peut porter un cookie de même nom, périmé, sur cet autre
+    // domaine — piège déjà rencontré cette semaine sur un profil voisin.
+    const cookieAuth = cookies.find(
+      (c) => c.name === AUTH_COOKIE && c.domain === new URL(PROD_URL).hostname,
+    )
+    await contexte.close()
+    if (!cookieAuth) return null
+
+    let brut = decodeURIComponent(cookieAuth.value)
+    if (brut.startsWith('base64-')) brut = Buffer.from(brut.slice('base64-'.length), 'base64').toString('utf8')
+    const session = JSON.parse(brut)
+    const jeton = Array.isArray(session) ? session[0] : session.access_token
+    return typeof jeton === 'string' && jeton ? jeton : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Repli automatique par mot de passe — demande du commanditaire (2026-08-10) :
+ * une session qui expire toute seule a bloqué deux nuits de suite ; ce script
+ * ne doit plus jamais s'arrêter sans dire quoi faire. Connexion directe par
+ * mot de passe, jamais dépendante d'un cookie de navigateur existant — ne
+ * peut donc pas expirer de la même façon. Compte de test dédié, déjà
+ * documenté et déjà présent dans .env.local (CLAUDE.md §5) : jamais lu ni
+ * affiché ici au-delà de cet usage.
+ */
+async function connexionParMotDePasse(env: Record<string, string>): Promise<string> {
+  const email = env.OMRA_TEST_ADMIN_EMAIL
+  const motDePasse = env.OMRA_TEST_ADMIN_PASSWORD
+  if (!email || !motDePasse) {
     throw new Error(
-      `session expirée : reconnecte-toi manuellement sur ${PROD_URL}/facturation avec le profil ${PROFILE_DIR}, puis relance`,
+      'Aucune session valide sur le profil Chrome persistant, et repli impossible : ' +
+        'OMRA_TEST_ADMIN_EMAIL / OMRA_TEST_ADMIN_PASSWORD absents de .env.local (voir CLAUDE.md §5). ' +
+        `Ce qu'il faut faire : les ajouter à .env.local, ou reconnecter manuellement le profil ` +
+        `${PROFILE_DIR} sur ${PROD_URL}/facturation, puis relancer.`,
     )
   }
-  let brut = decodeURIComponent(cookieAuth.value)
-  if (brut.startsWith('base64-')) brut = Buffer.from(brut.slice('base64-'.length), 'base64').toString('utf8')
-  const session = JSON.parse(brut)
-  return Array.isArray(session) ? session[0] : session.access_token
+
+  const clientAuth = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { data, error } = await clientAuth.auth.signInWithPassword({ email, password: motDePasse })
+  if (error || !data.session) {
+    throw new Error(
+      'Aucune session valide sur le profil Chrome persistant, et la reconnexion par mot de passe a échoué : ' +
+        (error?.message ?? 'session absente après connexion') +
+        `. Ce qu'il faut faire : vérifier OMRA_TEST_ADMIN_EMAIL/PASSWORD dans .env.local (compte actif, ` +
+        `poste toujours autorisé), ou reconnecter manuellement le profil ${PROFILE_DIR} sur ` +
+        `${PROD_URL}/facturation, puis relancer.`,
+    )
+  }
+  return data.session.access_token
+}
+
+async function obtenirJetonSession(env: Record<string, string>): Promise<string> {
+  const viaProfil = await extraireJetonViaProfilPersistant()
+  if (viaProfil) return viaProfil
+  return connexionParMotDePasse(env)
 }
 
 function recuSaisonDepuisRecuComplet(recu: Recu): RecuSaison {
@@ -115,7 +169,7 @@ describe.skipIf(!process.env.OMRA_LIVE_COMPARISON)('comparaison en direct — ch
     'Paiements, Journal financier et Suivi journalier : mêmes montants, lignes, totaux et compteurs',
     async () => {
       const env = lireEnvLocal(ENV_LOCAL)
-      const accessToken = await extraireJetonSession()
+      const accessToken = await obtenirJetonSession(env)
       const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
         global: { headers: { Authorization: `Bearer ${accessToken}` } },
         auth: { autoRefreshToken: false, persistSession: false },

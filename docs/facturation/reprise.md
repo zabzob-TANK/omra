@@ -541,6 +541,35 @@ pour de vrai.
 > 2026-08-09 a montré pourquoi : une sauvegarde sur la même machine que la
 > donnée qu'elle protège partage le même risque de panne.
 
+### 5.15 Déploiement — aucun garde ne bloque tant qu'il n'y a que des données de test
+
+Décision du commanditaire (2026-08-10), qui **annule et remplace** toute
+règle antérieure du genre « rien ne part en production sans que [telle
+vérification] soit vert » : une règle de ce type a bloqué une promotion en
+production deux nuits de suite, coûtant une nuit de travail et une journée
+de test à l'agence — pour protéger des données qui n'ont, à ce stade,
+aucune valeur réelle.
+
+Politique retenue, tant que la base ne contient que des données de test
+(donc jusqu'au passage en exploitation, §5.14) : **aucune vérification ne
+bloque un déploiement.** Se tromper est gratuit à ce stade ; déployer
+souvent vaut mieux que déployer sûr. Optimiser reste bienvenu (scripts de
+comparaison, tests automatisés) mais aucun d'eux ne doit conditionner un
+déploiement — ce sont des outils de diagnostic, plus des portes.
+
+Ce que ça change concrètement :
+- une vérification qui ne peut pas s'exécuter (session expirée, outil
+  indisponible…) ne doit plus jamais être traitée comme un motif pour ne
+  pas déployer ;
+- si une règle et le bon sens se contredisent, le bon sens l'emporte — mais
+  se signale, il ne se décide pas en silence ;
+- une règle qui bloquerait un chantier entier est une règle à signaler au
+  commanditaire, jamais une règle à appliquer telle quelle sans le dire.
+
+Cette politique elle-même redevient à revoir **au moment précis** où de
+vraies données de clients entrent dans la base (§5.14) : « se tromper est
+gratuit » cesse d'être vrai à cet instant précis, pas avant.
+
 ---
 
 ## 6. Module Administration

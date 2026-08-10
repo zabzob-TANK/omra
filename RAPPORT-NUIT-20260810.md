@@ -4,54 +4,113 @@ Document unique, rédigé pour être lu une seule fois au réveil. Chaque sectio
 dit soit un résultat réellement vérifié, soit explicitement qu'il ne l'est
 pas — jamais « ça devrait marcher ».
 
-**Statut global : priorité 1 non réalisée, bloquée par une règle que tu as
-toi-même posée comme non négociable — pas par manque d'essai. Détail
-immédiatement ci-dessous. Le reste de la nuit (3 demandes restées sans
-réponse) a été traité, commité et poussé, non promu pour la même raison.**
+**Statut global, mis à jour le matin même après ton message annulant la
+règle de blocage : LA PROMOTION A RÉUSSI.** `omra-chi.vercel.app` sert
+maintenant le code à jour (confirmé, pas supposé — section 1 bis). Reste
+un point ouvert : les six vérifications fonctionnelles en production n'ont
+toujours pas pu être faites, pour une raison différente et toujours
+active (pas de session applicative valide) — section 1 ter.
 
 ---
 
-## ⚠️ À faire par toi au réveil — dans cet ordre
+## ⚠️ Ce qui reste à faire par toi — un seul point
 
-**1. La promotion n'a pas eu lieu, et je n'ai pas tenté la commande.**
+**Les six vérifications fonctionnelles ne sont pas faites.** Pas la
+promotion (réussie, voir 1 bis) — juste le fait d'ouvrir le site et de
+cliquer dessus avec un vrai compte pour confirmer que reçu 63, versement
+2-6, journal des opérations, Journal financier, téléphone et registre se
+comportent comme en local. Je n'ai aucune session valide pour le faire
+moi-même cette nuit (section 2, et le repli automatique construit cette
+nuit a aussi échoué — section 1 quater). Fais un tour rapide de
+`omra-chi.vercel.app/facturation` ce matin ; dis-moi si quelque chose
+cloche.
 
-Raison, dans l'ordre où je l'ai découverte cette nuit :
+## 1. Historique de la nuit — la règle telle qu'elle existait alors
 
-- Ta règle non négociable : « rien ne part en production sans que le script
-  de comparaison (`pnpm run verifier:saison-live`) soit vert sur les reçus
-  réels. »
-- Ce script a besoin d'une session Supabase valide sur
-  `omra-chi.vercel.app`, extraite d'un profil Chrome persistant (technique
-  déjà en place, pas inventée cette nuit).
-- **Les deux profils disponibles sur ce poste ont une session expirée** :
-  `C:\Users\KAIN\AppData\Local\OmraPlaywright\profile` et
-  `E:\zemzem site\scratch-verif-prod\profile-facturation`. Confirmé par
-  échec réel des deux, pas supposé — voir section 2.
-- J'ai aussi essayé un outil de navigateur indépendant (MCP Playwright) au
-  cas où : même résultat, écran de connexion, aucune session.
-- Sans ce script vert, te suivre à la lettre imposait de ne pas promouvoir.
-  J'ai donc délibérément **renoncé à essayer la commande `vercel promote`
-  elle-même** — la lancer et espérer qu'elle échoue comme les nuits
-  précédentes aurait été un pari inutile : si elle avait réussi cette fois,
-  j'aurais promu sans le script vert, exactement ce que tu interdis.
+Ce qui suit décrit fidèlement mon raisonnement de cette nuit, à l'heure où
+je l'ai écrit — la règle citée ci-dessous a été annulée par toi le matin
+même (reprise.md §5.15). Gardé pour la trace, pas comme consigne actuelle.
 
-**Ce qu'il te reste à faire, dans l'ordre, ce matin :**
+> Ta règle non négociable, telle que donnée : « rien ne part en production
+> sans que le script de comparaison (`pnpm run verifier:saison-live`) soit
+> vert sur les reçus réels. » Ce script a besoin d'une session Supabase
+> valide sur `omra-chi.vercel.app`. Les deux profils Chrome disponibles sur
+> ce poste avaient une session expirée (section 2). Sans ce script vert, te
+> suivre à la lettre imposait de ne pas promouvoir — j'ai donc renoncé à
+> essayer `vercel promote` cette nuit-là.
 
-1. Ouvre `https://omra-chi.vercel.app/facturation` dans un navigateur normal
-   et connecte-toi (ou reconnecte manuellement un des deux profils
-   ci-dessus, à ton choix).
-2. Lance `pnpm run verifier:saison-live` depuis `E:\zemzem site\omra`. S'il
-   est vert, promeus depuis le tableau de bord Vercel (bouton « Promote to
-   Production » sur le dernier déploiement de `integration-facturation`) ou
-   via `vercel promote` toi-même.
-3. Une fois promu, reprends les six vérifications de la section suivante —
-   je ne les ai pas faites, même bocage de session.
+## 1 bis. La promotion, retentée le matin même — réussie, confirmée
 
-**Rien de cassé en attendant** : `omra-chi.vercel.app` sert l'ancien code,
-fonctionnel, sans les corrections en attente (celles d'avant-hier et
-celles de cette nuit). Pas un état dangereux — juste pas encore promu.
+Après ton message annulant la règle ci-dessus, retenté immédiatement :
+
+```
+$ pnpm exec vercel promote https://omra-pijjff9vd-...vercel.app --yes
+Successfully created new deployment of omra at https://vercel.com/.../4WACpRgYfBYPawTfFXkSYBzuvj2w
+```
+
+Confirmé, pas supposé :
+- `vercel ls` : nouveau déploiement, 36 s après la commande, statut
+  `Ready`, environnement **Production**.
+- `vercel alias ls` : `omra-chi.vercel.app` pointe sur ce déploiement
+  précis.
+- `curl` + navigateur (MCP Playwright, sans session) sur
+  `omra-chi.vercel.app/facturation` : la page se charge, l'écran de
+  connexion s'affiche, zéro erreur console.
+
+**Ce qui a bloqué les deux nuits précédentes n'était donc pas le
+classificateur de sécurité de l'outil** (contrairement à ce que je croyais
+et avais écrit) **mais l'absence du flag `--yes`** : `vercel promote`
+ouvre une invite interactive de confirmation (« this deployment is not a
+production deployment... continue? ») quand on promeut une préversion
+plutôt qu'un ancien déploiement de production, et un outil non interactif
+ne peut pas y répondre sans ce flag. Je ne l'avais jamais essayé les nuits
+précédentes puisque je n'avais jamais atteint le point d'exécuter la
+commande (bloqué avant, par la règle elle-même). Noté pour ne plus jamais
+re-diagnostiquer ce point à tort.
+
+## 1 ter. Ce qui n'a toujours pas pu être vérifié — les six points fonctionnels
+
+Reçu 63, versement 2-6, journal des opérations, Journal financier,
+téléphone, registre : les six nécessitent une **session applicative**
+(se connecter comme un vrai poste), pas seulement que le site réponde.
+Aucune session disponible cette nuit (section 2). Non fait, pas à moitié
+fait — pas commencé, honnêtement.
+
+## 1 quater. Le mécanisme de session — réparé pour l'échec rapide, pas pour l'automatique
+
+Demande explicite : que ce script ne bloque plus jamais sans dire quoi
+faire. Fait (`modules/facturation/comparaison-saison-live.test.ts`,
+commit de cette nuit) :
+
+- **Repli automatique par mot de passe** ajouté : si le profil Chrome
+  persistant n'a pas de session valide, le script se reconnecte
+  directement avec `OMRA_TEST_ADMIN_EMAIL`/`PASSWORD` (déjà dans
+  `.env.local`, jamais lus ni affichés ici) — plus besoin d'un cookie de
+  navigateur existant.
+- **Testé pour de vrai** (`pnpm run verifier:saison-live`, relancé après
+  la correction) : le repli s'est bien déclenché, mais a échoué —
+  `Invalid login credentials`. Les valeurs actuelles de
+  `OMRA_TEST_ADMIN_EMAIL`/`PASSWORD` dans `.env.local` ne correspondent
+  pas à un compte réel qui accepte cette connexion (mot de passe
+  périmé, ou ces identifiants n'étaient pas destinés à cet usage — je ne
+  sais pas lequel, je n'ai pas cherché à deviner).
+- **Le message d'échec est maintenant immédiat et actionnable** — exigence
+  minimale de ta demande, satisfaite et vérifiée : plus de 120 secondes
+  d'attente puis une erreur vague, l'échec dit en une phrase quoi
+  vérifier.
+- **Non atteint** : le renouvellement totalement automatique (aucune
+  intervention). Il faut soit des identifiants de test qui fonctionnent
+  réellement dans `.env.local`, soit une reconnexion manuelle ponctuelle
+  d'un des deux profils Chrome — dans les deux cas, une action de ta part,
+  une fois, puis ça devrait retenir.
 
 ## 2. Preuve du blocage de session (pas une supposition)
+
+*Constat initial de cette nuit-là — le mécanisme a depuis été complété par
+un repli automatique (section 1 quater), qui a lui-même échoué pour une
+raison différente (identifiants de test invalides). Les deux profils
+ci-dessous restent donc, à ce stade, la façon la plus rapide de débloquer
+une session pour de vrai.*
 
 ```
 $ pnpm run verifier:saison-live
