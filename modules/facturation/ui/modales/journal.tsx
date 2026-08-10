@@ -46,16 +46,63 @@ const LIMITE_SESSIONS = 500
 
 type Onglet = 'operations' | 'sessions'
 
+const TYPE_CREATION = 'billing_receipt.created'
 const TYPE_ANNULATION = 'billing_receipt.cancelled'
+const TYPE_VERSEMENT_1 = 'billing_receipt.first_payment_added'
+const TYPE_VERSEMENT_N = 'billing_receipt.payment_added'
 const TYPE_CONNEXION_ECHOUEE = 'facturation_session.login_failed'
 const TYPE_CONNEXION_REUSSIE = 'facturation_session.login_succeeded'
 const TYPE_DECONNEXION = 'facturation_session.logout'
 
-/** Purement visuel : quel liseré de couleur, jamais une distinction métier. */
-function categorieLigne(ligne: LigneJournalOperations): 'negative' | 'modification' | 'neutre' {
+type CategorieLigne = 'negative' | 'modification' | 'creation' | 'versement' | 'connexion' | 'neutre'
+
+/**
+ * Purement visuel : quel liseré de couleur et quelle icône, jamais une
+ * distinction métier. Retour du commanditaire (2026-08-10) : création et
+ * versement doivent se distinguer l'un de l'autre, pas seulement du reste —
+ * six catégories désormais, pas trois.
+ */
+function categorieLigne(ligne: LigneJournalOperations): CategorieLigne {
   if (ligne.typeAction === TYPE_ANNULATION || ligne.typeAction === TYPE_CONNEXION_ECHOUEE) return 'negative'
   if (ligne.changements.length > 0) return 'modification'
+  if (ligne.typeAction === TYPE_CREATION) return 'creation'
+  if (ligne.typeAction === TYPE_VERSEMENT_1 || ligne.typeAction === TYPE_VERSEMENT_N) return 'versement'
+  if (ligne.typeAction === TYPE_CONNEXION_REUSSIE || ligne.typeAction === TYPE_DECONNEXION) return 'connexion'
   return 'neutre'
+}
+
+/**
+ * Icône par nature de l'action, jamais par couleur : une annulation reste une
+ * opération financière (icône reçu, liseré rouge) — seule une connexion,
+ * réussie ou non, porte l'icône porte. Trois formes seulement : reçu, pièce,
+ * porte. Pictogramme, jamais un texte, pour distinguer une opération
+ * financière d'une connexion au premier regard (demande du commanditaire).
+ */
+function IconeLigne({ ligne }: { ligne: LigneJournalOperations }) {
+  if (ligne.typeAction.startsWith('facturation_session.')) {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="4" y="3" width="16" height="18" rx="1.5" />
+        <circle cx="14" cy="12" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    )
+  }
+  if (ligne.typeAction === TYPE_VERSEMENT_1 || ligne.typeAction === TYPE_VERSEMENT_N) {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v8M9.5 10a2 2 0 0 1 2-1.5h1a2 2 0 0 1 0 4h-1a2 2 0 0 0 0 4h1a2 2 0 0 0 2-1.5" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <line x1="8" y1="8" x2="16" y2="8" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="8" y1="16" x2="13" y2="16" />
+    </svg>
+  )
 }
 
 function dureeLisible(minutes: number): string {
@@ -228,6 +275,8 @@ export function ModaleJournal({
               </button>
             </div>
 
+            <div className="journal-separateur" aria-hidden="true" />
+
             <div className="journal-filtres">
               <div className="journal-champ">
                 <label htmlFor="journal-employe">{T.journal.employe}</label>
@@ -345,22 +394,28 @@ function LigneJournal({ ligne }: { ligne: LigneJournalOperations }) {
   return (
     <div className={`journal-ligne journal-ligne-${categorieLigne(ligne)}`}>
       <div className="journal-ligne-entete">
+        <span className="journal-icone">
+          <IconeLigne ligne={ligne} />
+        </span>
         <span className="journal-heure mono" dir="ltr">
-          {ligne.date} {ligne.heure}
+          <span className="journal-heure-date">{ligne.date}</span>
+          <span className="journal-heure-h">{ligne.heure}</span>
         </span>
         <span className="journal-action">
           <TexteArabe>{ligne.nature}</TexteArabe>
         </span>
-        {ligne.numeroRecu ? (
-          <span className="journal-recu">
-            <Reference>{ligne.numeroRecu}</Reference>
-          </span>
-        ) : null}
-        {ligne.client ? (
-          <span className="journal-client">
-            <TexteArabe>{ligne.client}</TexteArabe>
-          </span>
-        ) : null}
+        <span className="journal-corps">
+          {ligne.numeroRecu ? (
+            <span className="journal-recu">
+              <Reference>{ligne.numeroRecu}</Reference>
+            </span>
+          ) : null}
+          {ligne.client ? (
+            <span className="journal-client">
+              <TexteArabe>{ligne.client}</TexteArabe>
+            </span>
+          ) : null}
+        </span>
         <span className="journal-employe">
           <TexteArabe>{ligne.employe}</TexteArabe>
         </span>
@@ -379,9 +434,20 @@ function LigneJournal({ ligne }: { ligne: LigneJournalOperations }) {
           ))}
         </div>
       ) : null}
+      {/* Règle du 2026-08-10 : jamais un texte ou un nombre nu sans préfixe —
+          motif et identifiant tenté ne partagent pas le même préfixe, ce ne
+          sont pas la même chose (l'un est saisi par un utilisateur
+          authentifié, l'autre non). */}
       {ligne.motif ? (
         <div className="journal-motif">
+          <span className="journal-motif-prefixe">{T.detail.motifPrefixe}</span>{' '}
           <TexteArabe>{ligne.motif}</TexteArabe>
+        </div>
+      ) : null}
+      {ligne.identifiantTente ? (
+        <div className="journal-motif">
+          <span className="journal-motif-prefixe">{T.journal.identifiantTentePrefixe}</span>{' '}
+          <span dir="ltr">{ligne.identifiantTente}</span>
         </div>
       ) : null}
     </div>

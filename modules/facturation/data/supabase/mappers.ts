@@ -384,14 +384,15 @@ export function mapOperationsJournalRowToLigne(
       instantaneHistoriqueDepuisJson(ligne.action_type, ligne.before_data),
       instantaneHistoriqueDepuisJson(ligne.action_type, ligne.after_data),
     ),
-    // Un échec de connexion n'a ni motif ni reçu concerné : after_data porte
-    // l'identifiant tenté (202608090014), affiché à la même place que le
-    // motif des autres lignes plutôt que d'ajouter une colonne dédiée pour
-    // un seul type d'action.
-    motif:
+    // Un échec de connexion n'a pas de motif saisi par un utilisateur
+    // authentifié : l'identifiant tenté vit dans son propre champ
+    // (`identifiantTente`), jamais mélangé à `motif` — corrigé le
+    // 2026-08-10, voir le commentaire sur `LigneJournalOperations.motif`.
+    motif: ligne.action_type === 'facturation_session.login_failed' ? undefined : (ligne.reason ?? undefined),
+    identifiantTente:
       ligne.action_type === 'facturation_session.login_failed'
-        ? `المعرف المُدخل : ${texteOptionnel(ligne.after_data?.attempted_login) || '—'}`
-        : (ligne.reason ?? undefined),
+        ? texteOptionnel(ligne.after_data?.attempted_login) || '—'
+        : undefined,
     employe: ligne.actor_slot_label,
     employeSlot: ligne.actor_slot_number,
   }

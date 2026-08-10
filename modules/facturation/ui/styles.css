@@ -3275,13 +3275,14 @@ input.mono[inputmode='numeric'] {
 
 /* Semaine à gauche, filtres à droite — reste en RTL naturel, contrairement
    au sélecteur de jour du Journal financier (finance.tsx, direction: ltr
-   volontaire). Ne pas reproduire ce motif ici (demande explicite). */
+   volontaire). Ne pas reproduire ce motif ici (demande explicite). Reprise du
+   2026-08-10 : une seule barre d'outils alignée, plus trois éléments posés
+   côte à côte — même hauteur (30px) pour les flèches et les listes,
+   séparateur vertical entre la semaine et les filtres, largeurs régulières. */
 .journal-barre {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 16px;
   padding: 8px 0 10px;
   border-bottom: 1px solid var(--border);
 }
@@ -3290,18 +3291,23 @@ input.mono[inputmode='numeric'] {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .journal-fleche {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   background: #fff;
   border-radius: 6px;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
   color: var(--accent-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .journal-fleche:hover {
@@ -3314,117 +3320,173 @@ input.mono[inputmode='numeric'] {
   white-space: nowrap;
 }
 
+.journal-separateur {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  flex: 0 0 auto;
+}
+
 .journal-filtres {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1 1 auto;
 }
 
 .journal-champ {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .journal-champ label {
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .journal-champ select {
+  height: 30px;
+  width: 168px;
   font-size: 11.5px;
-  padding: 3px 6px;
+  padding: 0 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   background: #fff;
+  color: inherit;
 }
 
 .journal-liste {
-  max-height: 55vh;
+  max-height: 58vh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding-top: 2px;
 }
 
-/* Une trace par ligne : en-tête horodatage/nature/reçu/client/employé, puis
-   le détail champ par champ (seulement pour une modification) et le motif.
-   Liseré de couleur purement visuel (2026-08-09) — jamais une distinction
-   métier — pour repérer d'un coup d'œil les annulations et les échecs de
-   connexion (rouge) et les modifications (bleu, même convention que le
-   Journal financier) parmi le reste (neutre). */
+/* Une carte par trace : en-tête horodatage/nature/reçu/client/employé, puis
+   le détail (champ par champ pour une modification, motif) sur un fond
+   légèrement contrasté — nettement rattaché à sa carte, nettement détaché de
+   la carte suivante grâce à la marge entre cartes (reprise du 2026-08-10).
+   Liseré de couleur et icône purement visuels, jamais une distinction
+   métier : rouge (annulation, échec de connexion), bleu (modification, même
+   convention que le Journal financier), vert (création), ambre (versement),
+   mauve (connexion), gris (le reste — impression, dépassement, anomalie). */
 .journal-ligne {
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--border);
-  border-inline-start: 3px solid transparent;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  border-inline-start: 4px solid var(--muted-2);
+  margin-bottom: 8px;
+  overflow: hidden;
   font-size: 12.5px;
 }
 
-.journal-ligne:nth-child(even) {
-  background: #fafaf8;
-}
-
-.journal-ligne-negative {
-  border-inline-start-color: #b24d43;
-}
-
-.journal-ligne-modification {
-  border-inline-start-color: #4a72a5;
-}
+.journal-ligne-negative { border-inline-start-color: #b24d43; }
+.journal-ligne-modification { border-inline-start-color: #4a72a5; }
+.journal-ligne-creation { border-inline-start-color: var(--accent); }
+.journal-ligne-versement { border-inline-start-color: #b8863a; }
+.journal-ligne-connexion { border-inline-start-color: #7d5d8f; }
 
 .journal-ligne-entete {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 11px;
+  gap: 12px;
+  padding: 10px 12px;
 }
+
+.journal-icone {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.journal-ligne-negative .journal-icone { background: #fcebe9; color: #b24d43; }
+.journal-ligne-modification .journal-icone { background: #eaf1f8; color: #2c4a68; }
+.journal-ligne-versement .journal-icone { background: #f8f0df; color: #7d5a22; }
+.journal-ligne-connexion .journal-icone { background: #f1ecf4; color: #5c4269; }
+.journal-ligne-neutre .journal-icone { background: #f1f0ea; color: var(--muted); }
 
 .journal-heure {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
+  min-width: 74px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
 }
+
+.journal-heure-date { display: block; }
+.journal-heure-h { color: var(--muted-2); }
 
 .journal-action {
   flex: 0 0 auto;
-  min-width: 110px;
   font-weight: 600;
   font-size: 11px;
   background: var(--accent-soft);
   color: var(--accent-deep);
   border-radius: 5px;
-  padding: 2px 8px;
-  display: inline-block;
+  padding: 3px 9px;
+  white-space: nowrap;
 }
 
-.journal-ligne-negative .journal-action {
-  background: #fcebe9;
-  color: #7a352d;
-}
+.journal-ligne-negative .journal-action { background: #fcebe9; color: #7a352d; }
+.journal-ligne-modification .journal-action { background: #eaf1f8; color: #2c4a68; }
+.journal-ligne-versement .journal-action { background: #f8f0df; color: #7d5a22; }
+.journal-ligne-connexion .journal-action { background: #f1ecf4; color: #5c4269; }
+.journal-ligne-neutre .journal-action { background: #f1f0ea; color: var(--muted); }
 
-.journal-ligne-modification .journal-action {
-  background: #eaf1f8;
-  color: #2c4a68;
+.journal-corps {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .journal-recu {
   flex: 0 0 auto;
+  font-weight: 600;
 }
 
 .journal-client {
   flex: 1 1 auto;
-  min-width: 90px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .journal-employe {
   flex: 0 0 auto;
+  font-size: 11px;
   color: var(--muted);
-  font-size: 11.5px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--border);
 }
 
 /* Même construction que .finance-changements-cellule (Journal financier) :
-   la ligne s'étire en hauteur plutôt que de tronquer. */
-.journal-changements {
-  margin-top: 6px;
-  padding-inline-start: 4px;
+   la ligne s'étire en hauteur plutôt que de tronquer. Fond légèrement
+   contrasté (reprise du 2026-08-10) : sépare visiblement le détail de
+   l'en-tête, qui reste blanc. */
+.journal-changements,
+.journal-motif {
+  background: #faf9f5;
+  border-top: 1px solid var(--border);
+  padding: 9px 12px 10px;
+}
+
+.journal-changements + .journal-motif {
+  border-top: 1px dashed var(--border);
+  margin-top: -1px;
 }
 
 .journal-changements .finance-changement:not(:last-child) {
@@ -3432,10 +3494,13 @@ input.mono[inputmode='numeric'] {
 }
 
 .journal-motif {
-  margin-top: 4px;
-  padding-inline-start: 4px;
   font-size: 11px;
   color: var(--muted);
+}
+
+.journal-motif-prefixe {
+  font-weight: 600;
+  color: var(--accent-deep);
 }
 
 .journal-pagination {

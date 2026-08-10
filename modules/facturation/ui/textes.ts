@@ -686,6 +686,11 @@ export const T = {
     pasEncoreDeconnecte: 'لم يسجل خروج بعد',
     connecteAvantLaSemaine: 'متصل من قبل بداية الأسبوع',
     videSessions: 'لا توجد جلسات خلال هذا الأسبوع.',
+    // Règle posée le 2026-08-10 : un champ sans correspondance ne s'affiche
+    // jamais comme un texte ou un nombre nu — toujours avec ce préfixe,
+    // jamais confondu avec T.detail.motifPrefixe (« السبب: ») : un identifiant
+    // tenté n'est pas un motif saisi par un utilisateur authentifié.
+    identifiantTentePrefixe: 'المعرف المُدخل:',
   },
 
   depassement: {

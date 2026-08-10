@@ -463,7 +463,20 @@ export interface LigneJournalOperations {
   client?: string
   /** Détail champ par champ, seulement pour une modification. */
   changements: ChangementChamp[]
+  /**
+   * Motif saisi par la personne qui a agi — jamais affiché sans le préfixe
+   * `T.detail.motifPrefixe` (« السبب: »), même convention que la fiche du
+   * reçu (`detail.tsx`). Un champ sans ce préfixe est un nombre ou un texte
+   * nu, sans correspondance visible — règle posée le 2026-08-10 après un
+   * signalement du commanditaire (motif de test « 123 » affiché seul).
+   */
   motif?: string
+  /**
+   * Identifiant tenté lors d'un échec de connexion — jamais le mot de passe.
+   * Distinct de `motif` : ce n'est pas une raison saisie par un utilisateur
+   * authentifié, donc pas le même préfixe (voir `T.journal.identifiantTente`).
+   */
+  identifiantTente?: string
   employe: string
   /**
    * `account_slots.slot_number` de l'auteur — pour le filtre par employé,
