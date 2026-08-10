@@ -8,28 +8,10 @@
  */
 
 /*
- * Montserrat pour les données du reçu (voir plus bas pour le détail de ce
- * qui compte comme donnée) — décision du commanditaire du 2026-08-10.
- * Fichiers auto-hébergés (Google Fonts, licence SIL Open Font License) sous
- * `public/facturation/fonts` : pas de dépendance réseau à l'impression.
- * Sous-ensemble latin uniquement — les libellés arabes du document
- * n'utilisent de toute façon jamais cette police (voir plus bas).
+ * Montserrat (données du reçu, voir plus bas ce qui compte comme donnée) :
+ * chargée globalement dans styles.css, disponible ici sans redéclaration —
+ * ce fichier n'est jamais utilisé hors de l'application principale.
  */
-@font-face {
-  font-family: 'Montserrat';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/facturation/fonts/montserrat-400.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Montserrat';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/facturation/fonts/montserrat-700.woff2') format('woff2');
-}
 
 .recu-atelier {
   --offset-x: 0mm;

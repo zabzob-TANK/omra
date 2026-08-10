@@ -7,6 +7,32 @@
  * les valeurs arabes conservent leur direction via les primitives de `bidi.tsx`.
  */
 
+/*
+ * Montserrat pour les chiffres de tout le site — décision du commanditaire
+ * du 2026-08-10, distincte du texte arabe (IBM Plex Sans Arabic, inchangé)
+ * et remplace IBM Plex Mono partout où il servait aux nombres (`.mono` et
+ * les quelques classes dédiées plus bas). Fichiers auto-hébergés (Google
+ * Fonts, licence SIL Open Font License, sous-ensemble latin) sous
+ * `public/facturation/fonts`, chargés ici pour être disponibles sur tout
+ * l'écran, pas seulement le reçu (qui les référence aussi, sans les
+ * redéclarer — voir recu.css).
+ */
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/facturation/fonts/montserrat-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Montserrat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/facturation/fonts/montserrat-700.woff2') format('woff2');
+}
+
 .omra {
   --accent: #47593c;
   --accent-deep: #2e3b27;
@@ -168,7 +194,7 @@
 }
 
 .mono {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
 }
 
 /*
@@ -1583,7 +1609,7 @@ input[type='number'] {
 }
 
 .omra-recu-attente-numero {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 40px;
   font-weight: 700;
   color: #b3bcc7;
@@ -1859,7 +1885,7 @@ input[type='number'] {
 }
 
 .detail-numero .valeur {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 36px;
   font-weight: 700;
   color: #f6d97a;
@@ -1867,14 +1893,14 @@ input[type='number'] {
 }
 
 .detail-numero .date {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 11.5px;
   color: rgba(255, 255, 255, 0.45);
   direction: ltr;
 }
 
 .detail-numero .heure {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
   direction: ltr;
@@ -2345,7 +2371,7 @@ input.mono[inputmode='numeric'] {
 }
 
 .detail-finance-cellule .valeur {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 17.5px;
   font-weight: 700;
   color: var(--accent-deep);
@@ -3825,7 +3851,7 @@ input.mono[inputmode='numeric'] {
   padding: 0 7px;
   border-radius: 8px;
   background: #f1f3ea;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Montserrat', Arial, Tahoma, sans-serif;
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.02em;

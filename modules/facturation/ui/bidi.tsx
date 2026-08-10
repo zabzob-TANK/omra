@@ -21,6 +21,17 @@ interface ProprietesBase {
   bloc?: boolean
 }
 
+/**
+ * Police des valeurs techniques (montant, date, téléphone, référence) —
+ * décision du commanditaire du 2026-08-10, « les chiffres de tout le
+ * site » : ces quatre primitives sont le point de passage obligé de toute
+ * valeur numérique/technique dans l'application (voir l'en-tête du
+ * fichier), donc le bon endroit unique pour ce choix. Jamais sur
+ * `TexteArabe` : Montserrat ne couvre pas ce script et la valeur y
+ * retomberait de toute façon sur la police arabe.
+ */
+const POLICE_VALEUR_TECHNIQUE = "'Montserrat', Arial, Tahoma, sans-serif"
+
 function ValeurDirigee({
   categorie,
   children,
@@ -66,7 +77,11 @@ export function Montant({
   const texte = avecDevise ? centimesEnTexteDevise(centimes) : centimesEnTexte(centimes)
   const { dir, style } = attributsDirection('montant')
   return (
-    <span dir={dir} className={className} style={{ ...style, whiteSpace: 'nowrap' }}>
+    <span
+      dir={dir}
+      className={className}
+      style={{ ...style, whiteSpace: 'nowrap', fontFamily: POLICE_VALEUR_TECHNIQUE }}
+    >
       {texte}
     </span>
   )
@@ -76,7 +91,11 @@ export function Montant({
 export function DateValeur({ children, className }: Omit<ProprietesBase, 'bloc'>) {
   const { dir, style } = attributsDirection('date')
   return (
-    <span dir={dir} className={className} style={{ ...style, whiteSpace: 'nowrap' }}>
+    <span
+      dir={dir}
+      className={className}
+      style={{ ...style, whiteSpace: 'nowrap', fontFamily: POLICE_VALEUR_TECHNIQUE }}
+    >
       {children}
     </span>
   )
@@ -86,7 +105,11 @@ export function DateValeur({ children, className }: Omit<ProprietesBase, 'bloc'>
 export function Telephone({ children, className }: Omit<ProprietesBase, 'bloc'>) {
   const { dir, style } = attributsDirection('telephone')
   return (
-    <span dir={dir} className={className} style={{ ...style, whiteSpace: 'nowrap' }}>
+    <span
+      dir={dir}
+      className={className}
+      style={{ ...style, whiteSpace: 'nowrap', fontFamily: POLICE_VALEUR_TECHNIQUE }}
+    >
       {children}
     </span>
   )
@@ -102,7 +125,12 @@ export function Reference({ children, className }: Omit<ProprietesBase, 'bloc'>)
     <span
       dir={dir}
       className={className}
-      style={{ ...style, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}
+      style={{
+        ...style,
+        whiteSpace: 'nowrap',
+        fontVariantNumeric: 'tabular-nums',
+        fontFamily: POLICE_VALEUR_TECHNIQUE,
+      }}
     >
       {children}
     </span>
