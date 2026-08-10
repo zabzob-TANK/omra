@@ -22,12 +22,17 @@ import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import {
   classesAtelier,
+  donneesAvecVersementsTest,
   impressionBloquee,
   MESSAGE_COMPTEUR_IMPRESSION_ECHEC,
   MESSAGE_IMPRESSION_BLOQUEE,
+  type NombreVersementsTest,
   preparerRecuImprimable,
+  type ReglagesCalage,
+  REGLAGES_CALAGE_VIERGES,
+  resumeReglagesCalage,
   sequenceImpression,
-  variablesDecalage,
+  variablesCalage,
 } from '../recu/donnees'
 import { RecuImprimable } from '../recu/recu-imprimable'
 
@@ -41,12 +46,97 @@ const OUTILS = {
   imprimer: 'Imprimer',
   indication:
     'La correction validée de base reste intégrée au design. Les axes X/Y servent uniquement aux tests d’impression. Les données du reçu restent en lecture seule.',
-  titreX: 'Décalage horizontal temporaire en millimètres',
-  titreY: 'Décalage vertical temporaire en millimètres',
+  global: 'Global',
+  echelle: 'Échelle',
+  signature: 'Signature',
+  versements: 'Versements',
+  souche: 'Souche',
+  test: 'Test',
+  testReel: 'Réel',
+  test1: '1 vers.',
+  test6: '6 vers.',
+  resume: 'Résumé (copiable)',
 } as const
 
 /** Papier à en-tête, servi depuis `public/`. */
 const CHEMIN_FOND = '/facturation/fond-facture.png'
+
+/**
+ * Affiché quand « Imprimer » est actionné pendant que le jeu de test (1 ou 6
+ * versements) est actif : imprimer à ce moment-là enregistrerait un vrai
+ * clic d'impression sur le reçu réel tout en sortant des données de test.
+ */
+const MESSAGE_TEST_VERSEMENTS_ACTIF =
+  'Basculez sur « Réel » avant d’imprimer : ce reçu affiche actuellement le jeu de test.'
+
+/** Pas des boutons +/− de l'atelier de calage, en millimètres. */
+const PAS_MM = 0.5
+
+/**
+ * Champ numérique pas à pas de l'atelier de calage : saisie directe +
+ * boutons +/−. Sert aussi bien aux décalages en millimètres (bornes ±10,
+ * base 0) qu'à l'échelle en pourcentage (bornes 80-120, base 100) — seuls
+ * `min`, `max` et `valeurParDefaut` changent d'un champ à l'autre.
+ * Réservé à l'atelier de calage interne (voir `OUTILS`).
+ *
+ * `contexte` (le nom du bloc — Global, Échelle, Signature, Versements,
+ * Souche) ne s'affiche pas : il ne sert qu'à distinguer les boutons +/− au
+ * clavier ou au lecteur d'écran, sans quoi les champs de même libellé («
+ * Y », par exemple) partageraient le même nom accessible.
+ */
+function ChampMm({
+  contexte,
+  label,
+  valeur,
+  onChange,
+  min = -10,
+  max = 10,
+  unite = 'mm',
+  valeurParDefaut = 0,
+}: {
+  contexte: string
+  label: string
+  valeur: string
+  onChange: (valeur: string) => void
+  min?: number
+  max?: number
+  unite?: string
+  valeurParDefaut?: number
+}) {
+  const pas = (delta: number) => {
+    const nombre = Number(valeur) || valeurParDefaut
+    onChange((Math.round((nombre + delta) * 10) / 10).toString())
+  }
+  const titre = `${contexte} ${label}`
+  return (
+    <label className="recu-champ-mm">
+      {label}
+      <button
+        type="button"
+        onClick={() => pas(-PAS_MM)}
+        aria-label={`${titre} : moins ${PAS_MM} ${unite}`}
+      >
+        −
+      </button>
+      <input
+        type="number"
+        step={PAS_MM}
+        min={min}
+        max={max}
+        title={titre}
+        value={valeur}
+        onChange={(evenement) => onChange(evenement.target.value)}
+      />
+      <button
+        type="button"
+        onClick={() => pas(PAS_MM)}
+        aria-label={`${titre} : plus ${PAS_MM} ${unite}`}
+      >
+        +
+      </button>
+    </label>
+  )
+}
 
 interface Proprietes {
   recu: Recu
@@ -62,17 +152,37 @@ interface Proprietes {
   onRetour: () => void
   /** R-84 — comptabilise une impression. Doit être attendu avant l'impression (P18). */
   onImpression: () => Promise<void>
+  /**
+   * Décision du commanditaire (2026-08-08) : le panneau de calage (`OUTILS`)
+   * est un outil de mise au point pour la véritable imprimante/le véritable
+   * papier — réservé au slot 1. Un employé ne doit ni le voir, ni pouvoir
+   * agir sur ses réglages, même indirectement (voir `variablesCalage`
+   * appliqué plus bas, gardé lui aussi derrière ce drapeau).
+   */
+  estAdministrateur: boolean
 }
 
-export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
-  const donnees = useMemo(() => preparerRecuImprimable(recu), [recu])
+export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: Proprietes) {
+  const donneesReelles = useMemo(() => preparerRecuImprimable(recu), [recu])
 
   const [sansFond, setSansFond] = useState(false)
   const [reperes, setReperes] = useState(false)
-  const [decalageX, setDecalageX] = useState('0')
-  const [decalageY, setDecalageY] = useState('0')
+  const [reglages, setReglages] = useState<ReglagesCalage>(REGLAGES_CALAGE_VIERGES)
+  /**
+   * Jeu de test à nombre fixe de versements (1 ou 6), pour vérifier qu'un
+   * calage trouvé tient dans les deux cas — `null` affiche le vrai reçu.
+   * Outil de calage uniquement, jamais utilisé pour un reçu réellement remis.
+   */
+  const [versementsTest, setVersementsTest] = useState<NombreVersementsTest | null>(null)
   const [message, setMessage] = useState('')
   const [envoi, setEnvoi] = useState(false)
+
+  const donnees = versementsTest
+    ? donneesAvecVersementsTest(donneesReelles, versementsTest)
+    : donneesReelles
+
+  const definirReglage = (cle: keyof ReglagesCalage) => (valeur: string) =>
+    setReglages((actuel) => ({ ...actuel, [cle]: valeur }))
 
   // La règle `@page` n'est posée que pendant l'affichage de cet écran, afin de
   // ne pas interférer avec les autres impressions de l'application — c'est la
@@ -90,6 +200,15 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
 
   const imprimer = async () => {
     if (envoi) return
+    // Le jeu de test (1/6 versements) remplace `donnees` par des paiements
+    // fabriqués, mais `onImpression` enregistre toujours un vrai clic
+    // d'impression pour CE reçu (compteur, date, auteur) : sans ce blocage,
+    // imprimer en mode test créditerait le reçu réel d'une impression alors
+    // que la page sortie de l'imprimante afficherait des données inventées.
+    if (versementsTest !== null) {
+      setMessage(MESSAGE_TEST_VERSEMENTS_ACTIF)
+      return
+    }
     // R-81 — au-delà de six paiements, le fichier de référence bloque
     // l'impression au lieu de produire un document incomplet.
     if (impressionBloquee(donnees)) {
@@ -114,10 +233,7 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
   const classes = classesAtelier({ sansFond, reperes })
 
   return (
-    <div
-      className={classes}
-      style={variablesDecalage(decalageX, decalageY) as React.CSSProperties}
-    >
+    <div className={classes} style={variablesCalage(reglages) as React.CSSProperties}>
       {/*
         Le fichier de référence place « رجوع » dans une barre à lui, au-dessus
         du reçu, et non dans la barre d'outils sombre : celle-ci appartient au
@@ -141,52 +257,119 @@ export function EcranRecu({ recu, onRetour, onImpression }: Proprietes) {
         </button>
       </div>
 
-      <div className="recu-outils" aria-label="Outils de test">
-        <strong>{OUTILS.titre}</strong>
-        <button onClick={() => setSansFond(false)}>{OUTILS.apercuComplet}</button>
-        <button onClick={() => setSansFond(true)}>{OUTILS.impressionSeule}</button>
-        <button onClick={() => setReperes((actuel) => !actuel)}>{OUTILS.reperes}</button>
-        <label>
-          X{' '}
-          <input
-            type="number"
-            min={-10}
-            max={10}
-            step={0.1}
-            title={OUTILS.titreX}
-            value={decalageX}
-            onChange={(evenement) => setDecalageX(evenement.target.value)}
-          />
-        </label>
-        <label>
-          Y{' '}
-          <input
-            type="number"
-            min={-10}
-            max={10}
-            step={0.1}
-            title={OUTILS.titreY}
-            value={decalageY}
-            onChange={(evenement) => setDecalageY(evenement.target.value)}
-          />
-        </label>
-        <button
-          onClick={() => {
-            setDecalageX('0')
-            setDecalageY('0')
-          }}
-        >
-          {OUTILS.reinitialiser}
-        </button>
-        <button className="primary" onClick={imprimer} disabled={envoi}>
-          {envoi ? <IndicateurChargement /> : null}
-          {OUTILS.imprimer}
-        </button>
-        <span className="indication">{OUTILS.indication}</span>
-        {donnees.depassement ? (
-          <span className="alerte-depassement">{donnees.messageDepassement}</span>
-        ) : null}
-      </div>
+      {/*
+        Décision du commanditaire (2026-08-08) : le calage (positions,
+        échelle, jeu de versements de test, aperçu sans fond/repères) est un
+        outil de mise au point pour la vraie imprimante et le vrai papier —
+        réservé au slot 1. Un employé n'a accès qu'au bouton d'impression lui-
+        même, jamais aux réglages : `reglages`/`versementsTest`/`sansFond`/
+        `reperes` restent alors bloqués à leur valeur vierge (aucun moyen de
+        les modifier sans ce panneau), donc sans effet sur son impression.
+      */}
+      {estAdministrateur ? (
+        <div className="recu-outils" aria-label="Outils de test">
+          <strong>{OUTILS.titre}</strong>
+          <button onClick={() => setSansFond(false)}>{OUTILS.apercuComplet}</button>
+          <button onClick={() => setSansFond(true)}>{OUTILS.impressionSeule}</button>
+          <button onClick={() => setReperes((actuel) => !actuel)}>{OUTILS.reperes}</button>
+
+          <div className="recu-groupe">
+            <span className="recu-groupe-titre">{OUTILS.global}</span>
+            <ChampMm contexte={OUTILS.global} label="X" valeur={reglages.decalageX} onChange={definirReglage('decalageX')} />
+            <ChampMm contexte={OUTILS.global} label="Y" valeur={reglages.decalageY} onChange={definirReglage('decalageY')} />
+          </div>
+
+          <button
+            onClick={() => {
+              setReglages(REGLAGES_CALAGE_VIERGES)
+              setVersementsTest(null)
+            }}
+          >
+            {OUTILS.reinitialiser}
+          </button>
+          <button className="primary" onClick={imprimer} disabled={envoi}>
+            {envoi ? <IndicateurChargement /> : null}
+            {OUTILS.imprimer}
+          </button>
+          <span className="indication">{OUTILS.indication}</span>
+          {donnees.depassement ? (
+            <span className="alerte-depassement">{donnees.messageDepassement}</span>
+          ) : null}
+
+          <div className="recu-atelier-avance">
+            <div className="recu-groupe">
+              <span className="recu-groupe-titre">{OUTILS.echelle}</span>
+              <ChampMm
+                contexte={OUTILS.echelle}
+                label="%"
+                valeur={reglages.echelle}
+                onChange={definirReglage('echelle')}
+                min={80}
+                max={120}
+                unite="%"
+                valeurParDefaut={100}
+              />
+            </div>
+
+            <div className="recu-groupe">
+              <span className="recu-groupe-titre">{OUTILS.signature}</span>
+              <ChampMm contexte={OUTILS.signature} label="X" valeur={reglages.signatureX} onChange={definirReglage('signatureX')} />
+              <ChampMm contexte={OUTILS.signature} label="Y" valeur={reglages.signatureY} onChange={definirReglage('signatureY')} />
+            </div>
+
+            <div className="recu-groupe">
+              <span className="recu-groupe-titre">{OUTILS.versements}</span>
+              <ChampMm contexte={OUTILS.versements} label="X" valeur={reglages.versementsX} onChange={definirReglage('versementsX')} />
+              <ChampMm contexte={OUTILS.versements} label="Y" valeur={reglages.versementsY} onChange={definirReglage('versementsY')} />
+            </div>
+
+            <div className="recu-groupe">
+              <span className="recu-groupe-titre">{OUTILS.souche}</span>
+              <ChampMm contexte={OUTILS.souche} label="X" valeur={reglages.soucheX} onChange={definirReglage('soucheX')} />
+              <ChampMm contexte={OUTILS.souche} label="Y" valeur={reglages.soucheY} onChange={definirReglage('soucheY')} />
+            </div>
+
+            <div className="recu-groupe recu-test-versements">
+              <span className="recu-groupe-titre">{OUTILS.test}</span>
+              <button
+                className={versementsTest === null ? 'active' : undefined}
+                onClick={() => setVersementsTest(null)}
+              >
+                {OUTILS.testReel}
+              </button>
+              <button
+                className={versementsTest === 1 ? 'active' : undefined}
+                onClick={() => setVersementsTest(1)}
+              >
+                {OUTILS.test1}
+              </button>
+              <button
+                className={versementsTest === 6 ? 'active' : undefined}
+                onClick={() => setVersementsTest(6)}
+              >
+                {OUTILS.test6}
+              </button>
+            </div>
+
+            <label className="recu-champ-mm" style={{ flex: '1 1 260px', alignItems: 'flex-start' }}>
+              {OUTILS.resume}
+              <textarea
+                readOnly
+                className="recu-atelier-resume"
+                value={resumeReglagesCalage(reglages)}
+                onFocus={(evenement) => evenement.currentTarget.select()}
+              />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <div className="recu-outils recu-outils-employe" aria-label="Impression">
+          <button className="primary" onClick={imprimer} disabled={envoi}>
+            {envoi ? <IndicateurChargement /> : null}
+            {OUTILS.imprimer}
+          </button>
+        </div>
+      )}
 
       {message ? (
         <div

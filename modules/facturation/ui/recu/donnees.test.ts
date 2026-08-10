@@ -3,14 +3,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { MAX_VERSEMENTS } from '../../domain/constants'
 import { unRecu, unVersement } from '../../domain/rules/fixtures'
 import {
+  bornerDecalageMm,
+  bornerEchellePourcent,
   classesAtelier,
+  donneesAvecVersementsTest,
   impressionBloquee,
   libelleCopie,
   MESSAGE_IMPRESSION_BLOQUEE,
   MOTIF_REMPLISSAGE,
   preparerRecuImprimable,
+  REGLAGES_CALAGE_VIERGES,
+  resumeReglagesCalage,
   sequenceImpression,
-  variablesDecalage,
+  variablesCalage,
 } from './donnees'
 
 describe('R-78 — informations des deux parties du reçu', () => {
@@ -193,24 +198,85 @@ describe('R-83 — repères et calage', () => {
   })
 
   it('convertit les décalages en millimètres', () => {
-    expect(variablesDecalage('1.5', '-2')).toEqual({
+    expect(variablesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '1.5', decalageY: '-2' })).toMatchObject({
       '--offset-x': '1.5mm',
       '--offset-y': '-2mm',
     })
   })
 
   it('ramène une saisie vide ou invalide à zéro', () => {
-    expect(variablesDecalage('', 'abc')).toEqual({
+    expect(variablesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '', decalageY: 'abc' })).toMatchObject({
       '--offset-x': '0mm',
       '--offset-y': '0mm',
     })
   })
 
   it('borne les décalages à plus ou moins dix millimètres', () => {
-    expect(variablesDecalage('99', '-99')).toEqual({
-      '--offset-x': '10mm',
-      '--offset-y': '-10mm',
+    expect(bornerDecalageMm('99')).toBe(10)
+    expect(bornerDecalageMm('-99')).toBe(-10)
+  })
+
+  it('ramène une échelle vide ou invalide à 100 %', () => {
+    expect(bornerEchellePourcent('')).toBe(100)
+    expect(bornerEchellePourcent('abc')).toBe(100)
+  })
+
+  it('borne l’échelle entre 80 % et 120 %', () => {
+    expect(bornerEchellePourcent('200')).toBe(120)
+    expect(bornerEchellePourcent('10')).toBe(80)
+  })
+
+  it('produit les variables CSS de chaque bloc, indépendamment du décalage global', () => {
+    const vars = variablesCalage({
+      ...REGLAGES_CALAGE_VIERGES,
+      signatureX: '2',
+      signatureY: '-1',
+      versementsY: '3',
+      soucheX: '-4',
+      echelle: '95',
     })
+    expect(vars).toMatchObject({
+      '--offset-signature-x': '2mm',
+      '--offset-signature-y': '-1mm',
+      '--offset-versements-x': '0mm',
+      '--offset-versements-y': '3mm',
+      '--offset-souche-x': '-4mm',
+      '--offset-souche-y': '0mm',
+      '--offset-scale': '0.95',
+    })
+  })
+
+  it('résume tous les réglages en texte copiable', () => {
+    const resume = resumeReglagesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '1', signatureY: '2' })
+    expect(resume).toContain('Décalage global : X 1 mm')
+    expect(resume).toContain('Signature : X 0 mm, Y 2 mm')
+    expect(resume).toContain('Souche (ancrée à 159,2 mm)')
+  })
+})
+
+describe('Atelier de calage — jeu de test à nombre fixe de versements', () => {
+  it('affiche exactement une ligne remplie pour le test à 1 versement', () => {
+    const donnees = donneesAvecVersementsTest(preparerRecuImprimable(unRecu()), 1)
+    expect(donnees.lignes.filter((ligne) => !ligne.vide)).toHaveLength(1)
+    expect(donnees.lignes[0].vide).toBe(false)
+  })
+
+  it('affiche six lignes remplies pour le test à 6 versements', () => {
+    const donnees = donneesAvecVersementsTest(preparerRecuImprimable(unRecu()), 6)
+    expect(donnees.lignes.every((ligne) => !ligne.vide)).toBe(true)
+  })
+
+  it('ne signale jamais de dépassement dans le jeu de test', () => {
+    const donnees = donneesAvecVersementsTest(preparerRecuImprimable(unRecu()), 6)
+    expect(donnees.depassement).toBe(false)
+    expect(donnees.messageDepassement).toBe('')
+  })
+
+  it('conserve les autres champs du vrai reçu (nom, montants, numéro)', () => {
+    const recu = unRecu({ numero: 77, prenom: 'يوسف' })
+    const donnees = donneesAvecVersementsTest(preparerRecuImprimable(recu), 1)
+    expect(donnees.numero).toBe('77')
+    expect(donnees.nomComplet).toContain('يوسف')
   })
 })
 

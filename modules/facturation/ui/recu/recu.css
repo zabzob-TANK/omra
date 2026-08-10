@@ -10,6 +10,13 @@
 .recu-atelier {
   --offset-x: 0mm;
   --offset-y: 0mm;
+  --offset-scale: 1;
+  --offset-signature-x: 0mm;
+  --offset-signature-y: 0mm;
+  --offset-versements-x: 0mm;
+  --offset-versements-y: 0mm;
+  --offset-souche-x: 0mm;
+  --offset-souche-y: 0mm;
   --ink: #171717;
   --line: #cfcfcf;
   --header: #888;
@@ -151,6 +158,81 @@
   font-weight: 700;
 }
 
+/*
+ * Rangée dédiée à l'atelier de calage avancé — décalages par bloc, échelle,
+ * jeu de test 1/6 versements et résumé copiable. Outil interne uniquement,
+ * jamais visible d'un employé (cet écran n'est jamais atteint hors ouverture
+ * d'un reçu réel).
+ */
+.recu-atelier-avance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.recu-groupe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.recu-groupe-titre {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #9fb0c2;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-inline-end: 2px;
+}
+
+.recu-champ-mm {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: #dbe3eb;
+}
+
+.recu-atelier .recu-champ-mm input {
+  width: 52px;
+  height: 28px;
+  padding: 0 5px;
+  text-align: center;
+}
+
+.recu-atelier .recu-champ-mm button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.recu-atelier .recu-test-versements button.active {
+  background: #c18b2d;
+}
+
+.recu-atelier-resume {
+  flex: 1 1 260px;
+  min-width: 220px;
+  height: 60px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 /* ------------------------------------------------------------ Feuille */
 
 .recu-espace {
@@ -230,7 +312,7 @@
 .recu-contenu {
   position: absolute;
   inset: 0;
-  transform: translate(calc(-1.3mm + var(--offset-x)), var(--offset-y));
+  transform: translate(calc(-1.3mm + var(--offset-x)), var(--offset-y)) scale(var(--offset-scale));
   transform-origin: top left;
 }
 
@@ -313,7 +395,8 @@
 }
 
 .recu-nom-client .valeur {
-  font-size: 4.2mm;
+  /* Repéré et agrandi avec VisBug (21px) — laisse plus de place au nom. */
+  font-size: 5.56mm;
   margin-top: 1mm;
 }
 
@@ -324,6 +407,14 @@
   border-radius: 1.6mm;
   overflow: hidden;
   display: grid;
+  /*
+   * Élargir la colonne des montants à 66.6mm (comme repéré avec VisBug)
+   * réduit celle des étiquettes à ~32.6mm en `1fr` — trop étroit : « المبلغ
+   * المتفق عليه : » et « المبلغ المدفوع : » se retrouvent coupés par
+   * `overflow: hidden` ci-dessus. Revenu à la largeur d'origine en attendant
+   * une décision (réduire la police des étiquettes, ou accepter moins
+   * d'élargissement).
+   */
   grid-template-columns: 38mm 48mm 1fr;
   background: rgba(255, 255, 255, 0.33);
 }
@@ -354,6 +445,19 @@
   font-size: 5.1mm;
   font-weight: 400;
   letter-spacing: 0.1mm;
+  /*
+   * `justify-items: center` ne centre que dans sa propre colonne de la
+   * grille (38mm à 86mm) : décalée par rapport au centre réel de la page
+   * (68,6mm sur 137,2mm de large), donc visuellement à gauche. Recentré sans
+   * toucher aux colonnes elles-mêmes, pour ne pas reproduire le
+   * rognage des étiquettes déjà rencontré avec un élargissement de colonne.
+   */
+  transform: translateX(6.6mm);
+}
+
+/* Montant convenu grisé (repéré avec VisBug), pour le distinguer du montant payé. */
+.recu-montant-convenu {
+  color: rgb(128, 128, 128);
 }
 
 .recu-montants-etiquettes {
@@ -376,6 +480,13 @@
   margin-top: 2.7mm;
   font-size: 3.05mm;
   text-align: center;
+  /*
+   * Outil de calage uniquement : un transform n'affecte pas le flux du
+   * document, donc `.recu-bas` (signature, lignes de règlement) juste après
+   * ne bouge jamais à cause de ce décalage — seul le tableau se déplace
+   * visuellement.
+   */
+  transform: translate(var(--offset-versements-x), var(--offset-versements-y));
 }
 
 /*
@@ -412,6 +523,8 @@
   font-size: 4.05mm;
   text-align: right;
   padding-right: 1.5mm;
+  /* Fond éclairci (repéré avec VisBug) pour distinguer la colonne montant. */
+  background: rgb(247, 247, 247);
 }
 
 .recu-paiements .rang {
@@ -428,7 +541,12 @@
   position: relative;
   height: 25mm;
   margin-top: 4.8mm;
-  transform: translateY(-1.5mm);
+  /*
+   * Outil de calage : le décalage « Signature » déplace tout le bloc bas —
+   * cadre de signature et lignes الاسم/المتفق عليه/المدفوع — ensemble, comme
+   * un seul bloc sur le papier pré-imprimé.
+   */
+  transform: translateY(-1.5mm) translate(var(--offset-signature-x), var(--offset-signature-y));
 }
 
 .recu-signature {
@@ -488,8 +606,9 @@
 
 .recu-souche {
   position: absolute;
-  left: 4.3mm;
-  top: 159.2mm;
+  /* 159,2 mm reste l'ancrage de référence ; l'outil de calage n'ajoute qu'un décalage. */
+  left: calc(4.3mm + var(--offset-souche-x));
+  top: calc(159.2mm + var(--offset-souche-y));
   width: 137.2mm;
   height: 67.5mm;
   overflow: hidden;

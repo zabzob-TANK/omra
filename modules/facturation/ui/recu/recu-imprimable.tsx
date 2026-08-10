@@ -93,7 +93,7 @@ export function RecuImprimable({
                 <div>{L.typeChambre}</div>
               </div>
               <div className="recu-montants recu-ltr">
-                <div>{donnees.montantConvenu}</div>
+                <div className="recu-montant-convenu">{donnees.montantConvenu}</div>
                 <div>{donnees.montantPaye}</div>
               </div>
               <div className="recu-montants-etiquettes recu-rtl">

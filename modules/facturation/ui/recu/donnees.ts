@@ -198,7 +198,7 @@ export async function sequenceImpression(
  * R-82, R-83 — État de l'atelier d'impression.
  *
  * Le fichier de référence pilote le fond du papier et les repères par des
- * classes sur `<body>`, et le calage par deux variables CSS en millimètres.
+ * classes sur `<body>`, et le calage par des variables CSS en millimètres.
  * Ces fonctions rendent ce comportement testable sans navigateur.
  */
 export function classesAtelier(options: { sansFond: boolean; reperes: boolean }): string {
@@ -208,17 +208,132 @@ export function classesAtelier(options: { sansFond: boolean; reperes: boolean })
 }
 
 /**
- * R-83 — Décalages de calage, bornés à ±10 mm comme les champs du fichier.
- * Une saisie vide ou non numérique vaut zéro.
+ * Outil de calage d'impression, réservé à l'atelier interne (jamais montré à
+ * un employé) : chaque bloc du reçu (signature, tableau des versements,
+ * souche) reçoit son propre décalage en millimètres, en plus du décalage
+ * global existant et d'une échelle pour compenser une imprimante qui
+ * agrandit ou réduit. Toutes les valeurs sont des chaînes de saisie brutes
+ * (comme les champs `<input>` d'origine) : elles ne sont bornées qu'au
+ * moment de produire les variables CSS, jamais pendant la frappe.
  */
-export function variablesDecalage(x: string, y: string): { '--offset-x': string; '--offset-y': string } {
-  const borner = (valeur: string) => {
-    const nombre = Number(valeur)
-    if (!Number.isFinite(nombre)) return 0
-    return Math.min(10, Math.max(-10, nombre))
-  }
+export interface ReglagesCalage {
+  decalageX: string
+  decalageY: string
+  echelle: string
+  signatureX: string
+  signatureY: string
+  versementsX: string
+  versementsY: string
+  soucheX: string
+  soucheY: string
+}
+
+/** État initial de l'atelier de calage : aucun décalage, échelle à 100 %. */
+export const REGLAGES_CALAGE_VIERGES: ReglagesCalage = {
+  decalageX: '0',
+  decalageY: '0',
+  echelle: '100',
+  signatureX: '0',
+  signatureY: '0',
+  versementsX: '0',
+  versementsY: '0',
+  soucheX: '0',
+  soucheY: '0',
+}
+
+/** Bornes des décalages par bloc, mêmes bornes que le décalage global d'origine. */
+const BORNE_DECALAGE_MM = 10
+const BORNE_ECHELLE_MIN_POURCENT = 80
+const BORNE_ECHELLE_MAX_POURCENT = 120
+
+/** Une saisie vide ou non numérique vaut zéro, comme les champs d'origine. */
+export function bornerDecalageMm(valeur: string): number {
+  const nombre = Number(valeur)
+  if (!Number.isFinite(nombre)) return 0
+  return Math.min(BORNE_DECALAGE_MM, Math.max(-BORNE_DECALAGE_MM, nombre))
+}
+
+/** Une saisie vide ou non numérique vaut 100 % (aucune mise à l'échelle). */
+export function bornerEchellePourcent(valeur: string): number {
+  // `Number('')` vaut 0, pas NaN : une chaîne vide doit être détectée avant
+  // la conversion, sans quoi un champ vidé retomberait à 80 % (la borne
+  // basse) au lieu de 100 % (aucune mise à l'échelle).
+  if (valeur.trim() === '') return 100
+  const nombre = Number(valeur)
+  if (!Number.isFinite(nombre)) return 100
+  return Math.min(BORNE_ECHELLE_MAX_POURCENT, Math.max(BORNE_ECHELLE_MIN_POURCENT, nombre))
+}
+
+/** Convertit les réglages de calage en variables CSS, bornées et en millimètres. */
+export function variablesCalage(reglages: ReglagesCalage): Record<string, string> {
   return {
-    '--offset-x': `${borner(x)}mm`,
-    '--offset-y': `${borner(y)}mm`,
+    '--offset-x': `${bornerDecalageMm(reglages.decalageX)}mm`,
+    '--offset-y': `${bornerDecalageMm(reglages.decalageY)}mm`,
+    '--offset-scale': `${bornerEchellePourcent(reglages.echelle) / 100}`,
+    '--offset-signature-x': `${bornerDecalageMm(reglages.signatureX)}mm`,
+    '--offset-signature-y': `${bornerDecalageMm(reglages.signatureY)}mm`,
+    '--offset-versements-x': `${bornerDecalageMm(reglages.versementsX)}mm`,
+    '--offset-versements-y': `${bornerDecalageMm(reglages.versementsY)}mm`,
+    '--offset-souche-x': `${bornerDecalageMm(reglages.soucheX)}mm`,
+    '--offset-souche-y': `${bornerDecalageMm(reglages.soucheY)}mm`,
   }
+}
+
+/** Résumé texte de tous les réglages actuels, pensé pour être copié-collé tel quel. */
+export function resumeReglagesCalage(reglages: ReglagesCalage): string {
+  return [
+    `Décalage global : X ${bornerDecalageMm(reglages.decalageX)} mm, Y ${bornerDecalageMm(reglages.decalageY)} mm`,
+    `Échelle : ${bornerEchellePourcent(reglages.echelle)} %`,
+    `Signature : X ${bornerDecalageMm(reglages.signatureX)} mm, Y ${bornerDecalageMm(reglages.signatureY)} mm`,
+    `Tableau des versements : X ${bornerDecalageMm(reglages.versementsX)} mm, Y ${bornerDecalageMm(reglages.versementsY)} mm`,
+    `Souche (ancrée à 159,2 mm) : X ${bornerDecalageMm(reglages.soucheX)} mm, Y ${bornerDecalageMm(reglages.soucheY)} mm`,
+  ].join('\n')
+}
+
+/** Nombre de versements affichés par le jeu de test de l'atelier de calage. */
+export type NombreVersementsTest = 1 | 6
+
+/**
+ * Ligne de versement de test : valeurs fixes et plausibles, jamais tirées
+ * d'un vrai reçu. Sert uniquement à comparer visuellement le calage à 1 et à
+ * 6 versements, sans dépendre de la disponibilité d'un vrai reçu qui en
+ * compte autant.
+ */
+function ligneVersementTest(rang: number): LignePaiement {
+  return {
+    rang,
+    banque: 'البنك الشعبي',
+    dateInstrument: '01/01/2027',
+    numeroInstrument: '1234567',
+    methode: 'شيك',
+    datePaiement: '01/01/2027',
+    montant: '5 000 DH',
+    vide: false,
+  }
+}
+
+/**
+ * Remplace les lignes de versement par un jeu de test à nombre fixe —
+ * réservé à l'atelier de calage, jamais utilisé pour un reçu réellement
+ * imprimé. Le reste des données (nom, montants, numéro…) reste celui du vrai
+ * reçu ouvert : seul le tableau des versements change.
+ */
+export function donneesAvecVersementsTest(
+  donnees: DonneesRecuImprimable,
+  nombre: NombreVersementsTest,
+): DonneesRecuImprimable {
+  const lignes: LignePaiement[] = Array.from({ length: MAX_VERSEMENTS }, (_, index) => {
+    if (index < nombre) return ligneVersementTest(index + 1)
+    return {
+      rang: index + 1,
+      banque: '',
+      dateInstrument: '',
+      numeroInstrument: '',
+      methode: '',
+      datePaiement: '',
+      montant: '',
+      vide: true,
+    }
+  })
+  return { ...donnees, lignes, depassement: false, messageDepassement: '' }
 }

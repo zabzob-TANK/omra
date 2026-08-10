@@ -126,6 +126,7 @@ export function construireJourneeVolumineuse(
       montantRembourseCentimes: annule && index === 11 ? montantCentimes : undefined,
       impressions: 0,
       modifications: [],
+      nombreModifications: 0,
       anomalies: [],
       versements: [versement],
     }

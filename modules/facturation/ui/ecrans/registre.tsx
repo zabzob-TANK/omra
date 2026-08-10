@@ -23,6 +23,7 @@ import { motifRefusVersement } from '../../domain/rules/payment'
 import { dernierVersement, restantDu, statutAffiche, totalPaye } from '../../domain/rules/receipt'
 import type { AnomalieFinanciere, Recu } from '../../domain/types'
 import { DateValeur, Montant, Reference, Telephone, TexteArabe } from '../bidi'
+import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 
 /* Icônes des actions de ligne, reprises trait pour trait du fichier. */
@@ -105,6 +106,13 @@ function anomalieTropPercu(recu: Recu): AnomalieFinanciere | undefined {
 
 interface Proprietes {
   recus: Recu[]
+  /**
+   * Vrai entre la connexion et la fin du premier chargement des reçus : sans
+   * ce signal, `recus` vide (hérité de `etatAnonyme()`) est indiscernable
+   * d'un registre réellement vide, et affiche à tort « aucune donnée »
+   * pendant que les vraies lignes arrivent encore.
+   */
+  chargement?: boolean
   rechercheNom: string
   rechercheNumero: string
   afficherAnnules: boolean
@@ -126,6 +134,7 @@ interface Proprietes {
 
 export function EcranRegistre({
   recus,
+  chargement,
   rechercheNom,
   rechercheNumero,
   afficherAnnules,
@@ -237,7 +246,17 @@ export function EcranRegistre({
               </thead>
               <tbody>
                 {/* Le fichier garde les en-têtes et pose l'état vide dans le tableau. */}
-                {lignes.length === 0 ? (
+                {chargement ? (
+                  <tr>
+                    <td colSpan={20}>
+                      <div className="omra-empty">
+                        <span className="omra-spinner-grand">
+                          <IndicateurChargement />
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : lignes.length === 0 ? (
                   <tr>
                     <td colSpan={20}>
                       <div className="omra-empty">

@@ -288,6 +288,7 @@ export function construireJeuDemonstration(
       montantRembourseCentimes: d.annulation ? cumul : undefined,
       impressions: d.impressions ?? 0,
       modifications: d.modifications ?? [],
+      nombreModifications: d.modifications?.length ?? 0,
       derniereModification: d.derniereModification,
       modifiePar: d.modifiePar,
       // Cohérent avec l'adaptateur Supabase (`traduireAnomalies`) : un
