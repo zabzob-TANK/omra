@@ -298,9 +298,6 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
             {OUTILS.imprimer}
           </button>
           <span className="indication">{OUTILS.indication}</span>
-          {donnees.depassement ? (
-            <span className="alerte-depassement">{donnees.messageDepassement}</span>
-          ) : null}
 
           <div className="recu-atelier-avance">
             <div className="recu-groupe">
@@ -376,6 +373,28 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
           </button>
         </div>
       )}
+
+      {/*
+        Un écran dit ce qu'il en est immédiatement, sans qu'il faille tenter
+        l'action pour l'apprendre (règle appliquée partout dans l'appli).
+        Décision du commanditaire (2026-08-11) : cette anomalie s'affiche
+        donc dès l'ouverture, pour les deux rôles — avant, seul le poste 1 la
+        voyait, l'employé ne l'apprenait qu'après avoir cliqué Imprimer et
+        s'être vu refuser l'impression.
+      */}
+      {donnees.depassement ? (
+        <div
+          role="alert"
+          style={{
+            padding: '10px 14px',
+            background: '#9c3b32',
+            color: '#fff',
+            fontSize: 12.5,
+          }}
+        >
+          {donnees.messageDepassement}
+        </div>
+      ) : null}
 
       {message ? (
         <div

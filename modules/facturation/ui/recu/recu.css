@@ -155,15 +155,6 @@
   color: #bac5d1;
 }
 
-.recu-outils .alerte-depassement {
-  padding: 5px 10px;
-  border-radius: 8px;
-  background: #9c3b32;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
 /*
  * Rangée dédiée à l'atelier de calage avancé — décalages par bloc, échelle,
  * jeu de test 1/6 versements et résumé copiable. Outil interne uniquement,

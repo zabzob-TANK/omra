@@ -570,6 +570,33 @@ Cette politique elle-même redevient à revoir **au moment précis** où de
 vraies données de clients entrent dans la base (§5.14) : « se tromper est
 gratuit » cesse d'être vrai à cet instant précis, pas avant.
 
+### 5.16 Un commentaire périmé coûte plus cher qu'aucun commentaire
+
+Incident du 2026-08-11 : `modules/facturation/ui/application.tsx` portait un
+commentaire affirmant que l'authentification omra avait « déjà eu lieu
+avant que cette interface ne soit montée » et que l'écran de connexion du
+prototype (`EcranConnexion`) « ne s'affiche plus jamais côté omra ». Vrai au
+moment où ce commentaire a été écrit ; faux depuis la séparation étanche
+Facturation/Administration (`app/facturation/page.tsx` tolère désormais
+l'absence de session et affiche `EcranConnexion` au lieu de rediriger) — le
+comportement a changé, le commentaire qui le décrivait n'a pas suivi.
+
+Ce commentaire périmé a failli faire conclure, lors d'une relecture
+approfondie, que `chargementInitialRegistre` (le filet anti-« registre vide
+» affiché à tort pendant le premier chargement) était du code mort sans
+effet réel — alors que c'est exactement l'inverse : ce filet dépend de ce
+chemin de connexion pour avoir un effet, et l'aurait perdu si la conclusion
+erronée avait entraîné une suppression du code jugé inutile à tort.
+
+Règle retenue : **une documentation fausse coûte plus cher qu'aucune
+documentation.**
+Un commentaire manquant invite à vérifier le code ; un commentaire faux
+inspire confiance à tort et évite précisément cette vérification. Quand un
+changement modifie un comportement déjà décrit ailleurs dans le code (un
+commentaire, un autre fichier), la mise à jour de cette description fait
+partie du changement — pas une passe de nettoyage séparée, facultative ou
+remise à plus tard.
+
 ---
 
 ## 6. Module Administration
