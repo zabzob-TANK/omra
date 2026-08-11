@@ -226,6 +226,29 @@ describe('R-14 — instantané du premier versement', () => {
   })
 })
 
+describe('redondance défensive — restant clampé vs. recalcul brut de statutApres', () => {
+  it('restantApresCentimes (Math.max(0, …)) et le brut convenu − versement utilisé pour statutApres restent égaux', () => {
+    // `create-receipt.ts` écrit `restantApresCentimes` avec un clamp
+    // (`Math.max(0, convenuCentimes - montantVersement)`) mais recalcule
+    // `convenuCentimes - montantVersement` SANS ce clamp juste après, pour
+    // `statutApres` — fidélité voulue au fichier de référence, qui ne clampe
+    // pas non plus à cet endroit. Les deux ne peuvent diverger que si R-10
+    // (surpaiement interdit à la création, testé plus haut) est un jour
+    // assoupli sans que cette double écriture soit revue : le trop-perçu
+    // existe déjà ailleurs dans le système (chèques partagés confirmés,
+    // reprise.md §5.11), ce n'est donc pas un cas farfelu à écarter. Si ce
+    // test tombe, c'est le signal qu'il faut regarder cette double écriture
+    // avant d'aller plus loin — pas juste un test à corriger.
+    const resultat = preparerCreationRecu(saisie({ premierVersement: '10000', reduction: '1000' }), CONTEXTE)
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut !== 'ok') return
+
+    const { convenuCentimes, premierVersement: versement } = resultat.valeur.donnees
+    const brut = convenuCentimes - versement.montantCentimes
+    expect(versement.instantane.restantApresCentimes).toBe(brut)
+  })
+})
+
 describe('R-32 — dépassement d’une opération partagée à la création', () => {
   const operation = uneOperation({ id: 'SOP-1', montantTotalCentimes: 3000000 })
   const recus = [

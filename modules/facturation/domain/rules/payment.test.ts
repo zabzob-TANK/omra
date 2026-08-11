@@ -148,6 +148,31 @@ describe('R-20 — le sixième versement doit solder exactement', () => {
   })
 })
 
+describe('redondance défensive — Math.max(0, …) sur le restant après versement', () => {
+  it('un versement qui solde exactement (le cas le plus proche d’un besoin réel du clamp) retombe sur 0 sans son aide', () => {
+    // `payment.ts` calcule `restantApres` avec `Math.max(0, restant -
+    // montantCentimes)`. R-21, juste au-dessus dans la même fonction, refuse
+    // déjà tout montant supérieur au restant — donc `restant -
+    // montantCentimes` ne peut jamais être négatif au moment où ce clamp
+    // s'applique, et le clamp est aujourd'hui sans effet. Le scénario le
+    // plus proche d'en avoir besoin est un versement qui règle exactement le
+    // restant : ce test vérifie que le calcul brut (restant attendu moins le
+    // montant versé, recalculé ici indépendamment du code testé) tombe déjà
+    // pile sur 0 — pas seulement que la sortie clampée vaut 0. Si ce test
+    // tombe, c'est le signal que R-21 a changé quelque part et que ce clamp
+    // masquerait désormais un vrai trop-perçu au lieu de le montrer.
+    const restantAvant = 2600000 - 5 * 100000 // convenu du reçu − 5 versements de recuAvec(5)
+    const montant = 21000
+    const brut = restantAvant - montant * 100
+    expect(brut).toBe(0)
+
+    const resultat = preparerVersement(saisie({ montant: String(montant) }), recuAvec(5), CONTEXTE)
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut !== 'ok') return
+    expect(resultat.valeur.versement.instantane.restantApresCentimes).toBe(brut)
+  })
+})
+
 describe('R-22 — instantané du versement', () => {
   it('fige l’état du reçu au moment de l’enregistrement', () => {
     const resultat = preparerVersement(saisie({ montant: '5000' }), recuAvec(1), CONTEXTE)
