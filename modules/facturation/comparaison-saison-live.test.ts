@@ -147,9 +147,26 @@ async function connexionParMotDePasse(env: Record<string, string>): Promise<stri
   return data.session.access_token
 }
 
+/**
+ * Un jeton présent dans le cookie n'est pas forcément un jeton valide :
+ * l'access token peut avoir expiré sans que le refresh token du profil ait
+ * eu l'occasion de le renouveler (navigation trop rapide, `networkidle`
+ * atteint avant que l'appli n'ait fini son propre rafraîchissement). Sans ce
+ * contrôle, un jeton périmé mais présent empêchait le repli par mot de passe
+ * de se déclencher, et l'échec n'arrivait qu'au premier appel RPC plus bas —
+ * avec un message générique au lieu du message actionnable ci-dessus.
+ */
+async function jetonValide(env: Record<string, string>, jeton: string): Promise<boolean> {
+  const client = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { error } = await client.auth.getUser(jeton)
+  return !error
+}
+
 async function obtenirJetonSession(env: Record<string, string>): Promise<string> {
   const viaProfil = await extraireJetonViaProfilPersistant()
-  if (viaProfil) return viaProfil
+  if (viaProfil && (await jetonValide(env, viaProfil))) return viaProfil
   return connexionParMotDePasse(env)
 }
 

@@ -104,7 +104,13 @@ function ChampMm({
   valeurParDefaut?: number
 }) {
   const pas = (delta: number) => {
-    const nombre = Number(valeur) || valeurParDefaut
+    // `Number(valeur) || valeurParDefaut` casserait sur une valeur actuelle
+    // de 0 légitime (`0` est falsy) : pour l'échelle, dont le défaut est
+    // 100, un + après être retombé à 0 serait alors traité comme partant de
+    // 100 et non de 0. `Number.isFinite` distingue « pas un nombre » (chaîne
+    // vide, saisie invalide) d'un zéro réel.
+    const brut = Number(valeur)
+    const nombre = Number.isFinite(brut) ? brut : valeurParDefaut
     onChange((Math.round((nombre + delta) * 10) / 10).toString())
   }
   const titre = `${contexte} ${label}`

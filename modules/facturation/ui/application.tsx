@@ -193,10 +193,14 @@ export function ApplicationFacturation({
   // d'exploitation normal (avant la première saison, ou entre deux), pas une
   // panne. Voir `EcranAVenir` plus bas et `service.ts::chargerEtat()`.
   const aucuneSaison = etat.saisonIndisponible
-  // L'authentification omra a déjà eu lieu avant que cette interface ne soit
-  // montée (`requireActiveAccount()` dans `app/facturation/page.tsx`) :
-  // `chargerEtat()` porte donc toujours un utilisateur réel ici, et l'écran
-  // de connexion du prototype (ci-dessous) ne s'affiche plus jamais côté omra.
+  // Séparation étanche Facturation/Administration (`app/facturation/page.tsx`) :
+  // `requireActiveAccount()` y est tolérant, pas bloquant — sans session
+  // valide, `etatInitial.utilisateur` est `null` et cette interface monte
+  // quand même, avec `EcranConnexion` (ci-dessous) affiché. Cet écran est
+  // donc bien vivant côté omra, pas un vestige du prototype autonome — un
+  // commentaire antérieur affirmait le contraire à tort (corrigé le
+  // 2026-08-11 en auditant `chargementInitialRegistre`, qui dépend
+  // justement de ce chemin de connexion pour avoir un effet réel).
   const [utilisateur, setUtilisateur] = useState<Utilisateur | null>(etatInitial.utilisateur)
   const [ecran, setEcran] = useState<Ecran>({ nom: 'registre' })
   const [fenetre, setFenetre] = useState<Fenetre>({ type: 'aucune' })
