@@ -25,6 +25,8 @@
   --offset-versements-y: 0mm;
   --offset-souche-x: 0mm;
   --offset-souche-y: 0mm;
+  --offset-reglement-x: 0mm;
+  --offset-reglement-y: 0mm;
   --ink: #171717;
   --line: #cfcfcf;
   --header: #888;
@@ -623,6 +625,12 @@
   grid-template-rows: repeat(3, 7mm);
   align-items: center;
   font-size: 3.4mm;
+  /*
+   * Outil de calage, indépendant du décalage « Signature » : la position du
+   * cadre de signature et celle de ces trois lignes se réglaient jusque-là
+   * ensemble, sans pouvoir ajuster l'une sans l'autre.
+   */
+  transform: translate(var(--offset-reglement-x), var(--offset-reglement-y));
 }
 
 .recu-lignes-reglement .trait {

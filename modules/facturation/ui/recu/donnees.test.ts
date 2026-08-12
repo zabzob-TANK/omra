@@ -123,9 +123,9 @@ describe('R-80 — motif de remplissage des champs d’instrument absents', () =
     expect(ligne.methode).toBe('شيك')
   })
 
-  it('normalise la nature affichée', () => {
+  it('normalise et abrège la nature affichée (تحويل بنكي → تحويل, comme partout ailleurs dans l’appli)', () => {
     const virement = unRecu({ versements: [unVersement({ nature: 'Virement' })] })
-    expect(preparerRecuImprimable(virement).lignes[0].methode).toBe('تحويل بنكي')
+    expect(preparerRecuImprimable(virement).lignes[0].methode).toBe('تحويل')
   })
 })
 
@@ -241,6 +241,8 @@ describe('R-83 — repères et calage', () => {
       versementsY: '3',
       soucheX: '-4',
       soucheY: '0',
+      reglementX: '5',
+      reglementY: '0',
     })
     expect(vars).toMatchObject({
       '--offset-signature-x': '2mm',
@@ -249,6 +251,8 @@ describe('R-83 — repères et calage', () => {
       '--offset-versements-y': '3mm',
       '--offset-souche-x': '-4mm',
       '--offset-souche-y': '0mm',
+      '--offset-reglement-x': '5mm',
+      '--offset-reglement-y': '0mm',
       '--offset-scale': '0.95',
     })
   })
@@ -266,6 +270,8 @@ describe('R-83 — repères et calage', () => {
       versementsY: '0',
       soucheX: '0',
       soucheY: '0',
+      reglementX: '0',
+      reglementY: '0',
     })
     expect(resume).toContain('Décalage global : X 1 mm')
     expect(resume).toContain('Signature : X 0 mm, Y 2 mm')

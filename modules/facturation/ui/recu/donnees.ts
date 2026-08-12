@@ -13,7 +13,7 @@
 
 import { MAX_VERSEMENTS } from '../../domain/constants'
 import { centimesEnTexteDevise } from '../../domain/money'
-import { natureNormalisee } from '../../domain/payment-method'
+import { natureAbregee } from '../../domain/payment-method'
 import { restantDu, totalPaye } from '../../domain/rules/receipt'
 import type { Recu } from '../../domain/types'
 
@@ -93,7 +93,11 @@ export function preparerRecuImprimable(recu: Recu): DonneesRecuImprimable {
       banque: versement.banque || MOTIF_REMPLISSAGE,
       dateInstrument: versement.dateInstrument || MOTIF_REMPLISSAGE,
       numeroInstrument: versement.referenceInstrument || MOTIF_REMPLISSAGE,
-      methode: natureNormalisee(versement.nature),
+      // U-12 — libellé abrégé (تحويل بنكي → تحويل), comme partout ailleurs
+      // dans l'appli (instrument-panel.tsx) : le reçu ne l'utilisait pas
+      // encore. Demande du commanditaire (2026-08-12), qui rejoint une
+      // convention déjà établie plutôt que d'en inventer une nouvelle.
+      methode: natureAbregee(versement.nature),
       datePaiement: versement.date || '',
       montant: centimesEnTexteDevise(versement.montantCentimes),
       vide: false,
@@ -226,6 +230,14 @@ export interface ReglagesCalage {
   versementsY: string
   soucheX: string
   soucheY: string
+  /**
+   * Lignes الاسم:/المبلغ المتفق عليه:/المبلغ المدفوع, à côté de la
+   * signature — demande du commanditaire (2026-08-12) : bloc distinct de
+   * « Signature » (qui déplace le cadre lui-même), pour pouvoir ajuster
+   * l'un sans l'autre.
+   */
+  reglementX: string
+  reglementY: string
 }
 
 /**
@@ -245,6 +257,8 @@ export const REGLAGES_CALAGE_PAR_DEFAUT: ReglagesCalage = {
   versementsY: '-1',
   soucheX: '0',
   soucheY: '4',
+  reglementX: '0',
+  reglementY: '0',
 }
 
 /** Bornes des décalages par bloc, mêmes bornes que le décalage global d'origine. */
@@ -282,6 +296,8 @@ export function variablesCalage(reglages: ReglagesCalage): Record<string, string
     '--offset-versements-y': `${bornerDecalageMm(reglages.versementsY)}mm`,
     '--offset-souche-x': `${bornerDecalageMm(reglages.soucheX)}mm`,
     '--offset-souche-y': `${bornerDecalageMm(reglages.soucheY)}mm`,
+    '--offset-reglement-x': `${bornerDecalageMm(reglages.reglementX)}mm`,
+    '--offset-reglement-y': `${bornerDecalageMm(reglages.reglementY)}mm`,
   }
 }
 
@@ -293,6 +309,7 @@ export function resumeReglagesCalage(reglages: ReglagesCalage): string {
     `Signature : X ${bornerDecalageMm(reglages.signatureX)} mm, Y ${bornerDecalageMm(reglages.signatureY)} mm`,
     `Tableau des versements : X ${bornerDecalageMm(reglages.versementsX)} mm, Y ${bornerDecalageMm(reglages.versementsY)} mm`,
     `Souche (ancrée à 159,2 mm) : X ${bornerDecalageMm(reglages.soucheX)} mm, Y ${bornerDecalageMm(reglages.soucheY)} mm`,
+    `Lignes الاسم/المتفق عليه/المدفوع : X ${bornerDecalageMm(reglages.reglementX)} mm, Y ${bornerDecalageMm(reglages.reglementY)} mm`,
   ].join('\n')
 }
 

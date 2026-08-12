@@ -51,6 +51,7 @@ const OUTILS = {
   signature: 'Signature',
   versements: 'Versements',
   souche: 'Souche',
+  reglement: 'Règlement',
   test: 'Test',
   testReel: 'Réel',
   test1: '1 vers.',
@@ -330,6 +331,12 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
               <span className="recu-groupe-titre">{OUTILS.souche}</span>
               <ChampMm contexte={OUTILS.souche} label="X" valeur={reglages.soucheX} onChange={definirReglage('soucheX')} />
               <ChampMm contexte={OUTILS.souche} label="Y" valeur={reglages.soucheY} onChange={definirReglage('soucheY')} />
+            </div>
+
+            <div className="recu-groupe">
+              <span className="recu-groupe-titre">{OUTILS.reglement}</span>
+              <ChampMm contexte={OUTILS.reglement} label="X" valeur={reglages.reglementX} onChange={definirReglage('reglementX')} />
+              <ChampMm contexte={OUTILS.reglement} label="Y" valeur={reglages.reglementY} onChange={definirReglage('reglementY')} />
             </div>
 
             <div className="recu-groupe recu-test-versements">
