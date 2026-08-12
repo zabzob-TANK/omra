@@ -4,7 +4,8 @@
  * Reçu imprimable.
  *
  * Reproduit le document du fichier de référence : partie remise au client en
- * haut, souche conservée par l'agence en bas, sur un papier de 143,8 mm × 232 mm.
+ * haut, souche conservée par l'agence en bas, sur un papier de 150,3 mm ×
+ * 238,5 mm (mesuré au papier réel, voir recu.css).
  *
  * Couvre : R-78, R-79, R-80, R-82, R-83.
  *
@@ -12,8 +13,43 @@
  * comme dans le fichier.
  */
 
+import { useLayoutEffect, useRef, useState } from 'react'
+
 import type { DonneesRecuImprimable } from './donnees'
 import './recu.css'
+
+/** Taille de base du nom, en mm — point de départ avant réduction éventuelle. */
+const TAILLE_NOM_BASE_MM = 5.56
+
+/**
+ * Nom du client, réduit automatiquement s'il ne tient pas sur une ligne.
+ *
+ * `.recu-nom-client` n'a pas de hauteur fixe : un nom qui passerait à la
+ * ligne déborderait par-dessus le bloc suivant (montants) au lieu de le
+ * repousser, puisque ce conteneur est positionné en absolu. Décision du
+ * commanditaire (2026-08-12) : réduire la taille plutôt que tronquer le nom.
+ */
+function NomClient({ texte }: { texte: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [tailleMm, setTailleMm] = useState(TAILLE_NOM_BASE_MM)
+
+  useLayoutEffect(() => {
+    const element = ref.current
+    const conteneur = element?.parentElement
+    if (!element || !conteneur) return
+    // Repart de la taille de base avant de mesurer, pour ne jamais rester
+    // bloqué sur une réduction calculée pour un nom précédent plus long.
+    element.style.fontSize = `${TAILLE_NOM_BASE_MM}mm`
+    const debordement = element.scrollWidth / conteneur.clientWidth
+    setTailleMm(debordement > 1 ? TAILLE_NOM_BASE_MM / debordement : TAILLE_NOM_BASE_MM)
+  }, [texte])
+
+  return (
+    <div ref={ref} className="valeur" style={{ fontSize: `${tailleMm}mm`, whiteSpace: 'nowrap' }}>
+      {texte}
+    </div>
+  )
+}
 
 /** Libellés du document, relevés tels quels dans le fichier de référence. */
 const L = {
@@ -77,7 +113,7 @@ export function RecuImprimable({
               </div>
               <div className="recu-nom-client recu-rtl">
                 <div className="etiquette">{L.nom}</div>
-                <div className="valeur">{donnees.nomComplet}</div>
+                <NomClient texte={donnees.nomComplet} />
               </div>
               <div className="recu-carte-numero recu-rtl">
                 <div className="etiquette">{L.numero}</div>

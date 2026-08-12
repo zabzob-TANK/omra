@@ -29,7 +29,7 @@ import {
   type NombreVersementsTest,
   preparerRecuImprimable,
   type ReglagesCalage,
-  REGLAGES_CALAGE_VIERGES,
+  REGLAGES_CALAGE_PAR_DEFAUT,
   resumeReglagesCalage,
   sequenceImpression,
   variablesCalage,
@@ -173,7 +173,7 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
 
   const [sansFond, setSansFond] = useState(false)
   const [reperes, setReperes] = useState(false)
-  const [reglages, setReglages] = useState<ReglagesCalage>(REGLAGES_CALAGE_VIERGES)
+  const [reglages, setReglages] = useState<ReglagesCalage>(REGLAGES_CALAGE_PAR_DEFAUT)
   /**
    * Jeu de test à nombre fixe de versements (1 ou 6), pour vérifier qu'un
    * calage trouvé tient dans les deux cas — `null` affiche le vrai reçu.
@@ -287,7 +287,7 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
 
           <button
             onClick={() => {
-              setReglages(REGLAGES_CALAGE_VIERGES)
+              setReglages(REGLAGES_CALAGE_PAR_DEFAUT)
               setVersementsTest(null)
             }}
           >

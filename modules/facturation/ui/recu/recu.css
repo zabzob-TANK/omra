@@ -1,10 +1,12 @@
 /*
  * Reçu imprimable — dimensions reprises au millimètre du fichier de référence.
  *
- * Le papier réel mesure 143,8 mm × 232 mm et se place dans une feuille A4 à
- * 34,7 mm du bord gauche. Toutes les cotes ci-dessous sont celles du fichier :
- * ne pas les convertir en pixels, l'alignement sur le papier préimprimé en
- * dépend.
+ * Le papier réel mesure 150,3 mm × 238,5 mm et se place dans une feuille A4 à
+ * 34,7 mm du bord gauche. Mesure au papier réel par le commanditaire le
+ * 2026-08-12 (imprimé, pas seulement à l'écran) — remplace 143,8 × 232, une
+ * estimation initiale jamais vérifiée physiquement. Toutes les autres cotes
+ * ci-dessous restent celles du fichier : ne pas les convertir en pixels,
+ * l'alignement sur le papier préimprimé en dépend.
  */
 
 /*
@@ -243,8 +245,8 @@
    Le canevas A4 n'est rétabli qu'à l'impression. */
 .recu-page {
   position: relative;
-  width: 143.8mm;
-  height: 232mm;
+  width: 150.3mm;
+  height: 238.5mm;
   flex: none;
   overflow: hidden;
   background: #fff;
@@ -255,8 +257,8 @@
 .recu-fond {
   position: absolute;
   inset: 0;
-  width: 143.8mm;
-  height: 232mm;
+  width: 150.3mm;
+  height: 238.5mm;
   object-fit: fill;
   pointer-events: none;
   user-select: none;
@@ -271,8 +273,8 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 143.8mm;
-  height: 232mm;
+  width: 150.3mm;
+  height: 238.5mm;
   border: 0.35mm solid transparent;
   pointer-events: none;
   z-index: 20;
@@ -300,8 +302,8 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 143.8mm;
-  height: 232mm;
+  width: 150.3mm;
+  height: 238.5mm;
   overflow: hidden;
   z-index: 10;
 }
@@ -392,8 +394,13 @@
 }
 
 .recu-nom-client .valeur {
-  /* Repéré et agrandi avec VisBug (21px) — laisse plus de place au nom. */
-  font-size: 5.56mm;
+  /*
+   * Taille de base 5,56 mm (repérée et agrandie avec VisBug — 21px), mais
+   * plus fixée ici : réduite automatiquement pour un nom trop long
+   * (NomClient, recu-imprimable.tsx), qui pose sa propre taille en style
+   * inline. La valeur de base reste TAILLE_NOM_BASE_MM côté TypeScript,
+   * seule source — pas dupliquée ici pour ne pas risquer une divergence.
+   */
   margin-top: 1mm;
 }
 
@@ -857,8 +864,8 @@
     position: absolute !important;
     left: 34.7mm !important;
     top: 0 !important;
-    width: 143.8mm !important;
-    height: 232mm !important;
+    width: 150.3mm !important;
+    height: 238.5mm !important;
     overflow: hidden !important;
   }
 }

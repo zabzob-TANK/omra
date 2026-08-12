@@ -228,17 +228,23 @@ export interface ReglagesCalage {
   soucheY: string
 }
 
-/** État initial de l'atelier de calage : aucun décalage, échelle à 100 %. */
-export const REGLAGES_CALAGE_VIERGES: ReglagesCalage = {
-  decalageX: '0',
-  decalageY: '0',
-  echelle: '100',
-  signatureX: '0',
-  signatureY: '0',
+/**
+ * Réglages par défaut de l'atelier de calage — mesurés par le commanditaire
+ * au papier réel, imprimé, le 2026-08-12 (pas seulement à l'écran).
+ * Remplacent l'ancien état vierge (tout à zéro, échelle à 100 %), qui
+ * n'avait jamais été vérifié contre une vraie impression. « Réinitialiser »
+ * ramène désormais ici, plus à zéro — zéro n'a jamais été le bon calage.
+ */
+export const REGLAGES_CALAGE_PAR_DEFAUT: ReglagesCalage = {
+  decalageX: '-4',
+  decalageY: '-1.5',
+  echelle: '104.5',
+  signatureX: '-4.5',
+  signatureY: '-6.5',
   versementsX: '0',
-  versementsY: '0',
+  versementsY: '-1',
   soucheX: '0',
-  soucheY: '0',
+  soucheY: '4',
 }
 
 /** Bornes des décalages par bloc, mêmes bornes que le décalage global d'origine. */

@@ -12,7 +12,7 @@ import {
   MESSAGE_IMPRESSION_BLOQUEE,
   MOTIF_REMPLISSAGE,
   preparerRecuImprimable,
-  REGLAGES_CALAGE_VIERGES,
+  REGLAGES_CALAGE_PAR_DEFAUT,
   resumeReglagesCalage,
   sequenceImpression,
   variablesCalage,
@@ -198,14 +198,14 @@ describe('R-83 — repères et calage', () => {
   })
 
   it('convertit les décalages en millimètres', () => {
-    expect(variablesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '1.5', decalageY: '-2' })).toMatchObject({
+    expect(variablesCalage({ ...REGLAGES_CALAGE_PAR_DEFAUT, decalageX: '1.5', decalageY: '-2' })).toMatchObject({
       '--offset-x': '1.5mm',
       '--offset-y': '-2mm',
     })
   })
 
   it('ramène une saisie vide ou invalide à zéro', () => {
-    expect(variablesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '', decalageY: 'abc' })).toMatchObject({
+    expect(variablesCalage({ ...REGLAGES_CALAGE_PAR_DEFAUT, decalageX: '', decalageY: 'abc' })).toMatchObject({
       '--offset-x': '0mm',
       '--offset-y': '0mm',
     })
@@ -227,13 +227,20 @@ describe('R-83 — repères et calage', () => {
   })
 
   it('produit les variables CSS de chaque bloc, indépendamment du décalage global', () => {
+    // Réglages entièrement explicites, sans dépendre des valeurs de
+    // REGLAGES_CALAGE_PAR_DEFAUT : ce test vérifie l'indépendance des blocs
+    // entre eux, pas une valeur par défaut précise — il ne doit pas casser
+    // si ces valeurs par défaut changent à nouveau plus tard.
     const vars = variablesCalage({
-      ...REGLAGES_CALAGE_VIERGES,
+      decalageX: '0',
+      decalageY: '0',
+      echelle: '95',
       signatureX: '2',
       signatureY: '-1',
+      versementsX: '0',
       versementsY: '3',
       soucheX: '-4',
-      echelle: '95',
+      soucheY: '0',
     })
     expect(vars).toMatchObject({
       '--offset-signature-x': '2mm',
@@ -247,7 +254,19 @@ describe('R-83 — repères et calage', () => {
   })
 
   it('résume tous les réglages en texte copiable', () => {
-    const resume = resumeReglagesCalage({ ...REGLAGES_CALAGE_VIERGES, decalageX: '1', signatureY: '2' })
+    // Même raison : réglages explicites, indépendants de
+    // REGLAGES_CALAGE_PAR_DEFAUT.
+    const resume = resumeReglagesCalage({
+      decalageX: '1',
+      decalageY: '0',
+      echelle: '100',
+      signatureX: '0',
+      signatureY: '2',
+      versementsX: '0',
+      versementsY: '0',
+      soucheX: '0',
+      soucheY: '0',
+    })
     expect(resume).toContain('Décalage global : X 1 mm')
     expect(resume).toContain('Signature : X 0 mm, Y 2 mm')
     expect(resume).toContain('Souche (ancrée à 159,2 mm)')
