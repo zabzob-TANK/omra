@@ -236,7 +236,7 @@ export interface ReglagesCalage {
  * ramène désormais ici, plus à zéro — zéro n'a jamais été le bon calage.
  */
 export const REGLAGES_CALAGE_PAR_DEFAUT: ReglagesCalage = {
-  decalageX: '-4',
+  decalageX: '0.3',
   decalageY: '-1.5',
   echelle: '104.5',
   signatureX: '-4.5',
