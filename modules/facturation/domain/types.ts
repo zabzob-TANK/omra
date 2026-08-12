@@ -633,6 +633,13 @@ export interface ImpressionFinance {
   mouvementIds: string[]
   /** Prototype : `p.rowCount`. */
   nombreLignes: number
+  /**
+   * reprise.md §5.17 — faux quand l'impression part sans qu'un rechargement
+   * frais du journal ait pu être confirmé (serveur injoignable après une
+   * nouvelle tentative). N'a jamais bloqué l'impression — tracé pour un
+   * contrôle après coup.
+   */
+  verifie: boolean
 }
 
 /**

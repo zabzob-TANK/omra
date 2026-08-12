@@ -299,6 +299,7 @@ describe('R-63, R-64, R-65 — anomalies', () => {
     numeroImpression: numero,
     mouvementIds: ids,
     nombreLignes: ids.length,
+    verifie: true,
   })
 
   it('R-64 — aucune anomalie tant que le jour n’a pas été imprimé', () => {

@@ -305,6 +305,8 @@ export type FinancePrintEvent = {
   row_count: number
   printed_at: string
   printed_by_slot_label_snapshot: string
+  /** reprise.md §5.17. Absente sur les lignes écrites avant 202608120001 (colonne par défaut : true côté base). */
+  verified: boolean
 }
 
 /** Ligne brute de `list_cash_register_refund_movements` — une sortie de caisse réelle liée à une annulation. */

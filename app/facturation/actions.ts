@@ -35,6 +35,7 @@ import {
   journalOperations,
   modifierRecu,
   previsualiserModification,
+  recuFrais,
   registreBancaire,
   suiviJournalier,
   supprimerImageOperation,
@@ -125,9 +126,22 @@ export async function modifierRecuAction(
   return modifierRecu(recuId, saisie, confirme)
 }
 
-export async function enregistrerImpressionAction(recuId: string): Promise<Resultat<null>> {
+export async function enregistrerImpressionAction(
+  recuId: string,
+  verifie: boolean,
+): Promise<Resultat<null>> {
   await requireActiveAccount()
-  return enregistrerImpressionRecu(recuId)
+  return enregistrerImpressionRecu(recuId, verifie)
+}
+
+/**
+ * reprise.md §5.17 — donnée fraîche d'un reçu, demandée au serveur au
+ * moment d'imprimer plutôt que réutilisée depuis la mémoire du client (qui
+ * pourrait avoir été modifiée dans l'inspecteur du navigateur).
+ */
+export async function recuFraisAction(recuId: string): Promise<Recu | null> {
+  await requireActiveAccount()
+  return recuFrais(recuId)
 }
 
 export async function historiqueRecuAction(recuId: string): Promise<Modification[]> {
@@ -155,9 +169,10 @@ export async function journalOperationsAction(
 
 export async function enregistrerImpressionFinanceAction(
   jour: string,
+  verifie: boolean,
 ): Promise<Resultat<{ numeroImpression: number }>> {
   await requireActiveAccount()
-  return enregistrerImpressionFinance(jour)
+  return enregistrerImpressionFinance(jour, verifie)
 }
 
 export async function acquitterAnomaliesAction(jour: string): Promise<Resultat<null>> {

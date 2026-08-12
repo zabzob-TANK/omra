@@ -464,12 +464,14 @@ export async function corrigerPremierVersementSupabase(
 /**
  * `RecusPort.incrementerImpressions` — R-84. Enregistre un événement
  * d'impression via `record_billing_receipt_print` (migration
- * `202608020003`) et renvoie le nouveau numéro d'impression.
+ * `202608040001`, paramètre `verifie` ajouté par `202608120001`,
+ * reprise.md §5.17) et renvoie le nouveau numéro d'impression.
  */
-export async function incrementerImpressionsSupabase(recuId: string): Promise<number> {
+export async function incrementerImpressionsSupabase(recuId: string, verifie: boolean): Promise<number> {
   const supabase = await createClient()
   const resultat = await supabase.rpc('record_billing_receipt_print', {
     p_receipt_id: recuId,
+    p_verified: verifie,
   })
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const ligne = (resultat.data as { print_number: number }[] | null)?.[0]
@@ -563,8 +565,9 @@ export async function acquitterAnomaliesSupabase(
 /**
  * `ImpressionsFinancePort.creer` — Lot Finance, étape 4c (fusion.md §5).
  * reprise.md §5.12 : le compteur doit être écrit avant l'ouverture de la
- * boîte système ; c'est `sequenceImpression`/`ui/ecrans/finance.tsx` (comme
- * pour le reçu, P18) qui garantit cet ordre, pas cette fonction.
+ * boîte système ; c'est le gestionnaire `onImprimer` du journal financier
+ * (`ui/application.tsx`, via `useImpressionFraiche`, `ui/impression-fraiche.ts`
+ * — reprise.md §5.17) qui garantit cet ordre, pas cette fonction.
  */
 export async function creerImpressionFinanceSupabase(
   impression: ImpressionFinance,
@@ -575,6 +578,7 @@ export async function creerImpressionFinanceSupabase(
     p_season_id: saisonId,
     p_day: impression.jour,
     p_movement_ids: impression.mouvementIds,
+    p_verified: impression.verifie,
   })
   if (resultat.error) throw new Error(messageErreur(resultat.error))
   const ligne = (resultat.data as FinancePrintEvent[] | null)?.[0]
@@ -587,5 +591,6 @@ export async function creerImpressionFinanceSupabase(
     numeroImpression: ligne.print_number,
     mouvementIds: ligne.movement_ids,
     nombreLignes: ligne.row_count,
+    verifie: impression.verifie,
   }
 }

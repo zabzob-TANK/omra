@@ -174,31 +174,6 @@ export function libelleCopie(recu: Recu, original: boolean): string {
 }
 
 /**
- * P18 — Le compteur d'impression doit être écrit avant l'ouverture de la
- * boîte d'impression du système, jamais après : `enregistrer` est donc
- * lancé avant l'appel à `imprimer`.
- *
- * Décision actée : un échec du compteur ne bloque plus jamais l'impression
- * elle-même (l'employé doit pouvoir remettre le reçu au client), mais
- * l'erreur n'est jamais avalée en silence — `imprimer()` s'exécute dans tous
- * les cas, puis l'erreur éventuelle est relancée pour que l'appelant
- * l'affiche.
- */
-export async function sequenceImpression(
-  enregistrer: () => Promise<void>,
-  imprimer: () => void,
-): Promise<void> {
-  let erreurEnregistrement: unknown = null
-  try {
-    await enregistrer()
-  } catch (erreur) {
-    erreurEnregistrement = erreur
-  }
-  imprimer()
-  if (erreurEnregistrement) throw erreurEnregistrement
-}
-
-/**
  * R-82, R-83 — État de l'atelier d'impression.
  *
  * Le fichier de référence pilote le fond du papier et les repères par des

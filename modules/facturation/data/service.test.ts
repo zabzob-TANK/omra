@@ -586,7 +586,7 @@ describe('journal financier de bout en bout', () => {
     const etat = await chargerEtat()
     const jour = etat.recus[0].date.split('/').reverse().join('-')
 
-    const premiere = await enregistrerImpressionFinance(jour)
+    const premiere = await enregistrerImpressionFinance(jour, true)
     // Journée ancienne : refusée pour un employé, acceptée pour un administrateur.
     if (premiere.statut === 'ok') {
       expect(premiere.valeur.numeroImpression).toBeGreaterThan(0)

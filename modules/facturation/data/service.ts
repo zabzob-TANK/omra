@@ -674,16 +674,38 @@ export async function modifierRecu(
   return ok(null)
 }
 
-/** R-84 — Comptabilise une impression du reçu. */
-export async function enregistrerImpressionRecu(recuId: string): Promise<Resultat<null>> {
+/**
+ * R-84, reprise.md §5.17 — comptabilise une impression du reçu.
+ * `verifie` : faux quand l'appelant n'a pas pu confirmer de rechargement
+ * frais avant d'imprimer (repli après une nouvelle tentative infructueuse,
+ * voir `recuFrais`) — n'empêche jamais l'enregistrement ni l'impression,
+ * seulement tracé différemment pour un contrôle après coup.
+ */
+export async function enregistrerImpressionRecu(
+  recuId: string,
+  verifie: boolean,
+): Promise<Resultat<null>> {
   const source = sourceDonnees()
   const utilisateur = await source.session.utilisateurCourant()
   const recu = await source.recus.parId(recuId)
   if (!recu) return { statut: 'erreurs', erreurs: [{ champ: 'recu', code: 'numero-recu-introuvable' }] }
 
-  const total = await source.recus.incrementerImpressions(recuId)
-  await tracer(source, 'طباعة', `وصل ${recu.numero} — طباعة رقم ${total}`, utilisateur)
+  const total = await source.recus.incrementerImpressions(recuId, verifie)
+  const action = verifie ? 'طباعة' : 'طباعة (دون تحقق من الطزاجة)'
+  await tracer(source, action, `وصل ${recu.numero} — طباعة رقم ${total}`, utilisateur)
   return ok(null)
+}
+
+/**
+ * reprise.md §5.17 — donnée fraîche d'un reçu, redemandée au serveur au
+ * moment d'imprimer plutôt que réutilisée depuis la mémoire du client.
+ * `null` si le reçu n'existe pas (jamais une exception pour ce cas précis) :
+ * à l'appelant de décider, avec `impressionBloquee`, si ça bloque
+ * l'impression — cette fonction ne fait que lire.
+ */
+export async function recuFrais(recuId: string): Promise<Recu | null> {
+  const source = sourceDonnees()
+  return source.recus.parId(recuId)
 }
 
 // ---------------------------------------------------------------------------
@@ -1013,8 +1035,15 @@ export async function journalFinancier(periode: PeriodeFinance): Promise<Journal
 }
 
 /** R-61, R-62 — Enregistre une impression du journal. */
+/**
+ * reprise.md §5.17 — `verifie` : faux quand l'appelant n'a pas pu confirmer
+ * de rechargement frais du journal avant d'imprimer (repli après une
+ * nouvelle tentative infructueuse) — n'empêche jamais l'enregistrement ni
+ * l'impression, seulement tracé différemment pour un contrôle après coup.
+ */
 export async function enregistrerImpressionFinance(
   jour: string,
+  verifie: boolean,
 ): Promise<Resultat<{ numeroImpression: number }>> {
   const source = sourceDonnees()
   const maintenant = source.horloge.maintenant()
@@ -1055,13 +1084,15 @@ export async function enregistrerImpressionFinance(
       numeroImpression,
       mouvementIds,
       nombreLignes: mouvementIds.length,
+      verifie,
     },
     saison.id,
   )
 
+  const action = verifie ? 'طباعة الصندوق' : 'طباعة الصندوق (دون تحقق من الطزاجة)'
   await tracer(
     source,
-    'طباعة الصندوق',
+    action,
     `${dateFrDepuisCleJour(jour)} — ${String(numeroImpression).padStart(2, '0')} — ${mouvementIds.length} حركة`,
     utilisateur,
   )

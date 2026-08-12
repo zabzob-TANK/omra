@@ -57,6 +57,11 @@ import { EcranConnexion } from './ecrans/connexion'
 import { EcranFinance } from './ecrans/finance'
 import { EcranPaiements } from './ecrans/paiements'
 import { EcranSuiviJournalier } from './ecrans/suivi-journalier'
+import {
+  ImpressionBloqueeError,
+  type ResultatImpression,
+  useImpressionFraiche,
+} from './impression-fraiche'
 import { ModalePaiementDetail } from './modales/paiement-detail'
 import { ModalePaiementImage, type CiblePaiement } from './modales/paiement-image'
 import { SousNavFinance } from './sous-nav'
@@ -146,7 +151,13 @@ export interface ActionsFacturation {
     saisie: SaisieModification,
     confirme: boolean,
   ) => Promise<Resultat<{ avant: Recu; resultat: ResultatModification }>>
-  enregistrerImpression: (recuId: string) => Promise<Resultat<null>>
+  /** reprise.md §5.17 — `verifie` : faux si l'impression part sans rechargement frais confirmé. */
+  enregistrerImpression: (recuId: string, verifie: boolean) => Promise<Resultat<null>>
+  /**
+   * reprise.md §5.17 — donnée fraîche d'un reçu, redemandée au serveur au
+   * moment d'imprimer plutôt que réutilisée depuis la mémoire du client.
+   */
+  recuFrais: (recuId: string) => Promise<Recu | null>
   /**
    * Câblage ajouté le 2026-08-09 : détail des modifications d'un reçu
    * (date, auteur, motif) — appelé à la demande, seulement à l'ouverture de
@@ -160,7 +171,11 @@ export interface ActionsFacturation {
    * commanditaire.
    */
   journalOperations: (filtres: FiltresJournalOperations) => Promise<PageJournalOperations>
-  enregistrerImpressionFinance: (jour: string) => Promise<Resultat<{ numeroImpression: number }>>
+  /** reprise.md §5.17 — `verifie` : faux si l'impression part sans rechargement frais confirmé. */
+  enregistrerImpressionFinance: (
+    jour: string,
+    verifie: boolean,
+  ) => Promise<Resultat<{ numeroImpression: number }>>
   acquitterAnomalies: (jour: string) => Promise<Resultat<null>>
   suiviJournalier: (options: {
     mois?: string
@@ -290,6 +305,9 @@ export function ApplicationFacturation({
     },
     [actions, aujourdhui, journal],
   )
+
+  /** reprise.md §5.17 — voir l'usage dans `onImprimer` du journal financier, plus bas. */
+  const impressionJournal = useImpressionFraiche<JournalFinancier>()
 
   const chargerSuivi = useCallback(
     async (options: {
@@ -442,9 +460,11 @@ export function ApplicationFacturation({
             recu={recuAffiche}
             original={recuOriginal === recuAffiche.id}
             onRetour={() => setEcran({ nom: 'registre' })}
-            onImpression={async () => {
-              await actions.enregistrerImpression(recuAffiche.id)
+            onRechargerFrais={() => actions.recuFrais(recuAffiche.id)}
+            onImpression={async (verifie) => {
+              const resultat = await actions.enregistrerImpression(recuAffiche.id, verifie)
               void rafraichir()
+              return resultat
             }}
             estAdministrateur={estAdministrateur}
           />
@@ -691,7 +711,8 @@ export function ApplicationFacturation({
 
       {ecran.nom === 'finance' && !aucuneSaison && !financeIndisponible && journal ? (
         <EcranFinance
-          journal={journal}
+          journal={impressionJournal.donnees ?? journal}
+          cle={impressionJournal.cle}
           rafraichissement={rafraichissementJournal}
           aujourdhui={aujourdhui}
           hier={hier}
@@ -701,33 +722,70 @@ export function ApplicationFacturation({
               notifier('اختر يوماً واحداً للطباعة.', true)
               return
             }
-            // reprise.md §5.12 — le compteur est écrit avant l'ouverture de la
-            // boîte système. Un refus explicite (hors fenêtre autorisée, R-61)
-            // bloque l'impression, comme avant. Un échec inattendu (panne
-            // réseau, etc.), lui, ne doit jamais empêcher l'employé de remettre
-            // le document — même décision de résilience que P18 pour le reçu
-            // (`sequenceImpression`) : l'erreur est affichée, jamais avalée.
-            let echecCompteurInattendu = false
-            try {
-              const resultat = await actions.enregistrerImpressionFinance(journal.jourSelectionne)
-              if (resultat.statut !== 'ok') {
-                notifier('يمكن للموظف طباعة اليوم أو أمس فقط.', true)
-                return
+            const jourAImprimer = journal.jourSelectionne
+            const estUnReessai = impressionJournal.phase === 'echec'
+
+            // R-61 (refus hors fenêtre autorisée) reste un blocage dur,
+            // comme avant : détecté par le même appel qui enregistre le
+            // compteur, donc revérifié à chaque tentative réelle
+            // d'impression (fraîche ou de repli). Un échec inattendu de ce
+            // même appel (panne réseau…), lui, n'empêche jamais
+            // l'impression — même résilience P18 qu'avant (reprise.md
+            // §5.12). Renvoie le numéro d'impression tout juste attribué,
+            // pour que le document imprimé affiche son propre rang exact
+            // plutôt qu'une donnée chargée juste avant l'incrémentation.
+            const enregistrer = async (verifie: boolean): Promise<number | null> => {
+              let resultat: Resultat<{ numeroImpression: number }>
+              try {
+                resultat = await actions.enregistrerImpressionFinance(jourAImprimer, verifie)
+              } catch {
+                notifier('تعذر تسجيل عداد الطباعة. تمت الطباعة رغم ذلك.', true)
+                return null
               }
-            } catch {
-              echecCompteurInattendu = true
+              if (resultat.statut !== 'ok') {
+                throw new ImpressionBloqueeError('يمكن للموظف طباعة اليوم أو أمس فقط.')
+              }
+              return resultat.valeur.numeroImpression
             }
-            await chargerJournal(periodeFinance)
-            // R-67 — A4 paysage, marge 5 mm, posée le temps de l'impression.
+
+            // R-67 — A4 paysage, marge 5 mm, posée le temps de la tentative
+            // complète : reprise.md §5.17 peut imprimer depuis l'intérieur
+            // de `essayer`, pas seulement à la ligne suivante comme avant.
             const style = document.createElement('style')
             style.textContent = '@page{size:A4 landscape;margin:5mm}'
             document.head.appendChild(style)
             document.body.classList.add('finance-impression')
-            window.print()
-            document.body.classList.remove('finance-impression')
-            style.remove()
-            if (echecCompteurInattendu) {
-              notifier('تعذر تسجيل عداد الطباعة. تمت الطباعة رغم ذلك.', true)
+            let resultatImpression: ResultatImpression
+            try {
+              resultatImpression = await impressionJournal.essayer(
+                // reprise.md §5.17 — jamais l'affichage courant : une donnée
+                // fraîche est redemandée au serveur avant chaque impression,
+                // sans exception.
+                async () => {
+                  let frais: JournalFinancier
+                  try {
+                    frais = await actions.journalFinancier(periodeFinance)
+                  } catch {
+                    return null
+                  }
+                  const numero = await enregistrer(true)
+                  return numero === null ? frais : { ...frais, nombreImpressions: numero }
+                },
+                async () => {
+                  const numero = await enregistrer(false)
+                  return numero === null ? journal : { ...journal, nombreImpressions: numero }
+                },
+                'تعذر التحقق من تحديث بيانات اليومية المالية قبل الطباعة. أعد المحاولة.',
+                estUnReessai,
+              )
+            } finally {
+              document.body.classList.remove('finance-impression')
+              style.remove()
+            }
+            if (resultatImpression.phase === 'echec' || resultatImpression.phase === 'bloque') {
+              notifier(resultatImpression.message, true)
+            } else if (resultatImpression.nonVerifiee) {
+              notifier('تمت الطباعة دون تأكيد تحديث البيانات — سُجّلت كطباعة غير موثّقة.', true)
             }
           }}
           onAcquitter={() => setFenetre({ type: 'anomalieFinance' })}

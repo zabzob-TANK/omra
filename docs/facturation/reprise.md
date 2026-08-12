@@ -597,6 +597,51 @@ commentaire, un autre fichier), la mise à jour de cette description fait
 partie du changement — pas une passe de nettoyage séparée, facultative ou
 remise à plus tard.
 
+### 5.17 Impression — jamais le DOM affiché, toujours une donnée fraîche reconstruite de force
+
+Décision du commanditaire (2026-08-12). Menace identifiée : un employé peut
+modifier la page affichée dans son navigateur (inspecteur du navigateur) puis
+imprimer — la base n'est jamais touchée, mais le papier qui sort est
+falsifié. Sur un reçu, le client repart avec un faux document. Sur le
+Journal financier, c'est plus grave : ce document sert au contrôle de
+caisse.
+
+Règle générale, pour **tout** écran imprimable, présent ou futur — un
+principe unique, pas un correctif par écran :
+
+1. Au moment de cliquer sur « Imprimer », une donnée fraîche est redemandée
+   au serveur — jamais celle déjà en mémoire côté client, même chargée
+   quelques secondes plus tôt.
+2. Le contenu imprimable est reconstruit **de force** à partir de cette
+   réponse, jamais par une mise à jour en place du DOM déjà affiché. Une
+   simple mise à jour de state ne suffit pas : si la donnée fraîche est
+   identique à l'affichage courant, React peut légitimement ne rien
+   retoucher au DOM — une falsification faite à la main dans l'inspecteur
+   survivrait alors même à un rechargement « réussi ».
+3. Si cette étape échoue (réseau, session…) : un message clair l'indique et
+   propose de réessayer. Si le nouvel essai échoue aussi, **l'impression
+   reste possible** — même logique que l'échec du compteur d'impression
+   (§5.12), qui lui non plus n'a jamais bloqué : « ne doit jamais empêcher
+   l'employé de remettre le document ». Le coût d'un blocage systématique
+   (client au comptoir, réseau qui hoquette) est plus élevé et plus
+   fréquent que le risque qu'on couvre (falsification locale, rare, et
+   repérable après coup en comparant le papier au numéro de reçu).
+   L'impression part alors avec l'avertissement affiché à l'écran, et
+   l'événement est enregistré comme **impression non vérifiée** — traçable
+   après coup, jamais un repli silencieux et invisible.
+
+Ceci ne change rien à la règle déjà actée « un écran n'imprime jamais un
+document incomplet » : celle-ci vise une donnée manquante ou anormale
+(R-81, dépassement de six paiements), pas un document complet dont la
+fraîcheur n'a simplement pas pu être revérifiée. Les deux échecs ne se
+traitent pas pareil : donnée incomplète → toujours bloqué ; fraîcheur non
+vérifiable → jamais bloqué, seulement tracé.
+
+Implémentation : un mécanisme partagé (`useImpressionFraiche`,
+`modules/facturation/ui/impression-fraiche.ts`), pas dupliqué par écran —
+pour qu'un futur écran imprimable en hérite naturellement au lieu de
+redécouvrir la règle. Reçu et Journal financier l'utilisent tous les deux.
+
 ---
 
 ## 6. Module Administration

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { MAX_VERSEMENTS } from '../../domain/constants'
 import { unRecu, unVersement } from '../../domain/rules/fixtures'
@@ -14,7 +14,6 @@ import {
   preparerRecuImprimable,
   REGLAGES_CALAGE_PAR_DEFAUT,
   resumeReglagesCalage,
-  sequenceImpression,
   variablesCalage,
 } from './donnees'
 
@@ -302,38 +301,5 @@ describe('Atelier de calage — jeu de test à nombre fixe de versements', () =>
     const donnees = donneesAvecVersementsTest(preparerRecuImprimable(recu), 1)
     expect(donnees.numero).toBe('77')
     expect(donnees.nomComplet).toContain('يوسف')
-  })
-})
-
-describe('P18 — le compteur d’impression est écrit avant l’ouverture de la boîte système', () => {
-  it('attend la fin de l’enregistrement avant d’imprimer', async () => {
-    const ordre: string[] = []
-    let resoudre: () => void = () => {}
-    const enregistrer = () =>
-      new Promise<void>((resolve) => {
-        resoudre = () => {
-          ordre.push('enregistrer')
-          resolve()
-        }
-      })
-    const imprimer = () => ordre.push('imprimer')
-
-    const promesse = sequenceImpression(enregistrer, imprimer)
-
-    // Tant que l'enregistrement n'est pas résolu, l'impression n'a pas eu lieu.
-    expect(ordre).toEqual([])
-
-    resoudre()
-    await promesse
-
-    expect(ordre).toEqual(['enregistrer', 'imprimer'])
-  })
-
-  it('imprime quand même si l’enregistrement échoue, puis relance l’erreur', async () => {
-    const imprimer = vi.fn()
-    const enregistrer = () => Promise.reject(new Error('échec'))
-
-    await expect(sequenceImpression(enregistrer, imprimer)).rejects.toThrow('échec')
-    expect(imprimer).toHaveBeenCalledTimes(1)
   })
 })

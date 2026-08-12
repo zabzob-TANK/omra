@@ -36,6 +36,14 @@ interface Proprietes {
    * remplacées par un écran vide (2026-08-09).
    */
   rafraichissement?: boolean
+  /**
+   * reprise.md §5.17 — change à chaque impression réussie (voir
+   * `useImpressionFraiche`). Posée en `key` sur le contenu imprimable pour
+   * forcer un remontage complet : sans ça, une valeur de `journal` inchangée
+   * entre deux rechargements pourrait laisser React ignorer un nœud du DOM
+   * falsifié à la main dans l'inspecteur, malgré la donnée fraîche reçue.
+   */
+  cle?: number
   onPeriode: (periode: PeriodeFinance) => void
   onImprimer: () => Promise<void>
   onAcquitter: () => void
@@ -50,6 +58,7 @@ interface Proprietes {
 export function EcranFinance({
   journal,
   rafraichissement,
+  cle,
   onPeriode,
   onImprimer,
   onAcquitter,
@@ -150,7 +159,10 @@ export function EcranFinance({
           ) : null}
         </div>
 
-        <div className={rafraichissement ? 'omra-rafraichissement' : undefined}>
+        {/* reprise.md §5.17 — `key` force un remontage complet à chaque
+            impression réussie, pour que la donnée fraîche soit réécrite
+            dans le DOM plutôt que fusionnée en place (voir `cle` ci-dessus). */}
+        <div className={rafraichissement ? 'omra-rafraichissement' : undefined} key={cle}>
         {/*
           R-62, R-66, R-67 — bandeau supérieur visible uniquement à
           l'impression : code d'impression, état de la veille, compteur de

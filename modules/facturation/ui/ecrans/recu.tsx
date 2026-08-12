@@ -17,12 +17,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
+import type { Resultat } from '../../domain/rules/errors'
 import type { Recu } from '../../domain/types'
+import { ImpressionBloqueeError, useImpressionFraiche } from '../impression-fraiche'
 import { IndicateurChargement } from '../spinner'
 import { T } from '../textes'
 import {
   classesAtelier,
   donneesAvecVersementsTest,
+  type DonneesRecuImprimable,
   impressionBloquee,
   MESSAGE_COMPTEUR_IMPRESSION_ECHEC,
   MESSAGE_IMPRESSION_BLOQUEE,
@@ -31,7 +34,6 @@ import {
   type ReglagesCalage,
   REGLAGES_CALAGE_PAR_DEFAUT,
   resumeReglagesCalage,
-  sequenceImpression,
   variablesCalage,
 } from '../recu/donnees'
 import { RecuImprimable } from '../recu/recu-imprimable'
@@ -69,6 +71,19 @@ const CHEMIN_FOND = '/facturation/fond-facture.png'
  */
 const MESSAGE_TEST_VERSEMENTS_ACTIF =
   'Basculez sur « Réel » avant d’imprimer : ce reçu affiche actuellement le jeu de test.'
+
+/**
+ * reprise.md §5.17 — première tentative de rechargement échouée avant
+ * impression. Un réessai est proposé ; en cas de nouvel échec, l'impression
+ * part quand même, en repli, tracée comme non vérifiée (jamais bloquée pour
+ * ce seul motif — voir `impression-fraiche.ts`).
+ */
+const MESSAGE_RECHARGEMENT_ECHEC =
+  'Impossible de confirmer que les données sont à jour avant l’impression (connexion, session…). Réessayez : si l’échec persiste, l’impression sera possible quand même, avec les données actuellement affichées, et tracée comme non vérifiée.'
+
+/** reprise.md §5.17 — dernière impression partie sans confirmation de fraîcheur. */
+const MESSAGE_IMPRESSION_NON_VERIFIEE =
+  'Dernière impression envoyée sans confirmation que les données étaient à jour — enregistrée comme non vérifiée.'
 
 /** Pas des boutons +/− de l'atelier de calage, en millimètres. */
 const PAS_MM = 0.5
@@ -157,8 +172,21 @@ interface Proprietes {
    */
   original: boolean
   onRetour: () => void
-  /** R-84 — comptabilise une impression. Doit être attendu avant l'impression (P18). */
-  onImpression: () => Promise<void>
+  /**
+   * reprise.md §5.17 — donnée fraîche du reçu, redemandée au serveur au
+   * moment d'imprimer plutôt que réutilisée depuis la mémoire du client.
+   * Lecture seule, jamais d'effet de bord ; `null` si le reçu n'a pas pu être
+   * relu (réseau, session…) — un échec de rechargement, pas un blocage R-81.
+   */
+  onRechargerFrais: () => Promise<Recu | null>
+  /**
+   * R-84/P18 — comptabilise une impression, toujours avant l'ouverture de la
+   * boîte système. `verifie` reflète si la fraîcheur a pu être confirmée
+   * avant cette impression précise (reprise.md §5.17) : faux uniquement pour
+   * une impression partie en repli après un rechargement qui a échoué deux
+   * fois de suite.
+   */
+  onImpression: (verifie: boolean) => Promise<Resultat<null>>
   /**
    * Décision du commanditaire (2026-08-08) : le panneau de calage (`OUTILS`)
    * est un outil de mise au point pour la véritable imprimante/le véritable
@@ -169,7 +197,13 @@ interface Proprietes {
   estAdministrateur: boolean
 }
 
-export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: Proprietes) {
+export function EcranRecu({
+  recu,
+  onRetour,
+  onRechargerFrais,
+  onImpression,
+  estAdministrateur,
+}: Proprietes) {
   const donneesReelles = useMemo(() => preparerRecuImprimable(recu), [recu])
 
   const [sansFond, setSansFond] = useState(false)
@@ -182,11 +216,20 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
    */
   const [versementsTest, setVersementsTest] = useState<NombreVersementsTest | null>(null)
   const [message, setMessage] = useState('')
-  const [envoi, setEnvoi] = useState(false)
 
+  /**
+   * reprise.md §5.17 — `impression.donnees` porte la dernière donnée
+   * effectivement imprimée (fraîche, ou de repli si le rechargement a
+   * échoué deux fois). Tant qu'aucune impression n'a eu lieu, l'écran reste
+   * sur la préparation courante du reçu affiché.
+   */
+  const impression = useImpressionFraiche<DonneesRecuImprimable>()
+  const chargementImpression = impression.phase === 'chargement'
+
+  const baseAffichee = impression.donnees ?? donneesReelles
   const donnees = versementsTest
-    ? donneesAvecVersementsTest(donneesReelles, versementsTest)
-    : donneesReelles
+    ? donneesAvecVersementsTest(baseAffichee, versementsTest)
+    : baseAffichee
 
   const definirReglage = (cle: keyof ReglagesCalage) => (valeur: string) =>
     setReglages((actuel) => ({ ...actuel, [cle]: valeur }))
@@ -206,35 +249,61 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
   }, [])
 
   const imprimer = async () => {
-    if (envoi) return
+    if (chargementImpression) return
     // Le jeu de test (1/6 versements) remplace `donnees` par des paiements
-    // fabriqués, mais `onImpression` enregistre toujours un vrai clic
-    // d'impression pour CE reçu (compteur, date, auteur) : sans ce blocage,
-    // imprimer en mode test créditerait le reçu réel d'une impression alors
-    // que la page sortie de l'imprimante afficherait des données inventées.
+    // fabriqués ; imprimer dans cet état créditerait le reçu réel d'une
+    // impression alors que la page sortie de l'imprimante afficherait des
+    // données inventées — bloqué avant même de solliciter le serveur.
     if (versementsTest !== null) {
       setMessage(MESSAGE_TEST_VERSEMENTS_ACTIF)
       return
     }
-    // R-81 — au-delà de six paiements, le fichier de référence bloque
-    // l'impression au lieu de produire un document incomplet.
-    if (impressionBloquee(donnees)) {
-      setMessage(MESSAGE_IMPRESSION_BLOQUEE)
-      return
-    }
     setMessage('')
-    setEnvoi(true)
-    // P18 — le compteur doit être écrit avant l'ouverture de la boîte système.
-    // Décision actée : un échec du compteur ne bloque jamais l'impression —
-    // `sequenceImpression` imprime dans tous les cas et relance l'erreur
-    // ensuite, qu'on affiche ici sans jamais l'avaler en silence.
-    try {
-      await sequenceImpression(onImpression, () => window.print())
-    } catch {
-      setMessage(MESSAGE_COMPTEUR_IMPRESSION_ECHEC)
-    } finally {
-      setEnvoi(false)
+    const estUnReessai = impression.phase === 'echec'
+
+    // P18 — le compteur est écrit avant l'ouverture de la boîte système, dans
+    // les deux cas où une impression part réellement (fraîche ou de repli).
+    // Son échec ne bloque jamais l'impression elle-même, mais n'est jamais
+    // avalé en silence — `enregistrer` gère les deux issues (`Resultat`
+    // refusé, ou exception inattendue) de la même façon.
+    const enregistrer = async (verifie: boolean) => {
+      try {
+        const resultat = await onImpression(verifie)
+        if (resultat.statut !== 'ok') setMessage(MESSAGE_COMPTEUR_IMPRESSION_ECHEC)
+      } catch {
+        setMessage(MESSAGE_COMPTEUR_IMPRESSION_ECHEC)
+      }
     }
+
+    await impression.essayer(
+      // reprise.md §5.17 — jamais l'affichage courant : une donnée fraîche
+      // est redemandée au serveur et revérifiée (R-81) avant d'imprimer, à
+      // chaque clic, sans exception.
+      async () => {
+        const frais = await onRechargerFrais()
+        if (!frais) return null
+        const fraisDonnees = preparerRecuImprimable(frais)
+        if (impressionBloquee(fraisDonnees)) {
+          throw new ImpressionBloqueeError(MESSAGE_IMPRESSION_BLOQUEE)
+        }
+        await enregistrer(true)
+        return fraisDonnees
+      },
+      async () => {
+        // R-81 reste entière même en repli : la donnée de repli est celle
+        // affichée à l'écran, jamais revérifiée par un rechargement réussi
+        // cette fois-ci — si elle est déjà connue comme dépassant six
+        // paiements, l'impression reste bloquée, pas seulement « non
+        // vérifiée ».
+        if (impressionBloquee(donnees)) {
+          throw new ImpressionBloqueeError(MESSAGE_IMPRESSION_BLOQUEE)
+        }
+        await enregistrer(false)
+        return donnees
+      },
+      MESSAGE_RECHARGEMENT_ECHEC,
+      estUnReessai,
+    )
   }
 
   const classes = classesAtelier({ sansFond, reperes })
@@ -294,8 +363,8 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
           >
             {OUTILS.reinitialiser}
           </button>
-          <button className="primary" onClick={imprimer} disabled={envoi}>
-            {envoi ? <IndicateurChargement /> : null}
+          <button className="primary" onClick={imprimer} disabled={chargementImpression}>
+            {chargementImpression ? <IndicateurChargement /> : null}
             {OUTILS.imprimer}
           </button>
           <span className="indication">{OUTILS.indication}</span>
@@ -374,8 +443,8 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
         </div>
       ) : (
         <div className="recu-outils recu-outils-employe" aria-label="Impression">
-          <button className="primary" onClick={imprimer} disabled={envoi}>
-            {envoi ? <IndicateurChargement /> : null}
+          <button className="primary" onClick={imprimer} disabled={chargementImpression}>
+            {chargementImpression ? <IndicateurChargement /> : null}
             {OUTILS.imprimer}
           </button>
         </div>
@@ -417,8 +486,82 @@ export function EcranRecu({ recu, onRetour, onImpression, estAdministrateur }: P
         </div>
       ) : null}
 
+      {/* reprise.md §5.17 — document réellement incomplet, revérifié contre
+          la donnée fraîche au moment d'imprimer : bloquant, sans réessai ni
+          repli (R-81 ne change pas). */}
+      {impression.phase === 'bloque' ? (
+        <div
+          role="alert"
+          style={{
+            padding: '10px 14px',
+            background: '#9c3b32',
+            color: '#fff',
+            fontSize: 12.5,
+          }}
+        >
+          {impression.message}
+        </div>
+      ) : null}
+
+      {/* reprise.md §5.17 — rechargement échoué avant impression : jamais
+          bloquant, un réessai relance exactement la même tentative. */}
+      {impression.phase === 'echec' ? (
+        <div
+          role="alert"
+          style={{
+            padding: '10px 14px',
+            background: '#9c3b32',
+            color: '#fff',
+            fontSize: 12.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <span>{impression.message}</span>
+          <button
+            type="button"
+            onClick={() => void imprimer()}
+            style={{
+              flexShrink: 0,
+              background: '#fff',
+              color: '#9c3b32',
+              border: 'none',
+              borderRadius: 4,
+              padding: '4px 10px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Réessayer
+          </button>
+        </div>
+      ) : null}
+
+      {/* reprise.md §5.17 — la dernière impression est partie en repli après
+          un rechargement deux fois en échec ; tracée côté serveur comme non
+          vérifiée, jamais bloquante. */}
+      {impression.nonVerifiee ? (
+        <div
+          role="status"
+          style={{
+            padding: '10px 14px',
+            background: 'var(--warn-soft)',
+            color: 'var(--warn)',
+            fontSize: 12.5,
+          }}
+        >
+          {MESSAGE_IMPRESSION_NON_VERIFIEE}
+        </div>
+      ) : null}
+
       <main className="recu-espace">
-        <RecuImprimable donnees={donnees} cheminFond={CHEMIN_FOND} />
+        {/* `key` force un remontage complet à chaque impression réussie : la
+            donnée fraîche doit être réécrite dans le DOM, jamais fusionnée
+            en place, sans quoi une valeur inchangée pourrait laisser
+            survivre une falsification faite dans l'inspecteur (§5.17). */}
+        <RecuImprimable donnees={donnees} cheminFond={CHEMIN_FOND} key={impression.cle} />
       </main>
     </div>
   )

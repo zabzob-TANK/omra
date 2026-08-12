@@ -243,8 +243,14 @@ export interface RecusPort {
       montantRembourseCentimes: number
     },
   ): Promise<Recu>
-  /** R-84 — Incrémente le compteur d'impressions et renvoie sa nouvelle valeur. */
-  incrementerImpressions(recuId: string): Promise<number>
+  /**
+   * R-84 — Incrémente le compteur d'impressions et renvoie sa nouvelle valeur.
+   * reprise.md §5.17 — `verifie` : faux quand l'impression part sans qu'un
+   * rechargement frais du reçu ait pu être confirmé (serveur injoignable
+   * après une nouvelle tentative). N'a jamais bloqué l'impression — tracé
+   * pour un contrôle après coup, comme l'échec pur et simple du compteur.
+   */
+  incrementerImpressions(recuId: string, verifie: boolean): Promise<number>
   /**
    * R-35, R-38, R-40 — Image d'un instrument **unique**, portée par le
    * versement lui-même. Les instruments partagés passent par

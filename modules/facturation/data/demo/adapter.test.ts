@@ -92,8 +92,8 @@ describe('adaptateur de démonstration — reçus', () => {
   it('R-84 — incrémente le compteur d’impressions', async () => {
     const s = source()
     const recu = await s.recus.parNumero(262)
-    expect(await s.recus.incrementerImpressions(recu!.id)).toBe(1)
-    expect(await s.recus.incrementerImpressions(recu!.id)).toBe(2)
+    expect(await s.recus.incrementerImpressions(recu!.id, true)).toBe(1)
+    expect(await s.recus.incrementerImpressions(recu!.id, true)).toBe(2)
   })
 
   it('renvoie des copies : muter le résultat n’altère pas le dépôt', async () => {
@@ -227,7 +227,7 @@ describe('adaptateur de démonstration — isolation', () => {
     const a = source()
     const b = source()
     const recu = await a.recus.parNumero(262)
-    await a.recus.incrementerImpressions(recu!.id)
+    await a.recus.incrementerImpressions(recu!.id, true)
     expect((await b.recus.parNumero(262))!.impressions).toBe(0)
   })
 

@@ -424,7 +424,9 @@ export function creerSourceDemonstration(
       recu.montantRembourseCentimes = donnees.montantRembourseCentimes
       return copier(recu)
     },
-    async incrementerImpressions(recuId: string) {
+    // `verifie` (reprise.md §5.17) n'a rien à distinguer ici : la démonstration
+    // ne simule pas de panne réseau au rechargement, donc jamais de repli.
+    async incrementerImpressions(recuId: string, _verifie: boolean) {
       const recu = recus.find((r) => r.id === recuId)
       if (!recu) throw new Error(`Reçu introuvable : ${recuId}`)
       // La démonstration ne simule jamais une lecture ratée : toujours un

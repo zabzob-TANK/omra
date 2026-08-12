@@ -891,6 +891,7 @@ export function construireJeuDemonstration(
         'p-demo-253-1',
       ].sort(),
       nombreLignes: 5,
+      verifie: true,
     },
     {
       id: 'fp-demo-j4',
@@ -906,6 +907,7 @@ export function construireJeuDemonstration(
         'p-demo-256-1',
       ].sort(),
       nombreLignes: 5,
+      verifie: true,
     },
     {
       id: 'fp-demo-j2',
@@ -921,6 +923,7 @@ export function construireJeuDemonstration(
         'refund-demo-258',
       ].sort(),
       nombreLignes: 5,
+      verifie: true,
     },
     // Journée imprimée deux fois : le code d'impression passe à « 02 ».
     ...[1, 2].map((numeroImpression) => ({
@@ -939,6 +942,7 @@ export function construireJeuDemonstration(
         'p-demo-263-1',
       ].sort(),
       nombreLignes: 7,
+      verifie: true,
     })),
   ]
 

@@ -142,6 +142,7 @@ describe('R-69 — définition d’une journée active', () => {
       numeroImpression: 1,
       mouvementIds: [],
       nombreLignes: 0,
+      verifie: true,
     }
     expect(resumeJournee(jour, source({ impressions: [impression] })).active).toBe(true)
   })

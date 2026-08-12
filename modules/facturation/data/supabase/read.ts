@@ -347,6 +347,7 @@ export async function listerImpressionsFinanceReel(
     numeroImpression: ligne.print_number,
     mouvementIds: ligne.movement_ids,
     nombreLignes: ligne.row_count,
+    verifie: ligne.verified,
   }))
 }
 
