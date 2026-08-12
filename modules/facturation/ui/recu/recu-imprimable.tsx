@@ -143,9 +143,9 @@ export function RecuImprimable({
                 <col style={{ width: '15.16%' }} />
                 <col style={{ width: '15.88%' }} />
                 <col style={{ width: '16.61%' }} />
-                <col style={{ width: '14.44%' }} />
+                <col style={{ width: '8%' }} />
                 <col style={{ width: '17.33%' }} />
-                <col style={{ width: '16.61%' }} />
+                <col style={{ width: '23.05%' }} />
                 <col style={{ width: '3.97%' }} />
               </colgroup>
               <thead>

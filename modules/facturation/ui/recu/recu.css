@@ -609,7 +609,12 @@
 
 .recu-lignes-reglement {
   position: absolute;
-  right: 0;
+  /*
+   * Décalé de 0,8 cm vers la gauche (demande du commanditaire, 2026-08-12).
+   * 1,5 cm demandé initialement chevauchait le cadre de signature (mesuré :
+   * 0,87 cm est le maximum avant contact) — 0,8 cm confirmé à la place.
+   */
+  right: 8mm;
   top: 4.2mm;
   width: 84mm;
   display: grid;
@@ -898,11 +903,11 @@
 .recu-souche-entete col:nth-child(3),
 .recu-souche-lignes col:nth-child(3) { width: 15.88% !important; }
 .recu-souche-entete col:nth-child(4),
-.recu-souche-lignes col:nth-child(4) { width: 14.44% !important; }
+.recu-souche-lignes col:nth-child(4) { width: 8% !important; }
 .recu-souche-entete col:nth-child(5),
 .recu-souche-lignes col:nth-child(5) { width: 17.33% !important; }
 .recu-souche-entete col:nth-child(6),
-.recu-souche-lignes col:nth-child(6) { width: 21.31% !important; }
+.recu-souche-lignes col:nth-child(6) { width: 27.75% !important; }
 
 .recu-souche-contact col:nth-child(1) { width: 41.88% !important; }
 .recu-souche-contact col:nth-child(2) { width: 36.1% !important; }
