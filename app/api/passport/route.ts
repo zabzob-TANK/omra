@@ -62,7 +62,13 @@ export async function POST(request: Request) {
       ? frameFromEyes(vision.eyeLeft, vision.eyeRight)
       : null;
 
+  // Un document qui n'est pas marocain doit sauter aux yeux de l'appelant :
+  // tout le reste du pipeline (format du numéro, gabarit de page, position du
+  // portrait) suppose un passeport marocain et ne vaut plus rien sur un autre.
+  const foreignDocument = mrz?.foreignDocument ?? null;
+
   return Response.json({
+    foreignDocument,
     corners: vision.corners,
     cornersConfidence: vision.cornersConfidence,
     eyes: vision.eyeLeft && vision.eyeRight ? { left: vision.eyeLeft, right: vision.eyeRight } : null,

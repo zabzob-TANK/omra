@@ -182,7 +182,39 @@ test("on peut se fier au document plutôt qu'au réglage", () => {
   const damaged = ALAOUI[1].slice(0, 10) + "FRA" + ALAOUI[1].slice(13);
   const r = parseTd3(ALAOUI[0] + "\n" + damaged, AT, { expectedState: null });
   assert.equal(r.nationality, "FRA");
+  assert.equal(r.foreignDocument, null);
   assert.deepEqual(r.warnings.filter((w) => w.includes("Nationalité")), []);
+});
+
+test("un vrai passeport étranger est signalé, pas maquillé en marocain", () => {
+  // Les DEUX lignes portent FRA, et le code est loin de MAR : ce n'est pas une
+  // faute de lecture. Le forcer ferait passer un document étranger pour
+  // marocain, et lui appliquerait un format de numéro qui n'est pas le sien.
+  const l1 = "P<FRAALAOUI<<YOUSSEF<<<<<<<<<<<<<<<<<<<<<<<<";
+  const l2 = ALAOUI[1].slice(0, 10) + "FRA" + ALAOUI[1].slice(13);
+  const r = parseTd3(l1 + "\n" + l2, AT);
+  assert.ok(r.foreignDocument, "le doute doit être remonté");
+  assert.equal(r.foreignDocument?.readState, "FRA");
+  assert.equal(r.foreignDocument?.agreedOnBothLines, true);
+  assert.equal(r.nationality, "FRA", "on ne réécrit pas le pays lu");
+  assert.ok(r.warnings.some((w) => w.includes("à vérifier à la main")));
+});
+
+test("une seule lettre de travers reste une faute de lecture", () => {
+  // NAR est à une lettre de MAR : de l'OCR, pas un pays.
+  const l2 = ALAOUI[1].slice(0, 10) + "NAR" + ALAOUI[1].slice(13);
+  const r = parseTd3(ALAOUI[0] + "\n" + l2, AT);
+  assert.equal(r.foreignDocument, null);
+  assert.equal(r.nationality, "MAR");
+});
+
+test("un désaccord entre les deux lignes n'est jamais lu comme un étranger", () => {
+  // Ligne 1 dit MAR, ligne 2 dit FRA : l'une des deux est fausse. Dans le
+  // doute on garde le pays attendu plutôt que d'inventer un dossier étranger.
+  const l2 = ALAOUI[1].slice(0, 10) + "FRA" + ALAOUI[1].slice(13);
+  const r = parseTd3(ALAOUI[0] + "\n" + l2, AT);
+  assert.equal(r.foreignDocument, null);
+  assert.equal(r.nationality, "MAR");
 });
 
 test("les caractères parasites de l'OCR sont normalisés", () => {

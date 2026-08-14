@@ -231,8 +231,24 @@ export interface MrzField<T = string> {
   status: FieldStatus;
 }
 
+/** Le document ne semble pas venir du pays attendu. */
+export interface ForeignDocument {
+  /** Code lu sur la ligne 2. */
+  readState: string;
+  /** Les deux lignes portent-elles le même code ? Deux témoins valent mieux qu'un. */
+  agreedOnBothLines: boolean;
+  /** Distance au code attendu : 1 sent l'erreur de lecture, 3 le vrai étranger. */
+  distanceToExpected: number;
+}
+
 export interface Td3Result {
   ok: boolean;
+  /**
+   * Renseigné dès qu'un doute existe sur le pays émetteur. À traiter à part :
+   * le reste du pipeline suppose un passeport marocain (format du numéro,
+   * gabarit de la page, position du portrait).
+   */
+  foreignDocument: ForeignDocument | null;
   /** Les deux lignes normalisées, telles qu'utilisées pour le calcul. */
   lines: [string, string];
   documentType: string;
@@ -251,6 +267,14 @@ export interface Td3Result {
   checksPassed: number;
   checksTotal: number;
   warnings: string[];
+}
+
+/** Nombre de positions différentes entre deux codes de même longueur. */
+function codeDistance(a: string, b: string): number {
+  if (a.length !== b.length) return Math.max(a.length, b.length);
+  let d = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++;
+  return d;
 }
 
 /** Ne garde que les caractères valides en MRZ et complète à 44. */
@@ -335,22 +359,38 @@ export function parseTd3(
   const personalCheck = l2[42];
   const compositeCheck = l2[43];
 
-  // Le masque suit l'État ATTENDU, pas celui qui a été lu : c'est tout l'objet
-  // du réglage, puisque le code pays n'a pas de chiffre de contrôle.
+  // Une seule lettre qui change, c'est presque toujours l'OCR. Trois lettres
+  // cohérentes sur les DEUX lignes, c'est un document qui n'est pas marocain.
+  // Confondre les deux serait grave dans un sens comme dans l'autre : forcer
+  // un vrai passeport étranger le ferait passer pour marocain, et refuser une
+  // simple faute de lecture bloquerait un dossier valide.
   const readState = nationality.replace(/</g, "");
-  const effectiveState = expectedState ?? readState;
+  const readIssuer = l1.slice(2, 5).replace(/</g, "");
+  const agreed = !!readState && readState === readIssuer;
+  const distance = expectedState && readState ? codeDistance(readState, expectedState) : 0;
+
+  // Deux témoins d'accord sur un code franchement différent : on ne force pas.
+  const foreign: ForeignDocument | null =
+    expectedState && readState && readState !== expectedState && agreed && distance >= 2
+      ? { readState, agreedOnBothLines: agreed, distanceToExpected: distance }
+      : null;
+
+  const effectiveState = foreign ? readState : (expectedState ?? readState);
+  const stateForced = !!expectedState && !foreign && !!readState && readState !== expectedState;
+
   const numberMask = PASSPORT_NUMBER_MASKS[effectiveState];
 
-  if (expectedState) {
-    if (readState && readState !== expectedState) {
-      warnings.push(
-        `Nationalité lue « ${readState} », corrigée en ${expectedState} : ce champ n'a pas de chiffre de contrôle.`,
-      );
-    }
-    const readIssuer = l1.slice(2, 5).replace(/</g, "");
-    if (readIssuer && readIssuer !== expectedState) {
-      warnings.push(`État émetteur lu « ${readIssuer} » sur la première ligne, corrigé en ${expectedState}.`);
-    }
+  if (foreign) {
+    warnings.push(
+      `Document apparemment ${foreign.readState}, pas ${expectedState} : à vérifier à la main. ` +
+        `Le format du numéro et le gabarit de la page ne s'appliquent pas.`,
+    );
+  } else if (stateForced) {
+    warnings.push(
+      `Nationalité lue « ${readState} », corrigée en ${expectedState} : ce champ n'a pas de chiffre de contrôle.`,
+    );
+  } else if (expectedState && readIssuer && readIssuer !== expectedState && readIssuer !== readState) {
+    warnings.push(`État émetteur lu « ${readIssuer} » sur la première ligne, corrigé en ${expectedState}.`);
   }
 
   const isDigit = (c: string) => /^[0-9]$/.test(c);
@@ -448,6 +488,7 @@ export function parseTd3(
   if (!sexValid) warnings.push("Sexe illisible.");
 
   return {
+    foreignDocument: foreign,
     ok: compositeValid && num.status !== "invalid" &&
         birth.status !== "invalid" && expiry.status !== "invalid",
     lines: [l1, l2],
