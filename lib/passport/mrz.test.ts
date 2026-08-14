@@ -10,7 +10,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkDigit, parseTd3, repairField } from "./mrz.ts";
+import { checkDigit, parseTd3, repairField, applyMask, matchesMask,
+         PASSPORT_NUMBER_MASKS } from "./mrz.ts";
 
 const AT = new Date("2026-08-14T00:00:00Z");
 
@@ -102,19 +103,39 @@ test("une seule substitution est corrigée, pas deux", () => {
   assert.notEqual(two?.value, "AB1234567");
 });
 
-test("une correction reste une hypothèse, et le statut le dit", () => {
-  // Cas limite mesuré, pas théorique : la valeur exacte est "AB1234567", elle
-  // est lue "ABI2345G7", et la correction "AB12345G7" satisfait À LA FOIS le
-  // contrôle du champ et le contrôle global. Aucun des deux juges ne peut la
-  // rejeter — c'est la limite d'un chiffre de contrôle décimal.
+test("le masque de format corrige ce que les chiffres de contrôle ne savent pas", () => {
+  // Sans masque, "ABI2345G7" se « corrigeait » en "AB12345G7" : une valeur
+  // fausse qui satisfait à la fois le contrôle du champ et le contrôle global.
+  // Deux erreurs suffisaient à tromper les deux.
   //
-  // D'où le contrat : `repaired` n'est jamais synonyme de vérifié. Un champ
-  // dans cet état doit être confirmé à l'écran avant d'être enregistré.
-  const damaged = "ABI2345G7" + ALAOUI[1].slice(9);
-  const r = parseTd3(ALAOUI[0] + "\n" + damaged, AT);
-  assert.equal(r.passportNumber.status, "repaired");
-  assert.notEqual(r.passportNumber.status, "verified");
-  assert.ok(r.warnings.some((w) => w.includes("Numéro de passeport")));
+  // Le format du numéro marocain — deux lettres puis sept chiffres — rend la
+  // correction déterministe : une lettre en position de chiffre n'est plus une
+  // hypothèse à tester, c'est une erreur certaine.
+  for (const damaged of ["ABI2345G7", "A812345G7", "ABIZ34SG7"]) {
+    const r = parseTd3(ALAOUI[0] + "\n" + damaged + ALAOUI[1].slice(9), AT);
+    assert.equal(r.passportNumber.value, "AB1234567", `échec sur ${damaged}`);
+    assert.equal(r.passportNumber.status, "repaired");
+    assert.equal(r.compositeValid, true);
+  }
+});
+
+test("le format attendu est celui du passeport marocain", () => {
+  assert.equal(PASSPORT_NUMBER_MASKS.MAR, "LLDDDDDDD");
+  assert.equal(applyMask("AB1Z34S67", "LLDDDDDDD"), "AB1234567");
+  assert.equal(matchesMask("AB1234567", "LLDDDDDDD"), true);
+  assert.equal(matchesMask("ABC123456", "LLDDDDDDD"), false);
+  assert.equal(matchesMask("A12345678", "LLDDDDDDD"), false);
+});
+
+test("un numéro au format impossible est refusé même si le contrôle passe", () => {
+  // Trois lettres au lieu de deux : arithmétiquement cohérent, mais ce n'est
+  // pas un numéro marocain. Le contrôle de format rattrape ce que les chiffres
+  // de contrôle laissent passer.
+  const bad = "ABC123456";
+  const l2 = bad + String(checkDigit(bad)) + ALAOUI[1].slice(10);
+  const r = parseTd3(ALAOUI[0] + "\n" + l2, AT);
+  assert.equal(r.passportNumber.status, "invalid");
+  assert.ok(r.warnings.some((w) => w.includes("format inattendu")));
 });
 
 test("une correction que le contrôle global dément est signalée, pas retenue", () => {

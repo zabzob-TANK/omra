@@ -44,7 +44,55 @@ const TO_DIGIT: Record<string, string> = {
   O: "0", D: "0", Q: "0", I: "1", L: "1", Z: "2", S: "5", G: "6", B: "8", T: "7",
 };
 
+/** L'inverse : chiffre lu à la place d'une lettre. */
+const TO_LETTER: Record<string, string> = {
+  "0": "O", "1": "I", "2": "Z", "5": "S", "6": "G", "7": "T", "8": "B",
+};
+
 export type FieldKind = "numeric" | "alnum";
+
+/**
+ * Format attendu d'un champ, caractère par caractère :
+ * `L` lettre, `D` chiffre, `A` indifférent.
+ *
+ * C'est l'information la plus utile qu'on puisse donner à la correction. Un
+ * chiffre de contrôle dit seulement « c'est faux » ; un masque dit *où* et
+ * *comment*. Une lettre là où un chiffre est attendu n'est plus une hypothèse
+ * à tester, c'est une erreur certaine à corriger.
+ */
+export type Mask = string;
+
+/**
+ * Numéro de passeport, par État émetteur.
+ * MAR : deux lettres suivies de sept chiffres, sans exception.
+ */
+export const PASSPORT_NUMBER_MASKS: Record<string, Mask> = {
+  MAR: "LLDDDDDDD",
+};
+
+/** Ramène chaque caractère dans la classe imposée par le masque. */
+export function applyMask(field: string, mask: Mask): string {
+  return field
+    .split("")
+    .map((c, i) => {
+      const m = mask[i];
+      if (m === "D" && /[A-Z]/.test(c)) return TO_DIGIT[c] ?? c;
+      if (m === "L" && /[0-9]/.test(c)) return TO_LETTER[c] ?? c;
+      return c;
+    })
+    .join("");
+}
+
+/** Le champ respecte-t-il son format ? Un contrôle que les chiffres ne font pas. */
+export function matchesMask(field: string, mask: Mask): boolean {
+  if (field.length !== mask.length) return false;
+  for (let i = 0; i < mask.length; i++) {
+    const c = field[i], m = mask[i];
+    if (m === "D" && !/[0-9]/.test(c)) return false;
+    if (m === "L" && !/[A-Z]/.test(c)) return false;
+  }
+  return true;
+}
 
 /**
  * Un champ dont le chiffre de contrôle ne tombe pas juste est presque toujours
@@ -74,10 +122,19 @@ export function repairField(
   expected: number,
   kind: FieldKind = "alnum",
   accept: (candidate: string) => boolean = () => true,
+  mask?: Mask,
   maxCandidates = 20000,
 ): { value: string; repaired: boolean } | null {
   const valid = (c: string) => checkDigit(c) === expected && accept(c);
-  if (valid(field)) return { value: field, repaired: false };
+  if (valid(field) && (!mask || matchesMask(field, mask))) {
+    return { value: field, repaired: false };
+  }
+
+  // Un masque rend la correction déterministe : plus rien à chercher.
+  if (mask) {
+    const forced = applyMask(field, mask);
+    return valid(forced) ? { value: forced, repaired: forced !== field } : null;
+  }
 
   if (kind === "numeric") {
     const forced = field.split("").map((c) => TO_DIGIT[c] ?? c).join("");
@@ -141,10 +198,12 @@ export function repairField(
  *
  * - `verified`  — lue telle quelle et confirmée par son chiffre de contrôle.
  *                 Exacte au sens arithmétique. Utilisable sans relecture.
- * - `repaired`  — une confusion de caractère a été corrigée pour satisfaire les
- *                 contrôles. **C'est une hypothèse, pas une certitude** : deux
- *                 erreurs simultanées peuvent produire une valeur fausse qui
- *                 satisfait quand même les deux contrôles. Toujours faire
+ * - `repaired`  — une confusion de caractère a été corrigée. Deux régimes très
+ *                 différents : avec un masque de format connu (le numéro de
+ *                 passeport marocain), la correction est déterministe et sûre ;
+ *                 sans masque, elle reste une hypothèse — deux erreurs
+ *                 simultanées peuvent produire une valeur fausse qui satisfait
+ *                 quand même les deux contrôles. Dans le doute, faire
  *                 confirmer à l'écran.
  * - `unverified` — aucun chiffre de contrôle ne couvre ce champ (les noms, par
  *                 exemple). Vraisemblable, jamais garantie.
@@ -251,6 +310,8 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
   const personalCheck = l2[42];
   const compositeCheck = l2[43];
 
+  const numberMask = PASSPORT_NUMBER_MASKS[nationality.replace(/</g, "")];
+
   const isDigit = (c: string) => /^[0-9]$/.test(c);
   let passed = 0;
   const total = 5;
@@ -277,6 +338,7 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
     check: string,
     label: string,
     kind: FieldKind,
+    mask?: Mask,
   ): { value: string; status: FieldStatus } {
     const field = cur[slot];
     if (!isDigit(check)) return { value: field, status: "unverified" };
@@ -289,8 +351,8 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
     // D'abord avec le juge global, puis sans lui : si le chiffre de contrôle
     // global est lui-même mal lu, aucune correction ne peut le satisfaire, et
     // il ne faut pas pour autant refuser une réparation par ailleurs solide.
-    const strict = repairField(field, +check, kind, judge);
-    const loose = strict ?? repairField(field, +check, kind);
+    const strict = repairField(field, +check, kind, judge, mask);
+    const loose = strict ?? repairField(field, +check, kind, () => true, mask);
 
     if (!loose) {
       warnings.push(`${label} : chiffre de contrôle invalide.`);
@@ -309,7 +371,7 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
     return { value: loose.value, status: "verified" };
   }
 
-  const num = resolve("num", numberCheck, "Numéro de passeport", "alnum");
+  const num = resolve("num", numberCheck, "Numéro de passeport", "alnum", numberMask);
   const birth = resolve("birth", birthCheck, "Date de naissance", "numeric");
   const expiry = resolve("expiry", expiryCheck, "Date d'expiration", "numeric");
 
@@ -329,6 +391,11 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
     else warnings.push("Contrôle global de la ligne 2 invalide.");
   } else {
     warnings.push("Contrôle global absent.");
+  }
+
+  if (numberMask && num.status !== "invalid" && !matchesMask(num.value, numberMask)) {
+    warnings.push("Numéro de passeport : format inattendu pour ce pays.");
+    num.status = "invalid";
   }
 
   const birthDate = parseDate(birth.value, "birth", now);
