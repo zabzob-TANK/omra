@@ -2,6 +2,7 @@ import { analysePassport } from "@/lib/passport/gemini";
 import { parseTd3 } from "@/lib/passport/mrz";
 import { frameFromEyes } from "@/lib/passport/photoFrame";
 import { cityToArabic } from "@/lib/passport/cities";
+import { reconcile } from "@/lib/passport/reconcile";
 
 /**
  * Analyse d'un passeport : une image en entrée, tout ce qu'il faut pour
@@ -99,36 +100,6 @@ export async function POST(request: Request) {
     photoFrame: frame,
     mrz,
     vision,
-    crossCheck: crossCheck(vision, mrz),
+    reconciliation: reconcile(vision, mrz),
   });
-}
-
-/**
- * Là où la MRZ et le texte visible se recoupent, un désaccord est un signal :
- * soit l'image est mauvaise, soit un des deux a été mal lu. On le remonte au
- * lieu de choisir en silence.
- */
-function crossCheck(
-  vision: Awaited<ReturnType<typeof analysePassport>>,
-  mrz: ReturnType<typeof parseTd3> | null,
-) {
-  if (!mrz) return { checked: false as const, disagreements: [] };
-
-  const strip = (s: string | null) =>
-    (s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-  const pairs: [string, string, string][] = [
-    ["surname", strip(vision.surnameLatin), strip(mrz.surname.value)],
-    ["givenNames", strip(vision.givenNamesLatin), strip(mrz.givenNames.value)],
-    ["passportNumber", strip(vision.passportNumber), strip(mrz.passportNumber.value)],
-    ["sex", strip(vision.sex), strip(mrz.sex.value)],
-    ["dateOfBirth", strip(vision.dateOfBirth), strip(mrz.dateOfBirth.value)],
-    ["dateOfExpiry", strip(vision.dateOfExpiry), strip(mrz.dateOfExpiry.value)],
-  ];
-
-  const disagreements = pairs
-    .filter(([, a, b]) => a && b && a !== b)
-    .map(([field, visual, fromMrz]) => ({ field, visual, mrz: fromMrz }));
-
-  return { checked: true as const, disagreements };
 }
