@@ -45,6 +45,7 @@ export interface PassportVision {
   placeOfBirth: string | null;
   placeOfBirthArabic: string | null;
   address: string | null;
+  addressArabic: string | null;
   issuingAuthority: string | null;
   issuingAuthorityArabic: string | null;
 
@@ -87,6 +88,10 @@ espacés en bas, avec des chevrons <). S'il y a deux pages visibles, ignore l'au
      mieux qu'une transcription arrangée.
    - Les noms en arabe ET en latin, séparément.
    - Les dates au format JJ/MM/AAAA.
+   - Pour les lieux, deux versions : le libellé latin complet tel qu'imprimé
+     (placeOfBirth, issuingAuthority, address) et, séparément, le nom de la
+     ville ou de la province en arabe (placeOfBirthArabic, issuingAuthorityArabic,
+     addressArabic) — la ville seule, sans le reste de l'adresse.
 
 RÈGLE ABSOLUE : ne devine jamais. Si un champ est flou, masqué ou absent, mets-le
 à null et ajoute son nom dans unreadableFields. Un champ vide signalé est utile ;
@@ -132,6 +137,7 @@ const schema = {
     placeOfBirth: nullableString,
     placeOfBirthArabic: nullableString,
     address: nullableString,
+    addressArabic: nullableString,
     issuingAuthority: nullableString,
     issuingAuthorityArabic: nullableString,
 
@@ -214,6 +220,7 @@ function normalise(raw: Record<string, unknown>): PassportVision {
     placeOfBirth: str(raw.placeOfBirth),
     placeOfBirthArabic: str(raw.placeOfBirthArabic),
     address: str(raw.address),
+    addressArabic: str(raw.addressArabic),
     issuingAuthority: str(raw.issuingAuthority),
     issuingAuthorityArabic: str(raw.issuingAuthorityArabic),
     unreadableFields: Array.isArray(raw.unreadableFields)

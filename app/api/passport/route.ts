@@ -62,6 +62,17 @@ export async function POST(request: Request) {
       ? frameFromEyes(vision.eyeLeft, vision.eyeRight)
       : null;
 
+  // Le point entre les deux yeux, exposé tel quel : c'est le repère sur lequel
+  // se cale le cadre du portrait, et celui qu'on déplace si le cadrage est à
+  // reprendre à la main.
+  const eyeCenter =
+    vision.eyeLeft && vision.eyeRight
+      ? {
+          x: (vision.eyeLeft.x + vision.eyeRight.x) / 2,
+          y: (vision.eyeLeft.y + vision.eyeRight.y) / 2,
+        }
+      : null;
+
   // Un document qui n'est pas marocain doit sauter aux yeux de l'appelant :
   // tout le reste du pipeline (format du numéro, gabarit de page, position du
   // portrait) suppose un passeport marocain et ne vaut plus rien sur un autre.
@@ -71,7 +82,9 @@ export async function POST(request: Request) {
     foreignDocument,
     corners: vision.corners,
     cornersConfidence: vision.cornersConfidence,
-    eyes: vision.eyeLeft && vision.eyeRight ? { left: vision.eyeLeft, right: vision.eyeRight } : null,
+    eyes: vision.eyeLeft && vision.eyeRight
+      ? { left: vision.eyeLeft, right: vision.eyeRight, center: eyeCenter }
+      : null,
     photoFrame: frame,
     mrz,
     vision,
