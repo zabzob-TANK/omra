@@ -25,3 +25,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# images de test locales — jamais de données de pèlerins dans le dépôt
+/samples/
+*.passport.png
+*.passport.jpg
