@@ -1,6 +1,7 @@
 import { analysePassport } from "@/lib/passport/gemini";
 import { parseTd3 } from "@/lib/passport/mrz";
 import { frameFromEyes } from "@/lib/passport/photoFrame";
+import { cityToArabic } from "@/lib/passport/cities";
 
 /**
  * Analyse d'un passeport : une image en entrée, tout ce qu'il faut pour
@@ -78,8 +79,18 @@ export async function POST(request: Request) {
   // portrait) suppose un passeport marocain et ne vaut plus rien sur un autre.
   const foreignDocument = mrz?.foreignDocument ?? null;
 
+  // Les villes en arabe sont indicatives. La table sert surtout à écrire deux
+  // fois la même ville de la même façon ; ce qu'elle ne connaît pas garde la
+  // réponse du modèle, avec sa provenance, pour qu'on sache quoi relire.
+  const places = {
+    birth: cityToArabic(vision.placeOfBirth, vision.placeOfBirthArabic),
+    residence: cityToArabic(vision.address, vision.addressArabic),
+    authority: cityToArabic(vision.issuingAuthority, vision.issuingAuthorityArabic),
+  };
+
   return Response.json({
     foreignDocument,
+    places,
     corners: vision.corners,
     cornersConfidence: vision.cornersConfidence,
     eyes: vision.eyeLeft && vision.eyeRight
