@@ -53,7 +53,11 @@ export interface PassportVision {
   notes: string | null;
 }
 
-const PROMPT = `Tu analyses la photo d'un passeport marocain. L'image n'est pas redressée :
+const PROMPT = `Tu analyses la photo d'un passeport marocain. Ils le sont tous :
+le code pays est MAR, et le numéro de passeport fait toujours DEUX LETTRES
+suivies de SEPT CHIFFRES (exemple : XA4760146). Si un caractère est douteux,
+tranche avec cette contrainte plutôt qu'au jugé — un O en cinquième position
+est forcément un zéro. L'image n'est pas redressée :
 le document peut être incliné, en perspective, partiellement hors du cadre, avec des
 reflets ou une dominante de couleur. Travaille sur l'image telle qu'elle est.
 

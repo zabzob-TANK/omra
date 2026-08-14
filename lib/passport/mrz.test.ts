@@ -162,6 +162,29 @@ test("une entrée tronquée ne fait pas tomber la lecture", () => {
   assert.ok(r.warnings.length > 0);
 });
 
+test("une nationalité mal lue est corrigée, parce qu'aucun contrôle ne la couvre", () => {
+  // La norme exclut le code pays du contrôle global : une lecture fautive
+  // passerait sinon inaperçue, et ferait perdre le masque de format.
+  const damaged = ALAOUI[1].slice(0, 10) + "NAR" + ALAOUI[1].slice(13);
+  const r = parseTd3(ALAOUI[0] + "\n" + damaged, AT);
+  assert.equal(r.nationality, "MAR");
+  assert.equal(r.passportNumber.status, "verified", "le masque doit rester appliqué");
+  assert.ok(r.warnings.some((w) => w.includes("Nationalité lue")));
+});
+
+test("le masque tient même quand la nationalité est illisible", () => {
+  const damaged = "ABI2345G7" + ALAOUI[1].slice(9, 10) + "<<<" + ALAOUI[1].slice(13);
+  const r = parseTd3(ALAOUI[0] + "\n" + damaged, AT);
+  assert.equal(r.passportNumber.value, "AB1234567");
+});
+
+test("on peut se fier au document plutôt qu'au réglage", () => {
+  const damaged = ALAOUI[1].slice(0, 10) + "FRA" + ALAOUI[1].slice(13);
+  const r = parseTd3(ALAOUI[0] + "\n" + damaged, AT, { expectedState: null });
+  assert.equal(r.nationality, "FRA");
+  assert.deepEqual(r.warnings.filter((w) => w.includes("Nationalité")), []);
+});
+
 test("les caractères parasites de l'OCR sont normalisés", () => {
   const noisy = ALAOUI[0].replace(/</g, "«") + "\n" + ALAOUI[1].replace(/</g, "‹");
   const r = parseTd3(noisy, AT);

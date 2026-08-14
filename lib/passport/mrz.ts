@@ -70,6 +70,20 @@ export const PASSPORT_NUMBER_MASKS: Record<string, Mask> = {
   MAR: "LLDDDDDDD",
 };
 
+/**
+ * État émetteur attendu par défaut.
+ *
+ * L'application ne traite que des passeports marocains. Le préciser n'est pas
+ * un raccourci : le code pays n'est couvert par AUCUN chiffre de contrôle — la
+ * norme l'exclut du calcul global — donc une lecture fautive passerait
+ * inaperçue et ferait perdre le masque de format juste au moment où l'image
+ * est mauvaise et où il servirait le plus.
+ *
+ * Un code lu différemment est donc traité comme une erreur de lecture, corrigé,
+ * et signalé — jamais interprété comme un document étranger en silence.
+ */
+export const DEFAULT_ISSUING_STATE = "MAR";
+
 /** Ramène chaque caractère dans la classe imposée par le masque. */
 export function applyMask(field: string, mask: Mask): string {
   return field
@@ -283,7 +297,18 @@ function parseDate(yymmdd: string, kind: "birth" | "expiry", now = new Date()): 
   return `${String(dd).padStart(2, "0")}/${String(mm).padStart(2, "0")}/${year}`;
 }
 
-export function parseTd3(raw: string, now = new Date()): Td3Result {
+export interface ParseOptions {
+  /** Code pays attendu. Mettre `null` pour se fier à ce qui est lu. */
+  expectedState?: string | null;
+}
+
+export function parseTd3(
+  raw: string,
+  now = new Date(),
+  opts: ParseOptions = {},
+): Td3Result {
+  const expectedState =
+    opts.expectedState === undefined ? DEFAULT_ISSUING_STATE : opts.expectedState;
   const warnings: string[] = [];
   const candidates = raw
     .split(/\r?\n/)
@@ -310,7 +335,23 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
   const personalCheck = l2[42];
   const compositeCheck = l2[43];
 
-  const numberMask = PASSPORT_NUMBER_MASKS[nationality.replace(/</g, "")];
+  // Le masque suit l'État ATTENDU, pas celui qui a été lu : c'est tout l'objet
+  // du réglage, puisque le code pays n'a pas de chiffre de contrôle.
+  const readState = nationality.replace(/</g, "");
+  const effectiveState = expectedState ?? readState;
+  const numberMask = PASSPORT_NUMBER_MASKS[effectiveState];
+
+  if (expectedState) {
+    if (readState && readState !== expectedState) {
+      warnings.push(
+        `Nationalité lue « ${readState} », corrigée en ${expectedState} : ce champ n'a pas de chiffre de contrôle.`,
+      );
+    }
+    const readIssuer = l1.slice(2, 5).replace(/</g, "");
+    if (readIssuer && readIssuer !== expectedState) {
+      warnings.push(`État émetteur lu « ${readIssuer} » sur la première ligne, corrigé en ${expectedState}.`);
+    }
+  }
 
   const isDigit = (c: string) => /^[0-9]$/.test(c);
   let passed = 0;
@@ -410,12 +451,12 @@ export function parseTd3(raw: string, now = new Date()): Td3Result {
     ok: compositeValid && num.status !== "invalid" &&
         birth.status !== "invalid" && expiry.status !== "invalid",
     lines: [l1, l2],
-    documentType: l1.slice(0, 2).replace(/</g, ""),
-    issuingState: l1.slice(2, 5).replace(/</g, ""),
+    documentType: l1.slice(0, 2).replace(/</g, "") || "P",
+    issuingState: effectiveState,
     surname: { value: names.surname, status: nameStatus },
     givenNames: { value: names.givenNames, status: nameStatus },
     passportNumber: { value: num.value.replace(/</g, ""), status: num.status },
-    nationality: nationality.replace(/</g, ""),
+    nationality: effectiveState,
     dateOfBirth: { value: birthDate ?? birth.value, status: birthDate ? birth.status : "invalid" },
     sex: { value: sexChar === "<" ? "" : sexChar, status: sexValid ? "verified" : "invalid" },
     dateOfExpiry: { value: expiryDate ?? expiry.value, status: expiryDate ? expiry.status : "invalid" },
