@@ -11,12 +11,16 @@ import {
   lireGarde,
   optionsCookieSession,
   verdict,
+  type Univers,
   type Verdict,
 } from '@/lib/session-garde'
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
   let isRedirectResponse = false
+  // L'univers est connu plus bas, mais les cookies peuvent être écrits avant :
+  // `finAuNavigateur` et la durée maximale sont communes aux deux, seule
+  // l'inactivité diffère, donc ces bornes-ci suffisent pour les cookies.
   const bornes = limites()
 
   /**
@@ -81,7 +85,8 @@ export async function updateSession(request: NextRequest) {
    * quoi faire de cet arrêt : l'Administration redirige, la Facturation
    * laisse son propre écran reprendre la main.
    */
-  async function appliquerGarde(): Promise<Verdict> {
+  async function appliquerGarde(univers: Univers): Promise<Verdict> {
+    const bornes = limites(univers)
     const maintenant = Date.now()
     const existant = await lireGarde(request.cookies.get(COOKIE_GARDE)?.value)
     const etat = existant ?? { debut: maintenant, vu: maintenant }
@@ -148,7 +153,7 @@ export async function updateSession(request: NextRequest) {
       // déjà présents, jamais de nouvelle tentative ni de déconnexion ici.
     }
 
-    if (utilisateurFacturation && (await appliquerGarde()) !== 'valide') {
+    if (utilisateurFacturation && (await appliquerGarde('facturation')) !== 'valide') {
       // Durée dépassée : on coupe la session, sans rediriger. L'écran de
       // connexion de la Facturation reprend la main de lui-même.
       try {
@@ -205,7 +210,7 @@ export async function updateSession(request: NextRequest) {
 
   // Session authentifiée : les limites de durée s'appliquent avant même de
   // vérifier le rôle, pour qu'une session trop vieille ne serve à rien.
-  const decision = await appliquerGarde()
+  const decision = await appliquerGarde('administration')
   if (decision !== 'valide') {
     try {
       await supabase.auth.signOut()

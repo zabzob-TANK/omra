@@ -72,6 +72,9 @@ export function EcranConnexion({ onConnexion, comptesEssai }: Proprietes) {
           <span>{T.connexion.utilisateur}</span>
           <input
             className="omra-input"
+            // Dissuade le remplissage automatique, comme le champ mot de passe
+            // juste en dessous. Effet non garanti : voir `app/login/page.tsx`.
+            autoComplete="off"
             value={identifiant}
             onChange={(evenement) => setIdentifiant(evenement.target.value)}
             onKeyDown={(evenement) => {

@@ -20,6 +20,8 @@ const errorMessages: Record<string, string> = {
     'Session fermée : la durée maximale autorisée est atteinte. Reconnectez-vous pour continuer.',
   attente:
     'Trop de tentatives incorrectes. Patientez quelques secondes avant de réessayer.',
+  onglet:
+    'Nouvel onglet : identifiez-vous à nouveau. Un rafraîchissement ne le demande pas.',
 }
 
 export default async function LoginPage({
@@ -72,7 +74,13 @@ export default async function LoginPage({
                   id="identifier"
                   name="identifier"
                   type="text"
-                  autoComplete="username"
+                  // « username » et « current-password » sont justement les
+                  // indications qui invitent le navigateur a remplir tout seul.
+                  // Les remplacer le dissuade dans la plupart des navigateurs
+                  // actuels. Ce n'est ni garanti ni definitif : aucun site ne
+                  // peut empecher l'enregistrement d'un mot de passe, seul
+                  // l'utilisateur le peut, en repondant « jamais pour ce site ».
+                  autoComplete="off"
                   required
                   autoFocus
                 />
@@ -84,7 +92,7 @@ export default async function LoginPage({
                   id="password"
                   name="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   required
                 />
               </div>

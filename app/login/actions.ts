@@ -68,5 +68,7 @@ export async function login(formData: FormData) {
     redirect('/login?error=acces')
   }
 
-  redirect('/admin')
+  // `ouverture=1` autorise CET onglet : le composant `SessionOnglet` pose son
+  // marqueur puis retire le parametre de l'adresse.
+  redirect('/admin?ouverture=1')
 }

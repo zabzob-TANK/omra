@@ -46,6 +46,15 @@ export type Limites = {
   finAuNavigateur: boolean
 }
 
+/**
+ * Les deux mondes n'ont pas le meme usage, donc pas la meme tolerance.
+ * La Facturation est l'endroit ou l'on travaille toute la journee : trop la
+ * brider pousse a chercher des contournements. L'Administration est sensible
+ * et rarement ouverte : y redemander le mot de passe presque a chaque fois ne
+ * coute rien.
+ */
+export type Univers = 'administration' | 'facturation'
+
 export type EtatGarde = {
   /** Instant de la première authentification de cette session. */
   debut: number
@@ -80,20 +89,49 @@ function entierPositif(valeur: string | undefined, defaut: number): number {
  * personne ait à y penser. Hors production, larges : le développement local
  * ne doit pas redemander un mot de passe toutes les demi-heures.
  */
-export function limites(): Limites {
+export function limites(univers: Univers = 'facturation'): Limites {
   const production = process.env.NODE_ENV === 'production'
   const defautInactivite = production ? 30 : LARGE_MINUTES
   const defautMaximum = production ? 180 : LARGE_MINUTES
 
+  // L'Administration suit sa propre duree si elle est reglee, sinon celle de
+  // la Facturation : un deploiement qui n'en regle qu'une garde un
+  // comportement coherent au lieu de retomber sur un defaut plus permissif.
+  const inactiviteFacturation = entierPositif(
+    process.env.OMRA_SESSION_INACTIVITE_MINUTES,
+    defautInactivite,
+  )
+  const inactivite =
+    univers === 'administration'
+      ? entierPositif(process.env.OMRA_SESSION_INACTIVITE_ADMIN_MINUTES, inactiviteFacturation)
+      : inactiviteFacturation
+
   return {
-    inactiviteMs:
-      entierPositif(process.env.OMRA_SESSION_INACTIVITE_MINUTES, defautInactivite) * MINUTE,
+    inactiviteMs: inactivite * MINUTE,
     maximumMs:
       entierPositif(process.env.OMRA_SESSION_MAXIMUM_MINUTES, defautMaximum) * MINUTE,
     finAuNavigateur:
       (reglage(process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR) ?? (production ? '1' : '0')) === '1',
   }
 }
+
+/**
+ * Session liee a l'ONGLET pour l'Administration : un onglet neuf redemande le
+ * mot de passe, un rafraichissement non.
+ *
+ * A quoi cela sert, et a quoi cela ne sert pas. Le marqueur vit dans le
+ * `sessionStorage`, propre a chaque onglet, donc la verification se fait
+ * forcement dans le navigateur : ce n'est PAS une barriere de securite, elle
+ * se contourne avec les outils de developpement. C'est une mesure d'hygiene
+ * contre le « je clique sur le lien et je suis dedans ». La vraie protection
+ * reste la duree d'inactivite, elle appliquee par le serveur.
+ */
+export function sessionParOnglet(): boolean {
+  return reglage(process.env.NEXT_PUBLIC_OMRA_SESSION_ONGLET_ADMIN) === '1'
+}
+
+/** Nom du marqueur d'onglet, partage entre la page de connexion et l'Administration. */
+export const MARQUEUR_ONGLET = 'omra-onglet-administration'
 
 /**
  * Clé de signature. `OMRA_SESSION_SECRET` est le bon choix ; à défaut on

@@ -5,6 +5,7 @@ import {
   finPrevue,
   limites,
   lireGarde,
+  sessionParOnglet,
   verdict,
   type Limites,
 } from './session-garde'
@@ -141,5 +142,45 @@ describe('pré-chargement', () => {
     expect(estPrechargement(new Headers({ 'next-router-prefetch': '1' }))).toBe(true)
     expect(estPrechargement(new Headers({ purpose: 'prefetch' }))).toBe(true)
     expect(estPrechargement(new Headers())).toBe(false)
+  })
+})
+
+describe('durées propres à chaque monde', () => {
+  it('l’Administration peut être plus stricte que la Facturation', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '10')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_ADMIN_MINUTES', '5')
+    expect(limites('facturation').inactiviteMs).toBe(10 * MINUTE)
+    expect(limites('administration').inactiviteMs).toBe(5 * MINUTE)
+  })
+
+  it('sans réglage propre, l’Administration suit la Facturation', () => {
+    // Un déploiement qui n'en règle qu'une doit rester cohérent, jamais
+    // retomber sur un défaut plus permissif que ce qui a été demandé.
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '10')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_ADMIN_MINUTES', '')
+    expect(limites('administration').inactiviteMs).toBe(10 * MINUTE)
+  })
+
+  it('la durée maximale et la fermeture du navigateur restent communes', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_MAXIMUM_MINUTES', '180')
+    expect(limites('administration').maximumMs).toBe(limites('facturation').maximumMs)
+    expect(limites('administration').finAuNavigateur).toBe(
+      limites('facturation').finAuNavigateur,
+    )
+  })
+})
+
+describe('session par onglet', () => {
+  it('reste éteinte tant qu’elle n’est pas demandée', () => {
+    vi.stubEnv('NEXT_PUBLIC_OMRA_SESSION_ONGLET_ADMIN', '')
+    expect(sessionParOnglet()).toBe(false)
+  })
+
+  it('s’allume sur demande du déploiement', () => {
+    vi.stubEnv('NEXT_PUBLIC_OMRA_SESSION_ONGLET_ADMIN', '1')
+    expect(sessionParOnglet()).toBe(true)
   })
 })
