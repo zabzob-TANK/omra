@@ -212,7 +212,10 @@ export function AccountSlotCard({
 
         {configured ? (
           <div className="border-t border-border pt-4">
-            {!panneauReinitialisation ? (
+            {/* Le panneau reste ouvert tant qu'un résultat est affiché : le mot
+                de passe engendré n'existe nulle part ailleurs, le refermer le
+                perdrait définitivement. */}
+            {!panneauReinitialisation && resetState.status === 'idle' ? (
               <Button
                 type="button"
                 variant="outline"

@@ -328,7 +328,11 @@ export async function reinitialiserMotDePasseEmploye(
       throw new PublicActionError(publicMessages.passwordFailed)
     }
 
-    revalidatePath('/admin/comptes')
+    // PAS de `revalidatePath` ici, contrairement aux autres actions : elle
+    // remonterait la carte, refermerait le panneau et ferait disparaître le
+    // mot de passe engendré avant que quiconque ait pu le lire — alors qu'il
+    // est déjà en vigueur et qu'il n'existe nulle part ailleurs. Rien de ce
+    // qu'affiche l'écran ne change ici : ni le login, ni l'état du compte.
     return {
       status: 'success',
       message:
