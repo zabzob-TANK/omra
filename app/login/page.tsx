@@ -13,6 +13,13 @@ const errorMessages: Record<string, string> = {
   champs: 'Veuillez renseigner votre identifiant et votre mot de passe.',
   identifiants: 'Identifiant ou mot de passe incorrect.',
   acces: 'Ce compte n’est pas autorisé à accéder à l’application.',
+  // Arrêts décidés par le garde-barrière de session (`lib/session-garde.ts`).
+  inactivite:
+    'Session fermée après une période d’inactivité. Reconnectez-vous pour continuer.',
+  duree:
+    'Session fermée : la durée maximale autorisée est atteinte. Reconnectez-vous pour continuer.',
+  attente:
+    'Trop de tentatives incorrectes. Patientez quelques secondes avant de réessayer.',
 }
 
 export default async function LoginPage({
