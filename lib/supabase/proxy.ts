@@ -9,6 +9,7 @@ import {
   finPrevue,
   limites,
   lireGarde,
+  optionsCookieSession,
   verdict,
   type Verdict,
 } from '@/lib/session-garde'
@@ -52,13 +53,8 @@ export async function updateSession(request: NextRequest) {
             // cookie de session Supabase en cookie de session du navigateur,
             // effacé à sa fermeture. Sans cela, rouvrir le lien le lendemain
             // ramène directement dans l'application sans rien taper.
-            response.cookies.set(
-              name,
-              value,
-              bornes.finAuNavigateur
-                ? { ...options, maxAge: undefined, expires: undefined }
-                : options,
-            ),
+            // Même règle qu'à la connexion (`lib/supabase/server.ts`).
+            response.cookies.set(name, value, optionsCookieSession(options)),
           )
         },
       },

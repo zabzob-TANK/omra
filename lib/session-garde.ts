@@ -58,8 +58,19 @@ export type Verdict = 'valide' | 'inactivite' | 'maximum' | 'illisible'
 const MINUTE = 60_000
 const LARGE_MINUTES = 720 // 12 h : valeur de confort, hors production
 
+/**
+ * Une variable d'environnement définie mais VIDE doit valoir « non réglée ».
+ * Les plateformes de déploiement en créent facilement sans valeur, et un
+ * `??` seul les laisserait passer : la garde retombait alors sur une durée
+ * absurde au lieu de son défaut.
+ */
+function reglage(valeur: string | undefined): string | undefined {
+  const propre = valeur?.trim()
+  return propre ? propre : undefined
+}
+
 function entierPositif(valeur: string | undefined, defaut: number): number {
-  const n = Number(valeur)
+  const n = Number(reglage(valeur))
   return Number.isFinite(n) && n > 0 ? n : defaut
 }
 
@@ -80,7 +91,7 @@ export function limites(): Limites {
     maximumMs:
       entierPositif(process.env.OMRA_SESSION_MAXIMUM_MINUTES, defautMaximum) * MINUTE,
     finAuNavigateur:
-      (process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR ?? (production ? '1' : '0')) === '1',
+      (reglage(process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR) ?? (production ? '1' : '0')) === '1',
   }
 }
 
@@ -176,6 +187,27 @@ export function verdict(etat: EtatGarde, bornes: Limites, maintenant: number): V
 /** Instant auquel la session s'arrêtera si plus rien ne se passe. */
 export function finPrevue(etat: EtatGarde, bornes: Limites): number {
   return Math.min(etat.vu + bornes.inactiviteMs, etat.debut + bornes.maximumMs)
+}
+
+/**
+ * Retire la date d'expiration d'un cookie quand la session doit mourir avec le
+ * navigateur. Un cookie sans `maxAge` ni `expires` est un cookie de session :
+ * le navigateur l'efface en se fermant.
+ *
+ * À appliquer PARTOUT où un cookie d'authentification est écrit, pas seulement
+ * dans le garde-barrière : la connexion passe par une action serveur qui écrit
+ * elle-même le cookie, et oublier cet endroit laissait la session survivre à la
+ * fermeture malgré le réglage.
+ *
+ * Réserve connue : les navigateurs qui rouvrent les onglets de la session
+ * précédente restaurent aussi ces cookies. La limite d'inactivité reste alors
+ * la protection effective.
+ */
+export function optionsCookieSession<T extends { maxAge?: number; expires?: Date }>(
+  options: T,
+): T {
+  if (!limites().finAuNavigateur) return options
+  return { ...options, maxAge: undefined, expires: undefined }
 }
 
 /**

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ecrireGarde,
   estPrechargement,
@@ -16,21 +16,22 @@ const bornes: Limites = {
   finAuNavigateur: true,
 }
 
-const environnement = { ...process.env }
+// `vi.stubEnv` est la seule façon correcte de toucher à NODE_ENV : TypeScript
+// le déclare en lecture seule, et une affectation directe fuirait d'un test à l'autre.
 afterEach(() => {
-  process.env = { ...environnement }
+  vi.unstubAllEnvs()
 })
 
 describe('signature du cookie de garde', () => {
   it('relit ce qu’elle a écrit', async () => {
-    process.env.OMRA_SESSION_SECRET = 'secret-de-test'
+    vi.stubEnv('OMRA_SESSION_SECRET', 'secret-de-test')
     const etat = { debut: 1_700_000_000_000, vu: 1_700_000_060_000 }
     const relu = await lireGarde(await ecrireGarde(etat))
     expect(relu).toEqual(etat)
   })
 
   it('refuse un cookie dont la date a été modifiée', async () => {
-    process.env.OMRA_SESSION_SECRET = 'secret-de-test'
+    vi.stubEnv('OMRA_SESSION_SECRET', 'secret-de-test')
     const cookie = await ecrireGarde({ debut: 1_000, vu: 1_000 })
     const [charge, signature] = cookie.split('.')
     const falsifie = Buffer.from(
@@ -44,14 +45,14 @@ describe('signature du cookie de garde', () => {
   })
 
   it('refuse un cookie signé avec une autre clé', async () => {
-    process.env.OMRA_SESSION_SECRET = 'premiere-cle'
+    vi.stubEnv('OMRA_SESSION_SECRET', 'premiere-cle')
     const cookie = await ecrireGarde({ debut: 1_000, vu: 1_000 })
-    process.env.OMRA_SESSION_SECRET = 'seconde-cle'
+    vi.stubEnv('OMRA_SESSION_SECRET', 'seconde-cle')
     expect(await lireGarde(cookie)).toBeNull()
   })
 
   it('refuse un cookie absent ou mal formé', async () => {
-    process.env.OMRA_SESSION_SECRET = 'secret-de-test'
+    vi.stubEnv('OMRA_SESSION_SECRET', 'secret-de-test')
     expect(await lireGarde(undefined)).toBeNull()
     expect(await lireGarde('')).toBeNull()
     expect(await lireGarde('sans-point')).toBeNull()
@@ -95,10 +96,10 @@ describe('décision de fin de session', () => {
 
 describe('durées selon l’environnement', () => {
   it('protège par défaut en production', () => {
-    process.env.NODE_ENV = 'production'
-    delete process.env.OMRA_SESSION_INACTIVITE_MINUTES
-    delete process.env.OMRA_SESSION_MAXIMUM_MINUTES
-    delete process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '')
+    vi.stubEnv('OMRA_SESSION_MAXIMUM_MINUTES', '')
+    vi.stubEnv('OMRA_SESSION_FIN_AU_NAVIGATEUR', '')
     const b = limites()
     expect(b.inactiviteMs).toBe(30 * MINUTE)
     expect(b.maximumMs).toBe(180 * MINUTE)
@@ -106,20 +107,20 @@ describe('durées selon l’environnement', () => {
   })
 
   it('reste large hors production, pour ne pas gêner le développement', () => {
-    process.env.NODE_ENV = 'development'
-    delete process.env.OMRA_SESSION_INACTIVITE_MINUTES
-    delete process.env.OMRA_SESSION_MAXIMUM_MINUTES
-    delete process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '')
+    vi.stubEnv('OMRA_SESSION_MAXIMUM_MINUTES', '')
+    vi.stubEnv('OMRA_SESSION_FIN_AU_NAVIGATEUR', '')
     const b = limites()
     expect(b.inactiviteMs).toBe(720 * MINUTE)
     expect(b.finAuNavigateur).toBe(false)
   })
 
   it('obéit aux variables d’environnement du déploiement', () => {
-    process.env.NODE_ENV = 'production'
-    process.env.OMRA_SESSION_INACTIVITE_MINUTES = '720'
-    process.env.OMRA_SESSION_MAXIMUM_MINUTES = '720'
-    process.env.OMRA_SESSION_FIN_AU_NAVIGATEUR = '0'
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '720')
+    vi.stubEnv('OMRA_SESSION_MAXIMUM_MINUTES', '720')
+    vi.stubEnv('OMRA_SESSION_FIN_AU_NAVIGATEUR', '0')
     const b = limites()
     expect(b.inactiviteMs).toBe(720 * MINUTE)
     expect(b.maximumMs).toBe(720 * MINUTE)
@@ -127,10 +128,10 @@ describe('durées selon l’environnement', () => {
   })
 
   it('ignore une valeur absurde plutôt que de désactiver la garde', () => {
-    process.env.NODE_ENV = 'production'
-    process.env.OMRA_SESSION_INACTIVITE_MINUTES = '0'
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', '0')
     expect(limites().inactiviteMs).toBe(30 * MINUTE)
-    process.env.OMRA_SESSION_INACTIVITE_MINUTES = 'beaucoup'
+    vi.stubEnv('OMRA_SESSION_INACTIVITE_MINUTES', 'beaucoup')
     expect(limites().inactiviteMs).toBe(30 * MINUTE)
   })
 })
