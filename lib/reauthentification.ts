@@ -47,8 +47,14 @@ export async function motDePasseAdministrateurValide(
     const { data: session, error: erreurConnexion } =
       await essai.auth.signInWithPassword({ email: adresse, password: motDePasse })
     if (erreurConnexion || !session.user) return false
-    // La session d'essai ne doit pas survivre à la vérification.
-    await essai.auth.signOut().catch(() => undefined)
+
+    // `signOut()` sans portée est GLOBAL chez Supabase : il révoque tous les
+    // jetons de l'utilisateur, donc la session du navigateur de celui qui vient
+    // justement de confirmer son identité. Vérifié en conditions réelles :
+    // l'administrateur était éjecté vers l'écran de connexion au moment même où
+    // il validait. La portée locale ne touche que ce client-ci, qui ne stocke
+    // rien ; le jeton d'essai reste en mémoire et meurt avec la requête.
+    await essai.auth.signOut({ scope: 'local' }).catch(() => undefined)
     return session.user.id === authUserId
   } catch {
     return false
