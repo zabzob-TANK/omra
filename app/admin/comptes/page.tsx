@@ -79,8 +79,12 @@ export default async function ComptesPage() {
       <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
         <p>
-          Les mots de passe sont gérés uniquement par Supabase Auth. Après une
-          sauvegarde, ils ne sont jamais affichés ni récupérés par l’application.
+          Les mots de passe sont gérés uniquement par Supabase Auth, qui n’en
+          garde qu’une empreinte à sens unique : personne ne peut les relire,
+          ni vous, ni l’application. Le bouton œil montre seulement ce que vous
+          êtes en train de taper. Pour dépanner un employé, utilisez
+          « Réinitialiser le mot de passe » : un nouveau est créé et affiché une
+          seule fois, après confirmation par votre propre mot de passe.
         </p>
       </div>
 

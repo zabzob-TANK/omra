@@ -1,16 +1,24 @@
 'use server'
 
-import { randomUUID } from 'crypto'
+import { randomBytes, randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import {
   AdminAuthorizationError,
   requireAdministrator,
+  requireAdministratorAccount,
 } from '@/lib/admin-guard'
+import { motDePasseAdministrateurValide } from '@/lib/reauthentification'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export type AccountActionState = {
   status: 'idle' | 'success' | 'error'
   message: string
+  /**
+   * Mot de passe engendre par une reinitialisation, renvoye UNE SEULE FOIS a
+   * l'ecran qui l'a demandee. Rien n'en est conserve : la base ne garde qu'une
+   * empreinte a sens unique, et ce champ disparait au rechargement de la page.
+   */
+  motDePasseGenere?: string
 }
 
 const publicMessages = {
@@ -29,6 +37,9 @@ const publicMessages = {
   accessFailed: 'Impossible de modifier l’accès du compte.',
   stateFailed: 'Impossible de sauvegarder l’état du compte.',
   technical: 'Une erreur technique est survenue.',
+  reauthRefusee:
+    'Mot de passe administrateur incorrect. La reinitialisation est annulee.',
+  reauthManquante: 'Saisissez votre propre mot de passe pour confirmer.',
 } as const
 
 type PublicMessage = (typeof publicMessages)[keyof typeof publicMessages]
@@ -238,6 +249,91 @@ export async function setAccountSlotActive(
     return {
       status: 'success',
       message: active ? 'Compte activé.' : 'Compte désactivé.',
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      message: actionErrorMessage(error),
+    }
+  }
+}
+
+/**
+ * Longueur et alphabet du mot de passe engendré : assez long pour résister,
+ * sans les caractères qu'on confond en le recopiant à la main (I, l, 1, O, 0).
+ * Il sera lu à l'écran puis dicté ou écrit : la lisibilité compte autant que
+ * la force.
+ */
+const ALPHABET_LISIBLE = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+const LONGUEUR_ENGENDREE = 14
+
+function motDePasseEngendre(): string {
+  const octets = randomBytes(LONGUEUR_ENGENDREE)
+  let resultat = ''
+  for (const octet of octets) {
+    resultat += ALPHABET_LISIBLE[octet % ALPHABET_LISIBLE.length]
+  }
+  return resultat
+}
+
+/**
+ * Réinitialise le mot de passe d'un emplacement, après que l'administrateur a
+ * retapé le SIEN.
+ *
+ * Pourquoi engendrer au lieu d'afficher l'existant : Supabase ne conserve
+ * qu'une empreinte à sens unique des mots de passe, personne ne peut les
+ * relire. En garder une copie lisible pour pouvoir l'afficher ferait d'une
+ * fuite de la base une fuite de tous les mots de passe des employés, et
+ * d'un mot de passe réutilisé ailleurs un problème qui dépasse l'agence.
+ * Le besoin réel — dépanner un employé qui ne peut plus entrer — est couvert
+ * par cette réinitialisation, qui montre le nouveau mot de passe une fois.
+ */
+export async function reinitialiserMotDePasseEmploye(
+  _state: AccountActionState,
+  formData: FormData,
+): Promise<AccountActionState> {
+  try {
+    const administrateur = await requireAdministratorAccount()
+    const slotNumber = readSlotNumber(formData)
+
+    const confirmation = formData.get('mot_de_passe_administrateur')
+    if (typeof confirmation !== 'string' || !confirmation) {
+      throw new PublicActionError(publicMessages.reauthManquante)
+    }
+
+    // Être connecté ne suffit pas : on exige la preuve que l'administrateur
+    // est bien devant le clavier à cet instant.
+    if (!(await motDePasseAdministrateurValide(administrateur.authUserId, confirmation))) {
+      throw new PublicActionError(publicMessages.reauthRefusee)
+    }
+
+    const admin = createAdminClient()
+    const { data: slot, error: slotError } = await admin
+      .from('account_slots')
+      .select('auth_user_id, login')
+      .eq('slot_number', slotNumber)
+      .single()
+
+    if (slotError || !slot?.auth_user_id) {
+      throw new PublicActionError(publicMessages.notConfigured)
+    }
+
+    const nouveau = motDePasseEngendre()
+    const { error: erreurMotDePasse } = await admin.auth.admin.updateUserById(
+      slot.auth_user_id,
+      { password: nouveau },
+    )
+
+    if (erreurMotDePasse) {
+      throw new PublicActionError(publicMessages.passwordFailed)
+    }
+
+    revalidatePath('/admin/comptes')
+    return {
+      status: 'success',
+      message:
+        'Nouveau mot de passe créé. Notez-le maintenant : il ne sera plus jamais affiché.',
+      motDePasseGenere: nouveau,
     }
   } catch (error) {
     return {

@@ -64,6 +64,21 @@ export async function requireActiveAccount(): Promise<ActiveAccount> {
  * privilèges internes élevés) n'ouvre plus `/admin`.
  */
 export async function requireAdministrator(): Promise<void> {
+  await requireAdministratorAccount()
+}
+
+/**
+ * Même garde, mais rend l'identité de l'administrateur connecté.
+ *
+ * Nécessaire aux opérations qui doivent lui REDEMANDER son propre mot de
+ * passe avant d'agir — réinitialiser le mot de passe d'un employé, par
+ * exemple. `requireAdministrator()` reste la porte par défaut : on ne
+ * réclame cette identité que lorsqu'on va s'en servir.
+ */
+export async function requireAdministratorAccount(): Promise<{
+  authUserId: string
+  login: string
+}> {
   const supabase = await createClient()
   const utilisateur = await utilisateurAuthActifOuNull(supabase)
 
@@ -75,4 +90,6 @@ export async function requireAdministrator(): Promise<void> {
   if (!compteAdmin) {
     throw new AdminAuthorizationError()
   }
+
+  return { authUserId: compteAdmin.auth_user_id, login: compteAdmin.login }
 }
