@@ -41,11 +41,16 @@ export default async function LoginPage({
     // The login form remains available to unauthenticated users.
   }
 
-  if (dejaConnecte) {
+  const { error } = await searchParams
+
+  // Exception a la regle « deja connecte, donc vers /admin » : un onglet neuf
+  // arrive ici AVEC une session valide, justement pour qu'on lui redemande le
+  // mot de passe. Le renvoyer vers /admin le ferait rebondir aussitot ici, en
+  // boucle sans fin. Il voit donc le formulaire, et sa connexion reussie
+  // reposera le marqueur de son onglet.
+  if (dejaConnecte && error !== 'onglet') {
     redirect('/admin')
   }
-
-  const { error } = await searchParams
   const errorMessage = error ? errorMessages[error] : null
 
   return (
