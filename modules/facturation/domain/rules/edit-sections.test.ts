@@ -53,6 +53,7 @@ function saisie(partiel: Partial<SaisieModification> = {}): SaisieModification {
     montantOperation: '',
     montant: '',
     rangVersementCorrige: 1,
+    rabatteur: recu.rabatteur,
     ...partiel,
   }
 }
@@ -70,8 +71,9 @@ describe('P06 — un reçu annulé ne peut pas être modifié', () => {
 })
 
 describe('R-49 — une seule section à la fois', () => {
-  it('recense exactement six sections', () => {
-    expect(SECTIONS_MODIFIABLES).toHaveLength(6)
+  it('recense exactement sept sections (rabatteur ajouté le 2026-10-12, administrateur seul)', () => {
+    expect(SECTIONS_MODIFIABLES).toHaveLength(7)
+    expect(SECTIONS_MODIFIABLES).toContain('rabatteur')
     expect(SECTIONS_MODIFIABLES).toContain('identity')
     expect(SECTIONS_MODIFIABLES).toContain('firstPayment')
   })
@@ -430,7 +432,8 @@ describe('R-53 — section premier versement', () => {
 
 describe('R-54, R-55 — champs et versements non modifiables', () => {
   it('recense les champs verrouillés pour tout le monde, sans exception de rôle', () => {
-    expect(CHAMPS_NON_MODIFIABLES).toContain('rabatteur')
+    // 2026-10-12 — le rabatteur en est sorti : modifiable par l'administrateur seul.
+    expect(CHAMPS_NON_MODIFIABLES).not.toContain('rabatteur')
     expect(CHAMPS_NON_MODIFIABLES).toContain('numero')
     expect(CHAMPS_NON_MODIFIABLES).toContain('date')
   })
@@ -561,5 +564,77 @@ describe('apercuApresModification — récapitulatif avant validation (2026-08-0
     expect(versementDeux?.montantCentimes).toBe(600000)
     // Le versement 1 (non ciblé) reste le même objet, jamais reconstruit.
     expect(versementUn).toBe(recuDeuxVersements.versements[0])
+  })
+})
+
+describe('Rabatteur — administrateur seul (décision du 2026-10-12)', () => {
+  const recuAvecRabatteur = unRecu({ rabatteur: 'عزيزة' })
+
+  it('refuse un employé, même avec un motif et un rabatteur valides', () => {
+    const resultat = preparerModification(
+      { ...saisie({ section: 'rabatteur' }), rabatteur: 'تاجة' },
+      recuAvecRabatteur,
+      CONTEXTE,
+    )
+    expect(resultat.statut).toBe('erreurs')
+    if (resultat.statut !== 'erreurs') return
+    expect(resultat.erreurs.map((e) => e.code)).toContain('rabatteur-reserve-administrateur')
+  })
+
+  it('accepte l’administrateur et consigne l’ancien et le nouveau rabatteur', () => {
+    const resultat = preparerModification(
+      { ...saisie({ section: 'rabatteur' }), rabatteur: 'تاجة' },
+      recuAvecRabatteur,
+      { ...CONTEXTE, estAdministrateur: true },
+    )
+    expect(resultat.statut).toBe('ok')
+    if (resultat.statut !== 'ok') return
+    expect(resultat.valeur.champsModifies).toEqual({ rabatteur: 'تاجة' })
+    expect(resultat.valeur.changements).toEqual([
+      { champ: 'الوسيط', ancienne: 'عزيزة', nouvelle: 'تاجة' },
+    ])
+    expect(resultat.valeur.premierVersementCorrige).toBeUndefined()
+  })
+
+  it('refuse un rabatteur identique ou vide, et un motif absent', () => {
+    const admin = { ...CONTEXTE, estAdministrateur: true }
+    const identique = preparerModification(
+      { ...saisie({ section: 'rabatteur' }), rabatteur: 'عزيزة' },
+      recuAvecRabatteur,
+      admin,
+    )
+    expect(identique.statut === 'erreurs' && identique.erreurs.map((e) => e.code)).toContain(
+      'rabatteur-inchange',
+    )
+    const vide = preparerModification(
+      { ...saisie({ section: 'rabatteur', motif: '' }), rabatteur: '' },
+      recuAvecRabatteur,
+      admin,
+    )
+    expect(vide.statut === 'erreurs' && vide.erreurs.map((e) => e.code)).toEqual([
+      'motif-modification-obligatoire',
+      'rabatteur-obligatoire',
+    ])
+  })
+
+  it('ne touche jamais aux versements ni à leur instantané', () => {
+    const resultat = preparerModification(
+      { ...saisie({ section: 'rabatteur' }), rabatteur: 'تاجة' },
+      recuAvecRabatteur,
+      { ...CONTEXTE, estAdministrateur: true },
+    )
+    if (resultat.statut !== 'ok') throw new Error('refusé')
+    const apres = apercuApresModification(recuAvecRabatteur, resultat.valeur)
+    expect(apres.rabatteur).toBe('تاجة')
+    expect(apres.versements).toEqual(recuAvecRabatteur.versements)
+  })
+
+  it('refuse un reçu annulé', () => {
+    const resultat = preparerModification(
+      { ...saisie({ section: 'rabatteur' }), rabatteur: 'تاجة' },
+      unRecu({ rabatteur: 'عزيزة', statut: 'ملغى' }),
+      { ...CONTEXTE, estAdministrateur: true },
+    )
+    expect(resultat.statut).toBe('erreurs')
   })
 })

@@ -371,6 +371,24 @@ export async function appliquerModificationSupabase(
       if (error) throw new Error(messageErreur(error))
       break
     }
+    case 'rabatteur': {
+      // Décision du commanditaire (2026-10-12) : administrateur seul — la RPC
+      // le revérifie (`require_facturation_admin`) et exige que le rabatteur
+      // appartienne au programme du reçu. Même résolution nom → id que la
+      // création (`creerRecuSupabase`).
+      const programme = await chargerProgrammeActif()
+      const rabatteurId = programme.rabatteurs.find((r) => r.name === champsModifies.rabatteur)?.id
+      if (!rabatteurId) {
+        throw new Error('Rabatteur introuvable dans le programme actif.')
+      }
+      const { error } = await supabase.rpc('update_billing_receipt_rabatteur', {
+        p_receipt_id: recuId,
+        p_rabatteur_id: rabatteurId,
+        p_reason: modification.motif,
+      })
+      if (error) throw new Error(messageErreur(error))
+      break
+    }
     case 'group':
       // fusion.md §5.4 — `update_billing_receipt_dossier` déplace une
       // inscription entre dossiers réels (existant ou technique isolé) ; le

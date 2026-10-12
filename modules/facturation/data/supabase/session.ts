@@ -17,6 +17,7 @@ import type { ActiveAccount } from '@/lib/account-access'
 import { findActiveAccountByAuthUserId } from '@/lib/account-access'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { nomAffichageActeur } from '../../domain/acteur'
 import { ROLE_ADMINISTRATEUR } from '../../domain/constants'
 import type { Utilisateur } from '../../domain/types'
 import type { SessionPort } from '../ports'
@@ -56,15 +57,15 @@ function initialesDepuisLibelle(libelle: string): string {
 }
 
 function utilisateurDepuisCompte(compte: ActiveAccount): Utilisateur {
+  // Décision du commanditaire (2026-10-12) : le login (« simo ») plutôt que
+  // le libellé du slot (« Employé 1 »), « admin » pour le slot 1 — même règle
+  // que la lecture des reçus (`nomAffichageActeur`).
+  const nom = nomAffichageActeur(compte.slot_number, compte.login, compte.slot_label)
   return {
     id: compte.auth_user_id,
-    // `slot_label` est en français (« Administrateur », « Employé 1 », …),
-    // pas en arabe : aucun autre nom n'est disponible côté omra. Même
-    // convention que `mapVersement()`/`mapReceiptDetailToRecu()` en lecture,
-    // qui utilisent déjà `slot_label` pour `enregistrePar`/`employe`.
-    nom: compte.slot_label,
+    nom,
     role: compte.role === 'administrator' ? ROLE_ADMINISTRATEUR : ROLE_EMPLOYE,
-    initiales: initialesDepuisLibelle(compte.slot_label),
+    initiales: initialesDepuisLibelle(nom),
   }
 }
 

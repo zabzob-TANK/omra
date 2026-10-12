@@ -484,6 +484,9 @@ export const T = {
     consigne:
       'اختر قسمًا واحدًا فقط. بعد حفظه يمكنك فتح التعديل مرة أخرى لاختيار قسم آخر.',
     fixes: 'الوسيط ومبالغ الدفعات غير قابلة للتعديل. الدفعات الثانية وما بعدها تبقى كما سُجلت.',
+    /** 2026-10-12 — l'administrateur peut modifier le rabatteur et le montant d'une dfp. */
+    fixesAdministrateur:
+      'بصفتك مديرًا: يمكنك تعديل الوسيط من قسم «الوسيط»، وتصحيح مبلغ أي دفعة من قسم «طريقة الدفعة».',
     sectionChoisie: 'القسم المختار',
     retour: '←',
     motif: 'سبب التعديل *',
@@ -491,6 +494,10 @@ export const T = {
     numeroFixe: 'رقم الوصل — ثابت',
     dateFixe: 'تاريخ التسجيل — ثابت',
     rabatteurFixe: 'الوسيط — غير قابل للتعديل',
+    rabatteurAdministrateur: 'الوسيط — يعدّله المدير',
+    nouveauRabatteur: 'الوسيط الجديد *',
+    noteRabatteur:
+      'الدفعات المسجلة سابقًا تبقى باسم الوسيط القديم. الدفعات القادمة تُسجل باسم الوسيط الجديد.',
     gabaritMotif: 'مثال: تصحيح خطأ في الإدخال',
     aucunPrix: 'لا يوجد ثمن محدد لهذه التركيبة.',
     operationCollective: 'عملية جماعية — شخص واحد يدفع عن عدة أشخاص',
@@ -505,7 +512,9 @@ export const T = {
       firstPayment: {
         titre: 'طريقة الدفعة',
         sousTitre: 'الطريقة وبيانات الشيك أو التحويل، دون تغيير المبلغ',
+        sousTitreAdministrateur: 'الطريقة وبيانات الشيك أو التحويل، وتصحيح المبلغ (المدير)',
       },
+      rabatteur: { titre: 'الوسيط', sousTitre: 'تغيير الوسيط (المدير فقط)' },
     },
     /** Décision du commanditaire (2026-08-09) : n'importe quel versement, plus seulement le premier. */
     premiereDfpFixe: 'مبلغ الدفعة — لا يتغير',

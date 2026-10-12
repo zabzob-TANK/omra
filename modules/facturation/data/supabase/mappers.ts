@@ -38,6 +38,7 @@ import {
 } from './codes'
 import { dateSqlVersDateFr, isoVersDateFr, isoVersHeure, isoVersHorodatage } from './dates'
 import { dhVersCentimes } from './dh'
+import { nomAffichageActeur } from '../../domain/acteur'
 import { formaterTelephone } from '../../domain/format'
 import { LIBELLES_SECTIONS } from '../../domain/rules/edit-sections'
 import {
@@ -63,7 +64,7 @@ function mapImage(
     nomOrigine: image.original_file_name,
     origine: 'upload',
     deposeLe: isoVersHorodatage(image.uploaded_at),
-    deposePar: image.uploaded_by.slot_label,
+    deposePar: nomAffichageActeur(image.uploaded_by.slot_number, image.uploaded_by.login, image.uploaded_by.slot_label),
   }
 }
 
@@ -131,7 +132,11 @@ function mapVersement(
     date: isoVersDateFr(paiement.registered_at),
     heure: isoVersHeure(paiement.registered_at),
     dateHeure: isoVersHorodatage(paiement.registered_at),
-    enregistrePar: paiement.created_by.slot_label,
+    enregistrePar: nomAffichageActeur(
+      paiement.created_by.slot_number,
+      paiement.created_by.login,
+      paiement.created_by.slot_label,
+    ),
     referenceInstrument: instrument?.reference ?? '',
     dateInstrument: instrument ? dateSqlVersDateFr(instrument.instrument_date) : '',
     banque: instrument?.bank_name ?? '',
@@ -296,6 +301,7 @@ function instantaneHistoriqueDepuisJson(
     tarifDh: nombreOptionnel(donnees.catalog_price_dh),
     reductionDh: nombreOptionnel(donnees.discount_amount_dh),
     convenuDh: nombreOptionnel(donnees.agreed_amount_dh),
+    rabatteur: texteOptionnel(donnees.rabatteur_name_snapshot),
   }
 }
 
@@ -393,7 +399,7 @@ export function mapOperationsJournalRowToLigne(
       ligne.action_type === 'facturation_session.login_failed'
         ? texteOptionnel(ligne.after_data?.attempted_login) || '—'
         : undefined,
-    employe: ligne.actor_slot_label,
+    employe: nomAffichageActeur(ligne.actor_slot_number, ligne.actor_login, ligne.actor_slot_label),
     employeSlot: ligne.actor_slot_number,
   }
 }
@@ -479,10 +485,20 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions
     note: detail.registration.note ?? '',
     date: isoVersDateFr(detail.receipt.created_at),
     creeLe: isoVersHorodatage(detail.receipt.created_at),
-    employe: detail.receipt.created_by.slot_label,
+    employe: nomAffichageActeur(
+      detail.receipt.created_by.slot_number,
+      detail.receipt.created_by.login,
+      detail.receipt.created_by.slot_label,
+    ),
     statut: statutDepuisLifecycle(detail.receipt.lifecycle_status),
     motifAnnulation: cancellation?.reason ?? '',
-    annulePar: cancellation?.cancelled_by.slot_label ?? undefined,
+    annulePar: cancellation
+      ? nomAffichageActeur(
+          cancellation.cancelled_by.slot_number,
+          cancellation.cancelled_by.login,
+          cancellation.cancelled_by.slot_label,
+        )
+      : undefined,
     annuleLe: cancellation ? isoVersHorodatage(cancellation.cancelled_at) : undefined,
     modeRemboursement: cancellation
       ? modeRemboursementDepuisRoute(cancellation.restitution_route)
@@ -500,7 +516,11 @@ export function mapReceiptDetailToRecu(detail: BillingReceiptDetail, impressions
     nombreModifications: detail.modifications.count,
     derniereModification: dernierChangement ? isoVersHorodatage(dernierChangement.occurred_at) : undefined,
     modifiePar: dernierChangement
-      ? dernierChangement.actor_login ?? dernierChangement.actor_slot_label
+      ? nomAffichageActeur(
+          dernierChangement.actor_slot_number,
+          dernierChangement.actor_login,
+          dernierChangement.actor_slot_label,
+        )
       : undefined,
     versements: detail.payments
       .slice()

@@ -7,7 +7,10 @@
  * saisit ; pour en modifier une autre, il faut rouvrir la fenêtre.
  * R-50 — Le motif est toujours obligatoire.
  * R-54, R-55 — L'intermédiaire, les montants et les versements suivants ne sont
- * jamais modifiables ; l’écran le rappelle explicitement.
+ * jamais modifiables par un employé ; l’écran le rappelle explicitement.
+ * Décision du commanditaire (2026-10-12) : l'administrateur, lui, modifie le
+ * rabatteur (section « الوسيط », invisible pour un employé) et le montant
+ * d'un versement (section « طريقة الدفعة »).
  */
 
 import { useState } from 'react'
@@ -42,6 +45,7 @@ const DESCRIPTIONS: Record<SectionModifiable, string> = {
   group: T.modification.sections.group.sousTitre,
   note: T.modification.sections.note.sousTitre,
   firstPayment: T.modification.sections.firstPayment.sousTitre,
+  rabatteur: T.modification.sections.rabatteur.sousTitre,
 }
 
 interface Proprietes {
@@ -51,6 +55,7 @@ interface Proprietes {
     vols: { id: string; nom: string }[]
     chambres: { id: string; code: string }[]
     tarifs: Tarif[]
+    rabatteurs: { id: string; nom: string }[]
   }
   /** §5.9 — seul un administrateur peut corriger le montant du 1er versement. */
   estAdministrateur: boolean
@@ -95,6 +100,7 @@ function saisieInitiale(recu: Recu): SaisieModification {
     // Décision du commanditaire (2026-08-09) : 0 tant qu'aucun versement
     // n'est encore désigné — l'utilisateur choisit explicitement lequel.
     rangVersementCorrige: 0,
+    rabatteur: recu.rabatteur,
   }
 }
 
@@ -238,7 +244,9 @@ export function ModaleModification({
             </div>
           </div>
           <div>
-            <div className="etiquette">{T.modification.rabatteurFixe}</div>
+            <div className="etiquette">
+              {estAdministrateur ? T.modification.rabatteurAdministrateur : T.modification.rabatteurFixe}
+            </div>
             <div className="valeur">
               <TexteArabe>{recu.rabatteur || '—'}</TexteArabe>
             </div>
@@ -267,7 +275,10 @@ export function ModaleModification({
           <p className="modif-consigne">{T.modification.consigne}</p>
           {/* Le fichier présente les six sections sur deux colonnes. */}
           <div className="modif-sections">
-            {(Object.keys(LIBELLES_SECTIONS) as SectionModifiable[]).map((cle) => {
+            {(Object.keys(LIBELLES_SECTIONS) as SectionModifiable[])
+              // 2026-10-12 — la section du rabatteur n'existe pas pour un employé.
+              .filter((cle) => cle !== 'rabatteur' || estAdministrateur)
+              .map((cle) => {
               // Décision du commanditaire (2026-08-09) : la section reste
               // ouverte tant qu'au moins UN versement du reçu est
               // corrigeable — la liste de choix, plus bas, écarte ceux qui
@@ -306,13 +317,17 @@ export function ModaleModification({
                       ? T.modification.groupeIndisponible
                       : bloquee
                         ? T.modification.portePartagee
-                        : DESCRIPTIONS[cle]}
+                        : cle === 'firstPayment' && estAdministrateur
+                          ? T.modification.sections.firstPayment.sousTitreAdministrateur
+                          : DESCRIPTIONS[cle]}
                   </small>
                 </button>
               )
             })}
           </div>
-          <div className="modif-avertissement">{T.modification.fixes}</div>
+          <div className="modif-avertissement">
+            {estAdministrateur ? T.modification.fixesAdministrateur : T.modification.fixes}
+          </div>
         </>
       ) : (
         <>
@@ -444,6 +459,22 @@ export function ModaleModification({
                     </span>
                   </div>
                 </div>
+              </>
+            ) : null}
+
+            {section === 'rabatteur' ? (
+              <>
+                <div className="omra-fields">
+                  <Champ label={T.modification.nouveauRabatteur} pleine>
+                    <Selection
+                      valeur={saisie.rabatteur}
+                      onChange={(v) => modifier({ rabatteur: v })}
+                      options={referentiels.rabatteurs.map((r) => ({ valeur: r.id, libelle: r.nom }))}
+                      invalide={enErreur(erreurs, 'rabatteur')}
+                    />
+                  </Champ>
+                </div>
+                <div className="modif-avertissement">{T.modification.noteRabatteur}</div>
               </>
             ) : null}
 

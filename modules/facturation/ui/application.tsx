@@ -1056,6 +1056,7 @@ export function ApplicationFacturation({
                   vols: etat.vols,
                   chambres: etat.chambres,
                   tarifs: etat.tarifs,
+                  rabatteurs: etat.rabatteurs,
                 }}
                 estAdministrateur={estAdministrateur}
                 onFermer={fermer}

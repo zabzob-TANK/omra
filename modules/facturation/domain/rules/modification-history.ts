@@ -43,6 +43,7 @@ export interface InstantaneHistorique {
   dateInstrument?: string
   banque?: string
   payeur?: string
+  rabatteur?: string
 }
 
 /**
@@ -119,6 +120,11 @@ export function changementsHistorique(
       consignerChangement(changements, CHAMPS.payeur, avant.payeur || '', apres.payeur || '')
       break
 
+    // 2026-10-12 — administrateur seul (update_billing_receipt_rabatteur).
+    case 'billing_receipt.rabatteur_updated':
+      consignerChangement(changements, CHAMPS.rabatteur, avant.rabatteur || '', apres.rabatteur || '')
+      break
+
     default:
       break
   }
@@ -155,6 +161,8 @@ export function sectionDepuisActionType(actionType: string): SectionModifiable {
     case 'billing_receipt.first_payment_method_corrected':
     case 'billing_receipt.payment_method_corrected':
       return 'firstPayment'
+    case 'billing_receipt.rabatteur_updated':
+      return 'rabatteur'
     case 'billing_receipt.note_updated':
     default:
       return 'note'

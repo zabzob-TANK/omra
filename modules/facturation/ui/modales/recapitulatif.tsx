@@ -42,8 +42,9 @@ type ChampCarte =
   | 'convenu'
   | 'groupe'
   | 'note'
+  | 'rabatteur'
 
-/** Le rabatteur n'entre jamais dans cet ensemble : jamais modifiable (R-54). */
+/** Le rabatteur n'est modifiable que par l'administrateur (2026-10-12). */
 function champsChanges(avant: Recu, apres: Recu): Set<ChampCarte> {
   const changes = new Set<ChampCarte>()
   if (avant.prenom !== apres.prenom) changes.add('prenom')
@@ -57,6 +58,7 @@ function champsChanges(avant: Recu, apres: Recu): Set<ChampCarte> {
   if (avant.convenuCentimes !== apres.convenuCentimes) changes.add('convenu')
   if (avant.groupe !== apres.groupe) changes.add('groupe')
   if (avant.note !== apres.note) changes.add('note')
+  if (avant.rabatteur !== apres.rabatteur) changes.add('rabatteur')
   return changes
 }
 
@@ -190,7 +192,7 @@ function Fiche({
       <Ligne label={T.detail.convenu} changee={changes.has('convenu')}>
         <Montant centimes={recu.convenuCentimes} />
       </Ligne>
-      <Ligne label={T.detail.rabatteur} changee={false}>
+      <Ligne label={T.detail.rabatteur} changee={changes.has('rabatteur')}>
         <TexteArabe>{recu.rabatteur || T.recapitulatif.aucun}</TexteArabe>
       </Ligne>
       <Ligne label={T.detail.groupe} changee={changes.has('groupe')}>

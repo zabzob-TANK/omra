@@ -200,7 +200,10 @@ export interface Recu {
   reductionCentimes: number
   /** Prototype : `r.convenu` = tarif − réduction (R-08), en centimes. */
   convenuCentimes: number
-  /** Valeur arabe. Prototype : `r.rabatteur`. Non modifiable (R-54). */
+  /**
+   * Valeur arabe. Prototype : `r.rabatteur`. Non modifiable (R-54) pour un
+   * employé ; modifiable par l'administrateur seul depuis le 2026-10-12.
+   */
   rabatteur: string
   /** Prototype : `r.groupe` — code de famille, vide si absent. */
   groupe: string
@@ -568,6 +571,8 @@ export type SectionModifiable =
   | 'group'
   | 'note'
   | 'firstPayment'
+  /** Décision du commanditaire (2026-10-12) : administrateur seul. */
+  | 'rabatteur'
 
 /** Prototype : `r.modifications[i]`. */
 export interface Modification {

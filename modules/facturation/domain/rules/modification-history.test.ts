@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { changementsHistorique } from './modification-history'
+import { changementsHistorique, sectionDepuisActionType } from './modification-history'
 
 describe('changementsHistorique — reconstruction du détail à partir de before_data/after_data', () => {
   it('identité : prénom et nom, un seul champ touché reste seul dans la liste', () => {
@@ -100,5 +100,21 @@ describe('changementsHistorique — reconstruction du détail à partir de befor
       changementsHistorique('quelque.chose.inattendu', {}, {}),
     ).not.toThrow()
     expect(changementsHistorique('quelque.chose.inattendu', {}, {})).toEqual([])
+  })
+})
+
+describe('changementsHistorique — rabatteur (2026-10-12)', () => {
+  it('restitue l’ancien et le nouveau rabatteur', () => {
+    expect(
+      changementsHistorique(
+        'billing_receipt.rabatteur_updated',
+        { rabatteur: 'عزيزة' },
+        { rabatteur: 'تاجة' },
+      ),
+    ).toEqual([{ champ: 'الوسيط', ancienne: 'عزيزة', nouvelle: 'تاجة' }])
+  })
+
+  it('range la modification dans la section du rabatteur', () => {
+    expect(sectionDepuisActionType('billing_receipt.rabatteur_updated')).toBe('rabatteur')
   })
 })

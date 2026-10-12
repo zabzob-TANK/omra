@@ -241,6 +241,7 @@ describe('R-86 — journal d’audit', () => {
       montantOperation: '',
       montant: '',
       rangVersementCorrige: 1,
+      rabatteur: '',
     })
     const etat = await chargerEtat()
     expect(etat.audit[0].action).toBe('تعديل')
@@ -276,6 +277,7 @@ describe('previsualiserModification — récapitulatif avant validation (2026-08
       montantOperation: '',
       montant: '',
       rangVersementCorrige: 1,
+      rabatteur: '',
     })
     expect(apercu.statut).toBe('ok')
     if (apercu.statut !== 'ok') return
@@ -336,6 +338,7 @@ function saisieFirstPayment(partiel: Partial<SaisieModification> = {}): SaisieMo
     montantOperation: '',
     montant: '',
     rangVersementCorrige: 1,
+    rabatteur: '',
     ...partiel,
   }
 }

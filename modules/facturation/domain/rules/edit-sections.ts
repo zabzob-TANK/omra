@@ -4,8 +4,8 @@
  * Couvre : R-49 à R-55.
  *
  * Une seule section est modifiable à la fois, le motif est toujours obligatoire,
- * et chaque changement est consigné champ par champ. Le rabatteur et les
- * montants des versements ne sont jamais modifiables.
+ * et chaque changement est consigné champ par champ. Le rabatteur et le
+ * montant d'un versement ne sont modifiables que par l'administrateur.
  */
 
 import { NATURE_ESPECES, STATUT_ANNULE } from '../constants'
@@ -46,6 +46,7 @@ export const SECTIONS_MODIFIABLES: readonly SectionModifiable[] = [
   'group',
   'note',
   'firstPayment',
+  'rabatteur',
 ] as const
 
 /**
@@ -64,6 +65,8 @@ export const LIBELLES_SECTIONS: Record<SectionModifiable, string> = {
   // dans tous les cas ; `preparerModification` précise le rang exact pour le
   // journal d'historique (`sectionLibelle` du résultat).
   firstPayment: 'طريقة الدفعة',
+  // Décision du commanditaire (2026-10-12) : administrateur seul.
+  rabatteur: 'الوسيط',
 }
 
 /**
@@ -97,6 +100,7 @@ export const CHAMPS = {
   // seulement le premier — corrigé en même temps que le reste de ce libellé
   // ailleurs dans le fichier (LIBELLES_SECTIONS, montantAdministrateur...).
   montant: 'مبلغ الدفعة',
+  rabatteur: 'الوسيط',
 } as const
 
 export interface SaisieModification {
@@ -138,6 +142,8 @@ export interface SaisieModification {
    * rang (1 à 6). `0` : aucun versement encore choisi.
    */
   rangVersementCorrige: number
+  /** Nouveau rabatteur (nom). Administrateur seul (2026-10-12). */
+  rabatteur: string
 }
 
 /**
@@ -380,6 +386,21 @@ export function preparerModification(
   if (section === 'note') {
     consignerChangement(changements, CHAMPS.note, recu.note || '', saisie.note || '')
     champsModifies.note = saisie.note || ''
+  }
+
+  // Décision du commanditaire (2026-10-12) : le rabatteur se modifie par
+  // l'administrateur seul. Le serveur revérifie (`require_facturation_admin`).
+  if (section === 'rabatteur') {
+    const nouveauRabatteur = saisie.rabatteur.trim()
+    if (!contexte.estAdministrateur) {
+      liste.push({ champ: 'rabatteur', code: 'rabatteur-reserve-administrateur' })
+    } else if (!nouveauRabatteur) {
+      liste.push({ champ: 'rabatteur', code: 'rabatteur-obligatoire' })
+    } else if (memeValeur(nouveauRabatteur, recu.rabatteur)) {
+      liste.push({ champ: 'rabatteur', code: 'rabatteur-inchange' })
+    }
+    consignerChangement(changements, CHAMPS.rabatteur, recu.rabatteur || '', nouveauRabatteur)
+    champsModifies.rabatteur = nouveauRabatteur
   }
 
   let premierVersementCorrige: ResultatModification['premierVersementCorrige']
@@ -629,5 +650,8 @@ export function apercuApresModification(recu: Recu, resultat: ResultatModificati
  * restriction est imposée par `contexte.estAdministrateur` dans
  * `preparerModification`, pas par cette liste, qui ne décrit que ce qui est
  * verrouillé pour tout le monde sans exception.
+ *
+ * Le rabatteur en est sorti le 2026-10-12 pour la même raison : l'administrateur
+ * peut le modifier (section `rabatteur`), un employé reste bloqué.
  */
-export const CHAMPS_NON_MODIFIABLES = ['numero', 'date', 'rabatteur'] as const
+export const CHAMPS_NON_MODIFIABLES = ['numero', 'date'] as const

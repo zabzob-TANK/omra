@@ -77,6 +77,9 @@ export type CodeErreur =
   | 'montant-premier-versement-reserve-administrateur'
   /** Décision du commanditaire (2026-08-09) : jamais de trop-perçu créé par cette correction. */
   | 'montant-depasse-le-convenu'
+  /** Décision du commanditaire (2026-10-12) : le rabatteur se modifie par l'administrateur seul. */
+  | 'rabatteur-reserve-administrateur'
+  | 'rabatteur-inchange'
   // Journal financier
   | 'impression-hors-periode-autorisee'
   | 'acquittement-reserve-administrateur'
@@ -205,6 +208,8 @@ export const MESSAGES: Record<CodeErreur, (p?: Record<string, string | number>) 
     'بيانات العملية المشتركة تعدّل من سجل المدفوعات والتحويلات، وليس من الوصل.',
   'montant-premier-versement-reserve-administrateur': () =>
     'تعديل مبلغ الدفعة متاح للمدير فقط.',
+  'rabatteur-reserve-administrateur': () => 'تعديل الوسيط متاح للمدير فقط.',
+  'rabatteur-inchange': () => 'اختر وسيطًا مختلفًا عن الوسيط الحالي.',
   'montant-depasse-le-convenu': () =>
     'هذا المبلغ يتجاوز المبلغ المتفق عليه بعد احتساب باقي الدفعات.',
 
