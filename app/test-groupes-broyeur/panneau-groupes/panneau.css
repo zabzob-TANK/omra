@@ -1,0 +1,188 @@
+/* Panneau des groupes Visa — thème sombre, de droite à gauche. Autonome : couleurs de base, ressorts
+   et typographie sont posés sur sa racine, pour qu'il s'affiche pareil sur n'importe quelle page. */
+.d5 {
+  --fond: #0a0a0a;
+  --bord: rgba(255, 255, 255, .1);
+  --texte: #fafafa;
+  --discret: #a1a1a1;
+  position: relative; padding: 16px; border: 1px solid var(--bord); border-radius: 24px; background: #171717;
+  color: var(--texte); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: normal; text-align: right;
+}
+.d5 *, .d5 *::before, .d5 *::after { box-sizing: border-box; }
+.d5 button { font: inherit; cursor: pointer; }
+.d5 h3 { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.d5 h3 span { min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px; display: grid; place-items: center; font-size: 11.5px; background: #262626; color: var(--discret); }
+
+/* Fenêtre fixe, comme sous Windows : toujours visible quand la page défile, déplaçable par son titre. */
+.d5-fenetre { position: fixed; top: 96px; right: 24px; z-index: 30; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+/* L'en-tête (titre, niveaux, filtres) ne compte pas dans la largeur de la fenêtre (width 0 + min-width 100 %) :
+   il prend celle des pastilles et passe à la ligne si besoin. La fenêtre n'est jamais plus large que les groupes. */
+.d5-tete { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 14px; width: 0; min-width: 100%; }
+.d5-fenetre .d5-tete { cursor: grab; user-select: none; touch-action: none; }
+.d5-fenetre .d5-tete:active { cursor: grabbing; }
+.d5-fenetre .d5-tete button { cursor: pointer; }
+
+/* Halo tournant retiré le 2026-10-15 (décision du commanditaire) : son calque en rotation, plus grand que
+   la fenêtre, occupait à lui seul 4,7 millions de pixels en mémoire graphique et tournait en permanence. */
+
+/* Sélecteur des 3 niveaux d'information (1 minimal · 2 normal · 3 détail). */
+.d5-niveaux { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--bord); border-radius: 12px; background: #121212; }
+.d5-niveaux button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 9px; background: none; color: var(--discret); font-size: 12.5px; transition: background-color .2s, color .2s; }
+.d5-niveaux button b { font-size: 11px; font-weight: 700; opacity: .7; }
+.d5-niveaux button:hover { color: var(--texte); }
+.d5-niveaux button[data-actif='true'] { background: #e5e5e5; color: #0a0a0a; }
+
+/* Rubriques à largeur fixe, séparées par un petit trait (12 px de chaque côté) : toutes les pastilles
+   ont la même taille et s'alignent sur la ligne des titres. */
+.d5-c { flex: none; display: flex; align-items: center; padding-inline: 12px; min-width: 0; }
+.d5-c-rang { width: 50px; padding-right: 14px; }
+.d5-c-vue { width: 52px; justify-content: center; }
+.d5-c-nombre { width: 52px; justify-content: center; }
+.d5-c-icone { width: 46px; justify-content: center; }
+.d5-c-groupe { width: 200px; }
+.d5-c-numero { width: 116px; }
+.d5-c-logiciel { width: 130px; }
+.d5-c-etat { width: 170px; }
+.d5-c-ecart { width: 76px; justify-content: center; }
+.d5-c-actions { width: 230px; }
+.d5-trait { flex: none; width: 1px; height: 22px; border-radius: 1px; background: var(--bord); }
+.d5-titres { display: flex; align-items: center; height: 26px; padding-inline: 1px; font-size: 12px; color: var(--discret); width: 0; min-width: 100%; }
+.d5-titres .d5-trait { height: 12px; }
+
+/* Titres cliquables : un clic trie par la colonne, la flèche montre le tri actif. */
+.mb-tri { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; white-space: nowrap; transition: color .15s; }
+.mb-tri:hover, .mb-tri[data-actif='true'] { color: var(--texte); }
+.mb-tri-fleche { font-size: 8px; opacity: 0; transition: opacity .15s; }
+.mb-tri:hover .mb-tri-fleche { opacity: .4; }
+.mb-tri[data-actif='true'] .mb-tri-fleche { opacity: 1; }
+
+/* Pastilles. Le texte prend subtilement la couleur du groupe ; le nombre, encadré, est l'information
+   principale ; le rang reste discret. */
+.d5-liste { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.d5-pastille {
+  display: flex; align-items: center; min-height: 50px; border-radius: 25px; transition: opacity .2s;
+  background: color-mix(in srgb, var(--teinte) 13%, #1f1f1f); border: 1px solid color-mix(in srgb, var(--teinte) 32%, transparent);
+  color: color-mix(in srgb, var(--teinte) 22%, #f2f2f2);
+}
+.d5-pastille[data-masque='true'] .d5-c-nombre, .d5-pastille[data-masque='true'] .d5-c-icone, .d5-pastille[data-masque='true'] .d5-c-groupe,
+.d5-pastille[data-masque='true'] .d5-c-numero, .d5-pastille[data-masque='true'] .d5-c-logiciel, .d5-pastille[data-masque='true'] .d5-c-etat { opacity: .4; }
+.d5-nombre {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 28px; padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--teinte) 45%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--teinte) 14%, transparent);
+  font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--teinte) 30%, #ffffff);
+}
+.d5-icone { width: 22px; height: 22px; object-fit: contain; }
+.d5-nom { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.d5-nom-bouton { display: flex; align-items: center; width: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: right; cursor: pointer; }
+.d5-nom-bouton:hover .d5-nom { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--teinte) 60%, transparent); }
+.d5-num, .d5-logiciel { font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--teinte) 35%, #a3a3a3); }
+.mb-rang-nusuk { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 22px; height: 22px; color: #7a7a7a; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.mb-rang-nusuk[data-vide='true'] { color: #525252; font-weight: 400; }
+.mb-pastille-libre {
+  display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; padding: 2px 8px; border-radius: 7px;
+  font-size: 12px; font-weight: 500; white-space: nowrap; background: color-mix(in srgb, var(--teinte) 22%, transparent); color: color-mix(in srgb, var(--teinte) 55%, #fff);
+}
+.mb-ecart { display: inline-flex; gap: 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.d5 [data-signe='plus'] { color: #4ade80; }
+.d5 [data-signe='moins'] { color: #f87171; }
+.mb-vide { color: #525252; font-weight: 400; }
+
+/* Œil : à la couleur du groupe ; gris quand le groupe est masqué. */
+.mb-oeil { display: grid; place-items: center; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--teinte, #4ade80) 22%, transparent); color: color-mix(in srgb, var(--teinte, #4ade80) 65%, #fff); transition: background-color .2s, color .2s, transform .15s; }
+.mb-oeil:active { transform: scale(.92); }
+.mb-oeil[data-masque='true'] { background: rgba(148, 163, 184, .14); color: #737373; }
+.mb-oeil-petit { width: 28px; height: 28px; }
+.mb-oeil-petit svg { width: 15px; height: 15px; }
+
+/* Chiffres qui roulent. */
+.mb-nombre { display: inline-flex; }
+.mb-rouleau { position: relative; display: inline-block; width: 1ch; overflow-x: visible; overflow-y: clip; line-height: 1; font-variant-numeric: tabular-nums; }
+.mb-rouleau-gabarit { visibility: hidden; }
+/* Pas de « will-change » : il créait un calque graphique par chiffre possible (des centaines), à recalculer
+   à chaque dépôt d'un pèlerin. */
+.mb-rouleau-chiffre { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+/* Boutons d'action (Management Bar) : carrés au repos, ils s'allongent au survol et montrent leur nom. */
+.d5-actions { display: flex; gap: 6px; }
+.mb-action {
+  display: flex; align-items: center; gap: 8px; height: 34px; max-width: 34px; padding: 6px 8px;
+  overflow: hidden; white-space: nowrap; border: 0; border-radius: 8px;
+  transition: max-width var(--s-bouton-duree) var(--s-bouton), transform var(--s-bouton-duree) var(--s-bouton);
+}
+.mb-action:hover { max-width: 120px; transition: max-width var(--s-ouvre-duree) var(--s-ouvre) .15s, transform var(--s-bouton-duree) var(--s-bouton); }
+.mb-action:active { transform: scale(.95); }
+.mb-action:disabled { opacity: .35; cursor: not-allowed; }
+.mb-action:disabled:active { transform: none; }
+.mb-action-icone { flex-shrink: 0; }
+.mb-action-libelle {
+  font-size: 14px; visibility: hidden; opacity: 0; transform: translateX(-4px);
+  transition: opacity var(--s-libelle-duree) var(--s-libelle), transform var(--s-libelle-duree) var(--s-libelle), visibility 0s var(--s-libelle-duree);
+}
+.mb-action:hover .mb-action-libelle, .mb-action:active .mb-action-libelle {
+  visibility: visible; opacity: 1; transform: none;
+  transition: opacity var(--s-libelle-duree) var(--s-libelle), transform var(--s-libelle-duree) var(--s-libelle), visibility 0s;
+}
+.mb-action[data-ton='gris'] { background: rgba(82, 82, 82, .8); color: #e5e5e5; }
+.mb-action[data-ton='rouge'] { background: rgba(153, 27, 27, .8); color: #fca5a5; }
+.mb-action[data-ton='vert'] { background: rgba(22, 101, 52, .8); color: #86efac; }
+
+/* « Pèlerins sans groupe Nusuk » : toujours en tête, séparé du reste. */
+.d5-liste-fixe { padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px dashed var(--bord); }
+
+/* Épingles (Pin List) : liste épinglée en haut ; bouton plein et toujours visible sur un groupe épinglé,
+   visible au survol sur les autres ; sa place est réservée même pour « sans groupe ». */
+.d5-liste-epinglee { margin-bottom: 4px; }
+.d5-epingle {
+  flex: none; width: 32px; height: 32px; margin-left: 9px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 50%; background: #525252; color: #fff; opacity: 0; transition: opacity .25s, background-color .2s, transform .15s;
+}
+.d5-pastille:hover .d5-epingle, .d5-epingle:focus-visible, .d5-epingle[data-epingle='true'] { opacity: 1; }
+.d5-epingle:hover { background: #6b6b6b; }
+.d5-epingle:active { transform: scale(.9); }
+.d5-epingle[data-epingle='true'] svg { fill: currentColor; }
+.d5-place-epingle { flex: none; width: 32px; height: 32px; margin-left: 9px; }
+.d5-titres .d5-place-epingle { height: 1px; }
+
+/* Tableau du bas en pile (Notification List) : au repos, chaque pastille glisse sous la précédente
+   (8 px visibles) et rétrécit de 5 % par rang ; au-delà de la 3e, elles restent cachées derrière. Au
+   survol (ou quand le focus est dedans), la pile s'étale avec le ressort de la pile. */
+.d5-libelle { margin: 18px 6px 2px; font-size: 13px; font-weight: 500; color: var(--discret); animation: d5-libelle .22s ease-in-out; }
+.d5-libelle span { margin-right: 4px; padding: 0 6px; border-radius: 9px; background: #262626; font-size: 11.5px; }
+@keyframes d5-libelle { from { opacity: 0; } }
+.d5-pile { outline: none; }
+.d5-pile-liste { --hauteur-pastille: 50px; }
+.d5-pile-liste .d5-pastille {
+  position: relative; z-index: var(--z, 0); transform-origin: center top; transform: scaleX(calc(1 - var(--rang, 0) * .05));
+  transition: margin-top var(--s-pile-duree) var(--s-pile), transform var(--s-pile-duree) var(--s-pile), opacity .25s;
+}
+.d5-pile-liste .d5-pastille:not(:first-child) { margin-top: calc(8px - var(--hauteur-pastille) - 8px); }
+.d5-pile-liste .d5-pastille[data-rang-pile]:nth-child(n + 4) { opacity: 0; pointer-events: none; margin-top: calc(0px - var(--hauteur-pastille) - 8px); }
+.d5-pile:hover .d5-pile-liste .d5-pastille, .d5-pile:focus-within .d5-pile-liste .d5-pastille { transform: none; opacity: 1; pointer-events: auto; }
+.d5-pile:hover .d5-pile-liste .d5-pastille:not(:first-child), .d5-pile:focus-within .d5-pile-liste .d5-pastille:not(:first-child) { margin-top: 0; }
+
+/* Montée de niveau : les nouvelles rubriques se déroulent (largeur depuis 0, fondu, léger flou). */
+.d5-c.d5-nouvelle { overflow: hidden; animation: d5-deroule-colonne var(--s-pile-duree) var(--s-pile) both; }
+.d5-trait.d5-nouvelle { animation: d5-apparait .3s ease both; }
+@keyframes d5-deroule-colonne { from { width: 0; padding-inline: 0; opacity: 0; filter: blur(2px); } }
+@keyframes d5-apparait { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .d5-c.d5-nouvelle, .d5-trait.d5-nouvelle { animation: none; }
+}
+
+/* Filtres par catégorie, sous le titre (la fenêtre est moins large) : icône + nombre de groupes ; pâle et
+   barré quand caché. */
+.d5-titre-filtres { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.d5-filtres { display: flex; gap: 4px; }
+.d5-filtre {
+  display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 7px; border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--teinte) 40%, transparent); background: color-mix(in srgb, var(--teinte) 16%, #1c1c1c);
+  color: color-mix(in srgb, var(--teinte) 30%, #ffffff); font-size: 11.5px; transition: opacity .2s, background-color .2s, transform .15s;
+}
+.d5-filtre img { width: 15px; height: 15px; object-fit: contain; }
+.d5-filtre b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.d5-filtre:hover { background: color-mix(in srgb, var(--teinte) 26%, #1c1c1c); }
+.d5-filtre:active { transform: scale(.94); }
+.d5-filtre[data-montree='false'] { opacity: .35; background: transparent; }
+.d5-filtre[data-montree='false'] b { text-decoration: line-through; }
+
+

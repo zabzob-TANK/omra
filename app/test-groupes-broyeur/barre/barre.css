@@ -1,0 +1,20 @@
+/* Atelier d'affichage du panneau des groupes : seulement le fond de page et la source des données.
+   Le panneau apporte ses propres styles (panneau-groupes/panneau.css). */
+.mb-page {
+  --fond: #0a0a0a; --bord: rgba(255, 255, 255, .1); --texte: #fafafa; --discret: #a1a1a1;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px 16px 60px;
+  background: var(--fond); color: var(--texte); font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.mb-page *, .mb-page *::before, .mb-page *::after { box-sizing: border-box; }
+.mb-page button { font: inherit; cursor: pointer; }
+.mb-message { margin: 0; color: var(--discret); font-size: 14px; }
+.mb-alerte { color: #fbbf24; max-width: 720px; text-align: center; }
+
+/* Source des données : archive des exports Excel de Nusuk, avec le bouton d'actualisation. */
+.mb-source { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 10px 14px; font-size: 13px; color: var(--discret); }
+.mb-source b { color: var(--texte); font-weight: 600; }
+.mb-source button { height: 32px; padding: 0 14px; border: 1px solid var(--bord); border-radius: 10px; background: #171717; color: var(--texte); font-size: 13px; transition: background-color .2s, transform .15s; }
+.mb-source button:hover:enabled { background: #262626; }
+.mb-source button:active:enabled { transform: scale(.97); }
+.mb-source button:disabled { opacity: .6; cursor: progress; }
+.mb-source-message { flex-basis: 100%; text-align: center; color: #fbbf24; }
