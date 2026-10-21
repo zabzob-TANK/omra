@@ -22,6 +22,56 @@
 .d5-fenetre .d5-tete:active { cursor: grabbing; }
 .d5-fenetre .d5-tete button { cursor: pointer; }
 
+/* Ancré en haut de la page : une ligne de réglages, puis une bande d'environ 10 % de la hauteur de l'écran en trois
+   cases indépendantes qui défilent chacune de leur côté (verticalement, et de côté si le niveau 3 est trop large). */
+.d5-compact { --largeur-detail: 729px; --hauteur-bande: clamp(100px, calc(15vh - 40px), 170px); display: flex; flex-direction: column; gap: 6px; padding: 0; border: 0; border-radius: 0; background: none; }
+.d5-compact-reglages { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 14px; }
+.d5-compact .d5-ancrer { height: 30px; }
+.d5-compact-cases { display: flex; gap: 8px; height: var(--hauteur-bande); }
+.d5-case { display: flex; flex-direction: column; min-width: 0; padding: 6px 8px; border: 1px solid var(--bord); border-radius: 12px; background: #171717; }
+.d5-case h4 { flex: none; display: flex; align-items: center; gap: 6px; margin: 0 2px 3px; font-size: 11.5px; line-height: 14px; font-weight: 600; color: var(--discret); }
+.d5-case h4 span { min-width: 18px; padding: 0 5px; border-radius: 8px; background: #262626; font-size: 10.5px; text-align: center; }
+/* Largeurs fixes : chaque case prend la largeur de ses lignes et ne se resserre jamais ; la case du centre (épinglés,
+   tout le détail) garde la largeur d'une ligne complète même vide, pour que la bande ne bouge pas. L'ensemble tient
+   dans un écran de 1280 px. */
+.d5-case { flex: none; }
+.d5-case-epingles { min-width: var(--largeur-detail, 0); }
+.d5-case-liste { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; margin: 0; padding: 0 0 0 2px; list-style: none; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #3a3a3a transparent; }
+.d5-case-vide { margin: 4px 2px; font-size: 11.5px; color: #525252; }
+/* Pastilles en petit (épinglés et tous) : mêmes rubriques que la fenêtre, une ligne de 24 px. « Sans groupe » garde
+   la taille de la fenêtre. */
+.d5-case-reduite .d5-pastille { flex: none; min-height: 24px; height: 24px; border-radius: 12px; }
+.d5-case-reduite .d5-c { padding-inline: 6px; }
+.d5-case-reduite .d5-c-rang { width: 32px; padding-right: 8px; }
+.d5-case-reduite .d5-c-vue { width: 32px; }
+.d5-case-reduite .d5-c-nombre { width: 40px; }
+.d5-case-reduite .d5-c-icone { width: 28px; }
+.d5-case-reduite .d5-c-groupe { width: 116px; }
+.d5-case-reduite .d5-c-numero { width: 94px; }
+.d5-case-reduite .d5-c-logiciel { width: 86px; }
+.d5-case-reduite .d5-c-etat { width: 112px; }
+.d5-case-reduite .d5-c-ecart { width: 56px; }
+.d5-case-reduite .d5-c-actions { width: 80px; }
+.d5-case-reduite .d5-trait { height: 14px; }
+.d5-case-reduite .d5-nombre { min-width: 24px; height: 18px; padding: 0 4px; border-radius: 5px; font-size: 12px; }
+.d5-case-reduite .d5-icone { width: 15px; height: 15px; }
+.d5-case-reduite .d5-nom { font-size: 12px; }
+.d5-case-reduite .d5-num, .d5-compact .d5-logiciel, .d5-compact .mb-rang-nusuk { font-size: 11px; }
+.d5-case-reduite .mb-pastille-libre { padding: 0 6px; font-size: 11px; }
+.d5-case-reduite .mb-oeil-petit { width: 18px; height: 18px; }
+.d5-case-reduite .mb-oeil-petit svg { width: 11px; height: 11px; }
+.d5-case-reduite .d5-actions { gap: 4px; }
+.d5-case-reduite .mb-action { height: 20px; max-width: 22px; padding: 2px 4px; border-radius: 6px; }
+.d5-case-reduite .mb-action:hover { max-width: 22px; }
+.d5-case-reduite .mb-action svg { width: 13px; height: 13px; }
+.d5-case-reduite .mb-action-libelle { display: none; }
+.d5-case-reduite .d5-epingle, .d5-compact .d5-place-epingle { width: 18px; height: 18px; margin-left: 4px; }
+.d5-case-reduite .d5-epingle svg { width: 11px; height: 11px; }
+/* Réglages de la page et bouton fenêtre / ancrage, dans l'en-tête. */
+.d5-outils { display: flex; align-items: center; gap: 8px; }
+.d5-ancrer { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--bord); border-radius: 10px; background: #121212; color: var(--discret); font-size: 12.5px; transition: color .15s, background-color .15s; }
+.d5-ancrer:hover { color: var(--texte); background: #1f1f1f; }
+
 /* Halo tournant retiré le 2026-10-15 (décision du commanditaire) : son calque en rotation, plus grand que
    la fenêtre, occupait à lui seul 4,7 millions de pixels en mémoire graphique et tournait en permanence. */
 
@@ -146,8 +196,9 @@
 /* Tableau du bas en pile (Notification List) : au repos, chaque pastille glisse sous la précédente
    (8 px visibles) et rétrécit de 5 % par rang ; au-delà de la 3e, elles restent cachées derrière. Au
    survol (ou quand le focus est dedans), la pile s'étale avec le ressort de la pile. */
-.d5-libelle { margin: 18px 6px 2px; font-size: 13px; font-weight: 500; color: var(--discret); animation: d5-libelle .22s ease-in-out; }
-.d5-libelle span { margin-right: 4px; padding: 0 6px; border-radius: 9px; background: #262626; font-size: 11.5px; }
+.d5-libelle { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 6px 2px; font-size: 13px; font-weight: 500; color: var(--discret); animation: d5-libelle .22s ease-in-out; }
+.d5-libelle p { margin: 0; }
+.d5-libelle p span { margin-right: 4px; padding: 0 6px; border-radius: 9px; background: #262626; font-size: 11.5px; }
 @keyframes d5-libelle { from { opacity: 0; } }
 .d5-pile { outline: none; }
 .d5-pile-liste { --hauteur-pastille: 50px; }
@@ -157,8 +208,11 @@
 }
 .d5-pile-liste .d5-pastille:not(:first-child) { margin-top: calc(8px - var(--hauteur-pastille) - 8px); }
 .d5-pile-liste .d5-pastille[data-rang-pile]:nth-child(n + 4) { opacity: 0; pointer-events: none; margin-top: calc(0px - var(--hauteur-pastille) - 8px); }
-.d5-pile:hover .d5-pile-liste .d5-pastille, .d5-pile:focus-within .d5-pile-liste .d5-pastille { transform: none; opacity: 1; pointer-events: auto; }
-.d5-pile:hover .d5-pile-liste .d5-pastille:not(:first-child), .d5-pile:focus-within .d5-pile-liste .d5-pastille:not(:first-child) { margin-top: 0; }
+.d5-pile:hover .d5-pile-liste .d5-pastille, .d5-pile:focus-within .d5-pile-liste .d5-pastille, .d5-pile[data-depliee='true'] .d5-pile-liste .d5-pastille { transform: none; opacity: 1; pointer-events: auto; }
+.d5-pile:hover .d5-pile-liste .d5-pastille:not(:first-child), .d5-pile:focus-within .d5-pile-liste .d5-pastille:not(:first-child), .d5-pile[data-depliee='true'] .d5-pile-liste .d5-pastille:not(:first-child) { margin-top: 0; }
+/* Bouton « عرض الكل / طيّ » : déplie la pile pour de bon, ou la replie. */
+.d5-deplier { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border: 1px solid var(--bord); border-radius: 9px; background: #121212; color: var(--discret); font-size: 12px; transition: color .15s, background-color .15s; }
+.d5-deplier:hover { color: var(--texte); background: #1f1f1f; }
 
 /* Montée de niveau : les nouvelles rubriques se déroulent (largeur depuis 0, fondu, léger flou). */
 .d5-c.d5-nouvelle { overflow: hidden; animation: d5-deroule-colonne var(--s-pile-duree) var(--s-pile) both; }

@@ -25,20 +25,19 @@
 .pdt *, .pdt *::before, .pdt *::after { box-sizing: border-box; }
 .pdt button { font: inherit; cursor: pointer; }
 
-.pdt-bandeau { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.pdt-sur { margin: 0 0 6px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--doux); }
-.pdt h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; }
-.pdt-compteurs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.pdt-compteurs li { display: flex; align-items: baseline; gap: 6px; padding: 6px 12px; border: 1px solid var(--bord); border-left: 3px solid var(--t); border-radius: 6px; font-size: 12px; color: var(--doux); }
-.pdt-compteurs b { font-size: 16px; color: var(--texte); font-variant-numeric: tabular-nums; }
+/* Haut de page : lecture du registre et outils sur une ligne, puis le panneau des groupes ancré dessous, à droite
+   (demande du commanditaire, 2026-10-19 : côte à côte, les outils étaient serrés et prenaient de la place). */
+.pdt-haut { display: flex; flex-direction: column; gap: 12px; margin: 0 0 20px; }
+/* Outils sur une seule ligne, lecture du registre en petit dessous. */
+.pdt-haut-gauche { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pdt-haut-gauche .pdt-outils { order: -1; flex-wrap: nowrap; }
+.pdt-haut-gauche .pdt-lecture { margin: 0; }
 
-.pdt-consigne { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; margin: 22px 0 26px; padding: 14px 18px; border: 1px dashed var(--bord); border-radius: 10px; font-size: 12.5px; color: var(--doux); }
-.pdt-consigne p { margin: 0; }
-.pdt-consigne b { color: var(--texte); font-weight: 600; }
-.pdt-avertissement { color: #f2a541 !important; }
 
 .pdt-attente { padding: 40px 0; color: var(--doux); }
-.pdt-outils { display: grid; grid-template-columns: minmax(260px, 420px) 1fr auto auto; gap: 14px; margin: 0 0 20px; }
+.pdt-outils { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 14px; margin: 0; }
+.pdt-outils > .pdt-recherche { flex: 1 1 260px; max-width: 420px; }
+.pdt-outils > .pdt-barre-selection { flex: 1 1 320px; }
 /* Bouton d'essai : retirer le petit rebond des fiches voisines. Orange quand il est retiré. */
 .pdt-bouton-animations { padding: 0 14px; border: 1px solid var(--bord); border-radius: 10px; background: var(--panneau); color: var(--doux); font-size: 12.5px; white-space: nowrap; }
 .pdt-bouton-animations:hover { color: var(--texte); border-color: #4a515c; }
@@ -56,7 +55,7 @@
 .pdt-active .pdt-barre-pastille { background: #4ea5f0; color: #111317; }
 .pdt-barre-selection button { padding: 6px 10px; border: 1px solid var(--bord); border-radius: 6px; background: transparent; color: var(--texte); font-size: 12px; }
 .pdt-barre-selection button:disabled { opacity: .4; cursor: default; }
-.pdt-lecture { margin: -12px 0 16px; font-size: 12px; color: var(--doux); }
+.pdt-lecture { margin: 0 0 14px; font-size: 12px; color: var(--doux); }
 .pdt-lecture button { margin-left: 6px; padding: 3px 10px; border: 1px solid var(--bord); border-radius: 6px; background: var(--panneau); color: var(--texte); font-size: 12px; }
 .pdt-attente button { margin-left: 10px; padding: 6px 12px; border: 1px solid var(--bord); border-radius: 6px; background: var(--panneau); color: var(--texte); }
 
@@ -156,6 +155,9 @@
 .pdt-choisie::after { opacity: 1; transition-duration: .15s; }
 .pdt-choisie img, .pdt-choisie .pdt-sans-photo { box-shadow: 0 0 0 2px color-mix(in srgb, var(--t) 65%, transparent), 0 0 14px -4px var(--t); transition-duration: .15s; }
 /* Le trait lumineux qui fait une fois le tour de la fiche à la sélection. */
+/* Salut d'arrivée (voir saluerFiche) : lueur intérieure de la couleur du groupe, posée par-dessus le contenu sans le
+   masquer ; la fiche coupe ce qui dépasse, d'où une lueur vers l'intérieur. */
+.pdt-salut { position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none; opacity: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 70%, transparent), inset 0 0 14px -5px var(--t); background: linear-gradient(110deg, color-mix(in srgb, var(--t) 12%, transparent), transparent 70%); }
 .pdt-eclat { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; animation: pdt-eclat-fondu 1s ease-out both; }
 .pdt-eclat rect { width: calc(100% - 2px); height: calc(100% - 2px); fill: none; stroke: var(--t); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 14 86; filter: drop-shadow(0 0 3px var(--t)); animation: pdt-eclat-tour 1s ease-out both; }
 @keyframes pdt-eclat-tour { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
@@ -194,7 +196,6 @@
 .pdt-journal p { margin: 0; }
 
 /* Choix de vue : trois boutons par machine, et « Toutes » dans le bandeau. */
-.pdt-bandeau-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .pdt-toutes { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--doux); }
 .pdt-vues { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--bord); border-radius: 8px; background: var(--fond); }
 .pdt-vues button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--doux); font-size: 11.5px; letter-spacing: 0; text-transform: none; transition: background-color .15s, color .15s; }
@@ -331,3 +332,54 @@
 .pdt-bouton-geste[data-etat='arme'] { color: #ef6f6c; border-color: #ef6f6c; background: #2a1f22; }
 .pdt-bouton-geste[data-etat='fait'] { color: #4ade80; border-color: #2f7d53; }
 .pdt-bouton-geste[data-etat='erreur'] { color: #ef6f6c; }
+
+/* Groupes resserrés (demande du commanditaire, 2026-10-16) : mêmes tailles de photos, mais le moins de place possible
+   sur les côtés, pour aligner plus de groupes sur une ligne. Le nom latin disparaît des vues Liste et Photos (il
+   reste dans la vue Détails, dans le tableau et dans la recherche) ; une fiche sans nom arabe garde son nom latin.
+   En vue Photos, chaque fiche ne laisse que 3 px de chaque côté de la photo. Les groupes ont tous la même largeur,
+   celle qu'il faut pour trois photos de front ; la place restante en bout de ligne reste vide. */
+.pdt { --largeur-groupe: 244px; }
+.pdt-espace .pdt-atelier { grid-template-columns: repeat(auto-fill, var(--largeur-groupe)); column-gap: 12px; }
+.pdt-liste { padding-inline: 8px; }
+.pdt-vue-liste .pdt-nom-lat, .pdt-vue-photos .pdt-nom-lat { display: none; }
+.pdt-vue-photos { grid-template-columns: repeat(3, calc(64px + 8px)); }
+.pdt-vue-photos .pdt-fiche, .pdt-fantome.pdt-vue-photos .pdt-fiche, .pdt-couche.pdt-vue-photos .pdt-fiche { padding-inline: 3px; }
+/* Le numéro passe sur le coin de la photo, sur une petite pastille pour rester lisible. */
+.pdt-vue-photos .pdt-rang { top: 3px; right: 3px; z-index: 1; min-width: 16px; padding: 0 3px; border-radius: 4px; background: var(--papier); line-height: 15px; }
+/* Seul, le nom arabe prend toute la ligne pour rester aligné à droite. */
+.pdt-vue-liste .pdt-fiche-noms .pdt-nom-ar { flex: 1 1 auto; }
+
+/* Mise en page libre (version test, voir mise-en-page.jsx) : la page fait la hauteur de l'écran et chaque grande zone
+   est posée à la place de son rectangle, en pourcentage de l'écran. Les conteneurs intermédiaires s'effacent
+   (display: contents) pour que les quatre zones soient placées directement dans la page. */
+.pdt-libre { height: 100vh; min-height: 0; padding: 0; overflow: hidden; }
+.pdt-libre .pdt-haut, .pdt-libre .pdt-espace { display: contents; }
+/* Le séparateur ne sert qu'à la page normale ; le journal des passages (bas de page) n'a pas de place ici. */
+.pdt-libre .pdt-separateur, .pdt-libre .pdt-journal { display: none; }
+.pdt-libre .pdt-haut-gauche, .pdt-libre .d5-compact, .pdt-libre .pdt-espace .pdt-atelier, .pdt-libre .pdt-tableau { position: absolute; margin: 0; }
+.pdt-libre .pdt-haut-gauche { left: var(--options-x); top: var(--options-y); width: var(--options-l); height: var(--options-h); overflow: auto; }
+.pdt-libre .d5-compact { left: var(--groupes-x); top: var(--groupes-y); width: var(--groupes-l); height: var(--groupes-h); overflow: auto; }
+.pdt-libre .d5-compact .d5-compact-cases { height: auto; flex: 1; min-height: 0; }
+.pdt-libre .pdt-espace .pdt-atelier { left: var(--atelier-x); top: var(--atelier-y); width: var(--atelier-l); height: var(--atelier-h); }
+.pdt-libre .pdt-tableau { left: var(--liste-x); top: var(--liste-y); width: var(--liste-l); height: var(--liste-h); }
+
+/* Calque d'édition : un rectangle de couleur par zone, des poignées aux coins et sur les côtés. */
+.pdt-mep { position: absolute; inset: 0; z-index: 200; background: rgba(0, 0, 0, .18); }
+.pdt-mep-zone { position: absolute; border: 2px solid var(--c); border-radius: 6px; background: color-mix(in srgb, var(--c) 16%, transparent); cursor: move; touch-action: none; user-select: none; }
+.pdt-mep-zone:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
+.pdt-mep-nom { position: absolute; top: 6px; left: 8px; padding: 2px 8px; border-radius: 5px; background: var(--c); color: #111317; font-size: 12px; font-weight: 700; pointer-events: none; }
+.pdt-mep-nom small { margin-left: 6px; font-weight: 500; opacity: .8; }
+/* Les poignées passent au-dessus des autres rectangles : on peut toujours tirer un bord, même sous une zone voisine. */
+.pdt-mep-poignee { position: absolute; z-index: 2; width: 12px; height: 12px; border: 2px solid var(--c); border-radius: 3px; background: #111317; }
+.pdt-mep-n, .pdt-mep-s { left: calc(50% - 6px); cursor: ns-resize; }
+.pdt-mep-e, .pdt-mep-o { top: calc(50% - 6px); cursor: ew-resize; }
+.pdt-mep-n, .pdt-mep-ne, .pdt-mep-no { top: -7px; }
+.pdt-mep-s, .pdt-mep-se, .pdt-mep-so { bottom: -7px; }
+.pdt-mep-e, .pdt-mep-ne, .pdt-mep-se { right: -7px; }
+.pdt-mep-o, .pdt-mep-no, .pdt-mep-so { left: -7px; }
+.pdt-mep-ne, .pdt-mep-so { cursor: nesw-resize; }
+.pdt-mep-no, .pdt-mep-se { cursor: nwse-resize; }
+.pdt-mep-barre { position: fixed; left: 50%; bottom: 18px; z-index: 210; display: flex; align-items: center; gap: 12px; padding: 8px 12px; transform: translateX(-50%); border: 1px solid var(--bord); border-radius: 12px; background: #171a20; box-shadow: 0 16px 40px rgba(0, 0, 0, .6); font-size: 12.5px; color: var(--doux); white-space: nowrap; }
+.pdt-mep-barre b { color: var(--texte); }
+.pdt-mep-barre button { height: 30px; padding: 0 12px; border: 1px solid var(--bord); border-radius: 8px; background: var(--panneau); color: var(--texte); }
+.pdt-mep-barre .pdt-mep-terminer { border-color: #4ea5f0; background: color-mix(in srgb, #4ea5f0 25%, var(--panneau)); }

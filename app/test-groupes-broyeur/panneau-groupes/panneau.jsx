@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Info, Pin, RotateCcw, Trash2 } from 'lucide-react'
+import { ChevronsDown, ChevronsUp, Info, PanelTop, PictureInPicture2, Pin, RotateCcw, Trash2 } from 'lucide-react'
 import { CATEGORIES_LISTE, iconeGroupe, resumeGroupe, trierGroupes, triSuivant, TRI_INITIAL } from '../rubrique-visa'
 import { BoutonAction, Ecart, NombreGlissant, Oeil, RangNusuk, S_EPINGLE, S_PILE, STYLE_RESSORTS, TitreTri } from './affichage'
 import './panneau.css'
@@ -25,21 +25,27 @@ const CLE_CACHEES = 'mb-groupes-categories-cachees'
 const lireCachees = () => { try { const v = JSON.parse(localStorage.getItem(CLE_CACHEES) || '[]'); return new Set(Array.isArray(v) ? v.map(String) : []) } catch { return new Set() } }
 
 // Panneau des groupes : pastilles, halo tournant autour du bloc. Même forme à tous les niveaux, seules les rubriques
-// changent ; de droite à gauche, séparées par un petit trait : rang Nusuk, عرض, العدد, icône, المجموعة,
+// changent ; de droite à gauche, séparées par un petit trait : rang Nusuk, عرض, icône, المجموعة, العدد,
 // رقم المجموعة, puis Logiciel, الحالة, + / −, actions. « niveau » : à partir de quel niveau la rubrique
 // s'affiche. Largeurs fixes : toutes les pastilles ont la même taille et s'alignent sur les titres.
 const RUBRIQUES = [
   { cle: 'rang', titre: 'ترتيب', bulle: 'Rang du groupe dans la liste Nusuk', niveau: 2 },
   { cle: 'vue', titre: 'عرض', niveau: 2 },
-  { cle: 'nombre', titre: 'العدد', niveau: 1 },
+  // Nombre de pèlerins entre le nom du groupe et son numéro (demande du commanditaire, 2026-10-19).
   { cle: 'icone', titre: '', niveau: 1 },
   { cle: 'groupe', titre: 'المجموعة', niveau: 1 },
+  { cle: 'nombre', titre: 'العدد', niveau: 1 },
   { cle: 'numero', titre: 'رقم المجموعة', niveau: 2 },
   { cle: 'logiciel', titre: 'Logiciel', niveau: 3 },
   { cle: 'etat', titre: 'الحالة', niveau: 3 },
   { cle: 'ecart', titre: '+ / −', bulle: 'المضافون / المُزالون', niveau: 3 },
   { cle: 'actions', titre: '', niveau: 3 },
 ]
+
+// Formats fixes du panneau ancré : « minimal » (niveau 1 : icône, nom, nombre) et « détail » (niveau 3), quel que
+// soit le niveau choisi dans la fenêtre.
+const RUBRIQUES_MINIMAL = RUBRIQUES.filter(r => r.niveau <= 1)
+const RUBRIQUES_DETAIL = RUBRIQUES
 
 // « nouvelles » : rubriques qui viennent d'apparaître (montée de niveau) ; elles se déroulent.
 function Cellules({ rubriques, rendu, nouvelles }) {
@@ -81,13 +87,38 @@ const lireNiveau = () => { try { const n = Number(localStorage.getItem(CLE_NIVEA
 const CLE_POSITION = 'mb-fenetre-groupes'
 const lirePosition = () => { try { const p = JSON.parse(localStorage.getItem(CLE_POSITION) || 'null'); return Number.isFinite(p?.x) && Number.isFinite(p?.y) ? p : null } catch { return null } }
 
+// Ancré en haut de la page ou en fenêtre (demande du commanditaire, 2026-10-16) : un bouton de l'en-tête passe de
+// l'un à l'autre ; le choix est retenu dans ce navigateur. Seules les pages qui le permettent (« ancrable ») ont
+// ce bouton, et l'ancrage y est le choix par défaut ; ailleurs, le panneau reste une fenêtre.
+const CLE_ANCRE = 'mb-groupes-ancre'
+// « كل المجموعات » toujours dépliée, ou en pile repliée qui s'étale au survol (choix retenu dans ce navigateur).
+const CLE_DEPLIEE = 'mb-groupes-pile-depliee'
+const lireDepliee = () => { try { return localStorage.getItem(CLE_DEPLIEE) === '1' } catch { return false } }
+const lireAncre = () => { try { return localStorage.getItem(CLE_ANCRE) !== 'fenetre' } catch { return true } }
+
 // Le panneau ne fait qu'afficher : la page lui donne les groupes (listeGroupesVisa), les groupes
 // masqués et ce qu'il faut faire quand on affiche ou masque un groupe. Tri, épingles, niveau, position
 // et animations sont des réglages d'affichage, gérés ici.
 // Mémorisé : pendant un glisser dans la page, tant que ses groupes ne changent pas, le panneau n'est pas
 // recalculé à chaque mouvement de la souris (c'était une source de saccades sur les petits PC).
-export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer }) {
+// « outils » : réglages de la page posés dans l'en-tête du panneau (sur le Poste de tri : la vue de toutes les machines).
+export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer, ancrable = false, outils = null }) {
   const bloc = useRef(null)
+  const [ancreChoisi, setAncre] = useState(() => ancrable && lireAncre())
+  const ancre = ancrable && ancreChoisi
+  const basculerAncre = () => setAncre(a => {
+    try { localStorage.setItem(CLE_ANCRE, a ? 'fenetre' : 'haut') } catch { /* préférence facultative */ }
+    return !a
+  })
+  // Fenêtre : la pile « كل المجموعات » peut rester dépliée pour de bon.
+  const [depliee, setDepliee] = useState(lireDepliee)
+  const basculerDepliee = () => {
+    relever()
+    setDepliee(d => {
+      try { localStorage.setItem(CLE_DEPLIEE, d ? '0' : '1') } catch { /* préférence facultative */ }
+      return !d
+    })
+  }
   const [tri, setTri] = useState(TRI_INITIAL)
   // Glissement des lignes : positions relevées juste avant un changement d'ordre, puis chaque ligne
   // part de son ancienne place avec un ressort (tri : celui de la pile ; épingle : celui de la Pin List).
@@ -122,7 +153,7 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
 
   const [position, setPosition] = useState(lirePosition)
   function tirer(e) {
-    if (e.button !== 0 || e.target.closest('button')) return
+    if (ancre || e.button !== 0 || e.target.closest('button, input, label')) return
     const fenetre = bloc.current
     if (!fenetre) return
     e.preventDefault()
@@ -214,7 +245,7 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   const dessous = autres.filter(x => !estEpingle(x))
   const titre = r => r.titre && <TitreTri cle={r.cle} titre={r.titre} bulle={r.bulle} tri={tri} onTrier={onTrier} />
 
-  return (
+  const panneau = (
     <div ref={bloc} className="d5 d5-fenetre" dir="rtl" data-niveau={niveau} style={{ ...STYLE_RESSORTS, ...(position ? { left: position.x, top: position.y, right: 'auto' } : null) }}>
       <div className="d5-tete" onPointerDown={tirer} title="Tirer pour déplacer la fenêtre">
         <div className="d5-titre-filtres">
@@ -239,6 +270,18 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
             </button>
           ))}
         </div>
+        {(outils || ancrable) && (
+          <div className="d5-outils">
+            {outils}
+            {ancrable && (
+              <button type="button" className="d5-ancrer" onClick={basculerAncre} aria-pressed={!ancre}
+                title={ancre ? 'Détacher le panneau en fenêtre déplaçable' : 'Ancrer le panneau en haut de la page'}>
+                {ancre ? <PictureInPicture2 size={15} /> : <PanelTop size={15} />}
+                <span>{ancre ? 'Fenêtre' : 'Ancrer en haut'}</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="d5-titres">
@@ -251,11 +294,67 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
       {/* Tableau du bas : tous les autres groupes, en pile repliée façon « Notification List » ; elle
           s'étale au survol (ou au clavier). Seules les 3 premières pastilles dépassent au repos. */}
       {dessous.length > 0 && (
-        <div className="d5-pile" tabIndex={-1}>
-          <p className="d5-libelle">كل المجموعات <span>{dessous.length}</span></p>
+        <div className="d5-pile" tabIndex={-1} data-depliee={depliee}>
+          <div className="d5-libelle">
+            <p>كل المجموعات <span>{dessous.length}</span></p>
+            <button type="button" className="d5-deplier" onClick={e => { if (depliee) e.currentTarget.blur(); basculerDepliee() }} aria-pressed={depliee}
+              title={depliee ? 'Replier les groupes en pile (elle s’étale au survol)' : 'Déplier tous les groupes'}>
+              {depliee ? <ChevronsUp size={14} /> : <ChevronsDown size={14} />}
+              <span>{depliee ? 'طيّ' : 'عرض الكل'}</span>
+            </button>
+          </div>
           <ul className="d5-liste d5-pile-liste">{dessous.map((x, i) => pastille(x, sansGroupe.length + enHaut.length + i, i, dessous.length))}</ul>
         </div>
       )}
+    </div>
+  )
+  if (!ancre) return panneau
+
+  // Ancré (demandes du commanditaire, 2026-10-20) : une bande d'environ 15 % de la hauteur de l'écran. Sur une ligne,
+  // trois cases indépendantes, chacune avec sa propre barre de défilement et son format, toujours le même (le
+  // niveau 1/2/3 ne sert qu'à la fenêtre), et des largeurs fixes : la bande ne change pas d'une résolution à l'autre.
+  //  - « sans groupe » : la moins visible, format minimal ;
+  //  - au centre, les épinglés, ceux sur lesquels on travaille : tout le détail, toujours entier ;
+  //  - tous les autres, nombreux : format minimal (icône, nom, nombre, épingle).
+  // Les réglages (filtres, vue, fenêtre) sont à part, sur leur propre ligne au-dessus.
+  const caseGroupes = (cle, nom, liste, vide, depart, n, colonnesCase, reduite) => (
+    <section className={`d5-case d5-case-${cle}${reduite ? ' d5-case-reduite' : ''}`} aria-label={nom} data-niveau={n}>
+      <h4>{nom} <span>{liste.length}</span></h4>
+      {liste.length
+        ? <ul className="d5-case-liste">{liste.map((x, i) => (
+          <Pastille key={x.g.num} x={x} i={depart + i} niveau={n} colonnes={colonnesCase} nouvelles={null}
+            epingle={estEpingle(x)} masque={masques.has(x.g.num)} actions={actions} />
+        ))}</ul>
+        : <p className="d5-case-vide">{vide}</p>}
+    </section>
+  )
+  return (
+    <div ref={bloc} className="d5 d5-compact" dir="rtl" style={STYLE_RESSORTS}>
+      <div className="d5-compact-reglages">
+        <div className="d5-filtres" role="group" aria-label="Catégories affichées">
+          {FILTRES.map(f => {
+            const montree = !cachees.has(f.categorie)
+            return (
+              <button key={f.categorie} type="button" className="d5-filtre" data-montree={montree} aria-pressed={montree} onClick={() => basculerCategorie(f.categorie)}
+                style={{ '--teinte': CATEGORIES_LISTE[f.categorie]?.color }} title={`${f.nom} — ${montree ? 'affichée : cliquer pour cacher' : 'cachée : cliquer pour afficher'}`}>
+                <img src={iconeGroupe(f.categorie)} alt="" />
+                <b>{nombreParCategorie.get(f.categorie) || 0}</b>
+              </button>
+            )
+          })}
+        </div>
+        <div className="d5-outils">
+          {outils}
+          <button type="button" className="d5-ancrer" onClick={basculerAncre} title="Détacher le panneau en fenêtre déplaçable">
+            <PictureInPicture2 size={15} /><span>Fenêtre</span>
+          </button>
+        </div>
+      </div>
+      <div className="d5-compact-cases">
+        {caseGroupes('sans-groupe', 'بدون مجموعة', sansGroupe, '—', 0, 1, RUBRIQUES_MINIMAL, true)}
+        {caseGroupes('epingles', 'المثبتة', enHaut, 'لا توجد مجموعة مثبتة', sansGroupe.length, 3, RUBRIQUES_DETAIL, true)}
+        {caseGroupes('tous', 'كل المجموعات', dessous, '—', sansGroupe.length + enHaut.length, 1, RUBRIQUES_MINIMAL, true)}
+      </div>
     </div>
   )
 })

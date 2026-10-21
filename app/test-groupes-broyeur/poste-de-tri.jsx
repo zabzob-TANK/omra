@@ -8,6 +8,8 @@ import Tableau from './Tableau'
 import { chargerVisa, categorieMachine, motifVerrouMachine, machineFixe, etatFiche, iconeCategorie, CATEGORIES, COLONNES, NUSUK_CHANNEL, nouveauBrouillon, listeGroupesVisa } from './rubrique-visa'
 // Panneau des groupes (fenêtre fixe), mis au point sur /test-groupes-broyeur/barre ; affichage seulement.
 import { PanneauGroupes } from './panneau-groupes/panneau'
+// Mise en page (version test) : placer les grandes zones de la page à la souris.
+import { EditeurDisposition, ecrireDisposition, lireDisposition, releverDisposition, variablesDisposition } from './mise-en-page'
 import './poste-de-tri.css'
 
 // Poste de tri : glisser une fiche (ou une sélection) d'une machine à l'autre. Les fiches de la
@@ -77,7 +79,9 @@ function simulerVol(de, vers, attente = 0, k = 170, c = 26) {
   for (let i = 0; i < 180; i++) {
     etats.push({ x, y, vx, vy, r, s })
     const enAttente = i * PAS_VOL < attente
-    if (!enAttente && Math.hypot(x - vers.x, y - vers.y) < 0.3 && Math.hypot(vx, vy) < 6 && Math.abs(r) < 0.05 && Math.abs(s - 1) < 0.0005) break
+    // Fin du vol dès que la fiche est à moins d'un demi-pixel de sa place : la queue du ressort la faisait encore
+    // ramper d'un pixel pendant 120 ms avant de se caler (mesuré le 2026-10-16, « ça bouge vers la fin »).
+    if (!enAttente && Math.hypot(x - vers.x, y - vers.y) < 0.5 && Math.hypot(vx, vy) < 20 && Math.abs(r) < 0.05 && Math.abs(s - 1) < 0.0005) break
     for (let j = 0; j < 4; j++) {
       const h = PAS_VOL / 4
       if (enAttente) { vx *= Math.exp(-h / 0.12); vy *= Math.exp(-h / 0.12) }
@@ -163,6 +167,20 @@ function revelerFiche(el) {
   el.style.visibility = ''
   delete el.dataset.attend
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('pdt-sans-fondu')))
+}
+
+// Salut d'arrivée (demande du commanditaire, 2026-10-16) : la fiche déposée dans un autre groupe s'illumine
+// doucement de la couleur de ce groupe, puis s'éteint, en un peu moins d'une seconde. Même famille que l'allumage
+// de l'en-tête du groupe ; jamais le trait qui fait le tour (le « petit ruban »). Sans agrandissement : il faisait
+// bouger la fiche d'un pixel juste après sa pose (retiré le 2026-10-16). Un fondu, joué par la carte graphique.
+function saluerFiche(el) {
+  if (calme() || !el?.isConnected) return
+  el.querySelector('.pdt-salut')?.remove()
+  const lueur = document.createElement('span')
+  lueur.className = 'pdt-salut'
+  lueur.setAttribute('aria-hidden', 'true')
+  el.appendChild(lueur)
+  lueur.animate([{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0 }], { duration: 900, easing: 'ease-out' }).onfinish = () => lueur.remove()
 }
 
 // La fiche lâchée garde son élan et file jusqu'à sa vraie place, puis se redresse.
@@ -686,6 +704,14 @@ export default function PosteDeTri() {
   const [annulable, setAnnulable] = useState(null)
   const [maintien, setMaintien] = useState(null)
   const [photos, setPhotos] = useState({})
+  // Disposition libre des zones (null : la page normale) et calque d'édition.
+  const [disposition, setDisposition] = useState(null)
+  const [miseEnPage, setMiseEnPage] = useState(false)
+  useEffect(() => { setDisposition(lireDisposition()) }, [])
+  const ouvrirMiseEnPage = () => {
+    if (!disposition) setDisposition(releverDisposition(racine.current))
+    setMiseEnPage(true)
+  }
   const [recherche, setRecherche] = useState('')
   const champRecherche = useRef(null)
   const racine = useRef(null)
@@ -860,7 +886,7 @@ export default function PosteDeTri() {
         const proche = Math.max(0, etats.findIndex((e, i) => i * PAS_VOL >= (vols.get(v.copie).attente || 0) && Math.hypot(e.x - vers.x, e.y - vers.y) < 60))
         debutFondu = Math.min(debutFondu, Math.max(0, proche * PAS_VOL * 1000 - ecoule))
         finVols = Math.max(finVols, (etats.length - 1) * PAS_VOL * 1000 - ecoule)
-        const atterrir = () => { atterrissages.delete(v.copie); reveler(el); v.copie.remove() }
+        const atterrir = () => { atterrissages.delete(v.copie); reveler(el); v.copie.remove(); if (transfere(k)) saluerFiche(el) }
         atterrissages.set(v.copie, el); ecouterDefilement()
         if (anim.playState === 'finished') atterrir()
         else anim.onfinish = anim.oncancel = atterrir
@@ -894,6 +920,7 @@ export default function PosteDeTri() {
         el.style.opacity = '0'
         setTimeout(() => lanieres(racine.current, { modele: a.modeles[id], modeleArrivee, de, vers, couleur: couleurDe(a.vers), vue: a.vue, vueArrivee: a.vueArrivee }, () => {
           el.style.opacity = ''
+          saluerFiche(el)
           if (k === dernier) setAllumee({ num: a.vers, t: Date.now() })
         }), calme() ? 0 : k * CASCADE)
       } else {
@@ -1527,28 +1554,11 @@ export default function PosteDeTri() {
   const groupesChoisis = new Set(selection.map(groupeDe)).size
 
   return (
-    <div className="pdt" ref={racine}>
-      <header className="pdt-bandeau">
-        <div>
-          <p className="pdt-sur">Banc d’essai · groupes</p>
-          <h1>Poste de tri</h1>
-        </div>
-        <div className="pdt-bandeau-droite">
-          <div className="pdt-toutes"><span>Toutes</span><ChoixVue vue={vueCommune} choisir={choisirVueToutes} libelle="Vue de toutes les machines" /></div>
-          <ul className="pdt-compteurs" aria-label="Effectif par machine">
-            {toutes.map(m => <li key={m.num} style={{ '--t': teinte(m.num) }}><b><Compteur valeur={idsDe(m.num).length} /></b>{m.nomPerso}</li>)}
-          </ul>
-        </div>
-      </header>
-
-      <div className="pdt-consigne">
-        <p><b>Sélectionner :</b> clic sur la fiche = ajouter/retirer · Maj+clic = ajouter toute la plage · Échap = tout désélectionner.</p>
-        <p><b>Déplacer :</b> glisser une fiche sélectionnée emporte toute la sélection, même répartie sur plusieurs groupes, en un bloc.</p>
-        <p><b>Depuis le tableau :</b> tirer la poignée ⠿ d’une ligne vers un groupe ; les lignes cochées partent ensemble.</p>
-        <p><b>Groupes 🔒 :</b> visa en attente ou obtenu, rien n’entre ni ne sort. Seul un groupe temporaire se démonte (✕ maintenu). Ctrl+Z annule.</p>
-        <p className="pdt-avertissement">Lecture seule de Nusuk ; les déplacements sont une simulation en mémoire : rien n’est enregistré, rien ne part vers Nusuk.</p>
-      </div>
-
+    <div className={`pdt${disposition ? ' pdt-libre' : ''}`} ref={racine} style={variablesDisposition(disposition)}>
+      {/* Haut de page (2026-10-16) : plus de titre, de compteurs ni de consignes ; le panneau des groupes, ancré en
+          haut par défaut, porte la vue de toutes les machines. À sa gauche : lecture du registre et outils. */}
+      <div className="pdt-haut">
+      <div className="pdt-haut-gauche">
       {chargement === 'en-cours' && <p className="pdt-attente" role="status">Lecture du registre…</p>}
       {chargement === 'erreur' && <p className="pdt-attente" role="alert">Le registre n’a pas pu être lu : {lecture?.erreur} <button onClick={() => setEssai(n => n + 1)}>Relire</button></p>}
       {chargement === 'pret' && (
@@ -1582,6 +1592,10 @@ export default function PosteDeTri() {
             title={sansAnimation ? 'Les fiches voisines glissent et s’arrêtent net à leur place. Cliquer pour remettre le petit rebond.' : 'Cliquer pour retirer le petit rebond des fiches voisines (elles glissent toujours).'}>
             Rebond : {sansAnimation ? 'retiré' : 'avec'}
           </button>
+          <button type="button" className="pdt-bouton-animations" aria-pressed={miseEnPage} onClick={() => (miseEnPage ? setMiseEnPage(false) : ouvrirMiseEnPage())}
+            title="Placer les zones de la page à la souris (version test)">
+            Mise en page
+          </button>
           {/* L'enregistreur écrit son relevé sur le PC (route de développement) : il n'existe pas en ligne. */}
           {process.env.NODE_ENV === 'development' && (
           <button type="button" className="pdt-bouton-animations pdt-bouton-geste" data-etat={enregistrement} onClick={enregistrerGeste}
@@ -1591,6 +1605,12 @@ export default function PosteDeTri() {
           )}
         </div>
       )}
+      </div>
+      {chargement === 'pret' && (
+        <PanneauGroupes groupes={groupesPanneau} masques={masques} onMasquer={basculerMasque} ancrable
+          outils={<div className="pdt-toutes" dir="ltr"><span>Toutes</span><ChoixVue vue={vueCommune} choisir={choisirVueToutes} libelle="Vue de toutes les machines" /></div>} />
+      )}
+      </div>
 
       {chargement === 'pret' && (
         <div className="pdt-espace" style={{ '--largeur-tableau': `${largeurTableau}px` }}>
@@ -1619,7 +1639,12 @@ export default function PosteDeTri() {
         </div>
       )}
 
-      {chargement === 'pret' && <PanneauGroupes groupes={groupesPanneau} masques={masques} onMasquer={basculerMasque} />}
+      {miseEnPage && disposition && (
+        <EditeurDisposition racine={racine} disposition={disposition}
+          changer={d => { setDisposition(d); ecrireDisposition(d) }}
+          fermer={() => { ecrireDisposition(disposition); setMiseEnPage(false) }}
+          reinitialiser={() => { ecrireDisposition(null); setDisposition(null); setMiseEnPage(false) }} />
+      )}
       {refus && <div key={refus.id} className="pdt-refus-message" role="alert" onAnimationEnd={() => setRefus(r => (r?.id === refus.id ? null : r))}>🔒 {refus.texte}</div>}
 
       {glisse && enMain.length > 0 && (
