@@ -18,14 +18,14 @@ const MIN = 4 // taille minimale d'une zone, en % de l'écran
 const GRILLE = 8 // pas de la grille, en pixels
 const AIMANT = 8 // distance à laquelle un bord se colle à un autre, en pixels
 
-// Disposition par défaut du Poste de tri, réglée par le commanditaire dans l'éditeur (« Copier », 2026-10-26) : la barre
-// du haut, le panneau des groupes dessous, puis l'atelier et le tableau côte à côte. Une disposition retenue dans ce
-// navigateur passe devant ; « Réinitialiser » revient à celle-ci.
+// Disposition par défaut du Poste de tri, réglée par le commanditaire dans l'éditeur (« Copier », 2026-10-26, seconde
+// version) : la barre du haut, le panneau des groupes dessous sur toute la largeur, puis l'atelier et le tableau côte à
+// côte. Une disposition retenue dans ce navigateur passe devant ; « Réinitialiser » revient à celle-ci.
 export const DISPOSITION_DEFAUT = {
   options: { x: 1.68, y: 2.92, l: 96.65, h: 6.26 },
-  groupes: { x: 1.68, y: 10.43, l: 70.4, h: 11.26 },
-  atelier: { x: 17.92, y: 23.36, l: 54.16, h: 76.64 },
-  liste: { x: 72.5, y: 23.36, l: 25.83, h: 76.64 },
+  groupes: { x: 1.68, y: 10.43, l: 96.65, h: 14.58 },
+  atelier: { x: 23.75, y: 27.1, l: 54.38, h: 72.9 },
+  liste: { x: 78.75, y: 27.1, l: 19.58, h: 72.9 },
 }
 const valide = d => d && ZONES.every(z => ['x', 'y', 'l', 'h'].every(k => Number.isFinite(d[z.cle]?.[k])))
 export function lireDisposition() {
