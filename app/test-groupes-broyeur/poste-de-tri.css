@@ -363,7 +363,8 @@
 /* Le séparateur ne sert qu'à la page normale ; le journal des passages (bas de page) n'a pas de place ici. */
 .pdt-libre .pdt-separateur, .pdt-libre .pdt-journal { display: none; }
 .pdt-libre .pdt-haut-gauche, .pdt-libre .d5-compact, .pdt-libre .pdt-espace .pdt-atelier-defile, .pdt-libre .pdt-tableau { position: absolute; margin: 0; }
-.pdt-libre .pdt-haut-gauche { left: var(--options-x); top: var(--options-y); width: var(--options-l); height: var(--options-h); overflow: auto; }
+/* La zone Options ne coupe pas ce qui dépasse : le menu de la barre du haut se déroule par-dessus les autres zones. */
+.pdt-libre .pdt-haut-gauche { left: var(--options-x); top: var(--options-y); width: var(--options-l); height: var(--options-h); overflow: visible; }
 .pdt-libre .d5-compact { left: var(--groupes-x); top: var(--groupes-y); width: var(--groupes-l); height: var(--groupes-h); overflow: auto; }
 .pdt-libre .d5-compact .d5-compact-cases { height: auto; flex: 1; min-height: 0; }
 .pdt-libre .pdt-espace .pdt-atelier-defile { left: var(--atelier-x); top: var(--atelier-y); width: var(--atelier-l); height: var(--atelier-h); }

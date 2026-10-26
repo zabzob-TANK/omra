@@ -10,7 +10,7 @@ import { chargerVisa, categorieMachine, motifVerrouMachine, machineFixe, etatFic
 import { PanneauGroupes } from './panneau-groupes/panneau'
 import CardNav from './card-nav/CardNav'
 // Mise en page (version test) : placer les grandes zones de la page à la souris.
-import { EditeurDisposition, ecrireDisposition, lireDisposition, releverDisposition, variablesDisposition } from './mise-en-page'
+import { DISPOSITION_DEFAUT, EditeurDisposition, ecrireDisposition, lireDisposition, releverDisposition, variablesDisposition } from './mise-en-page'
 import './poste-de-tri.css'
 
 // Poste de tri : glisser une fiche (ou une sélection) d'une machine à l'autre. Les fiches de la
@@ -1982,7 +1982,7 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
         <EditeurDisposition racine={racine} disposition={disposition}
           changer={d => { setDisposition(d); ecrireDisposition(d) }}
           fermer={() => { ecrireDisposition(disposition); setMiseEnPage(false) }}
-          reinitialiser={() => { ecrireDisposition(null); setDisposition(null); setMiseEnPage(false) }} />
+          reinitialiser={() => { ecrireDisposition(null); setDisposition(DISPOSITION_DEFAUT); setMiseEnPage(false) }} />
       )}
       {refus && <div key={refus.id} className="pdt-refus-message" role="alert" onAnimationEnd={() => setRefus(r => (r?.id === refus.id ? null : r))}>🔒 {refus.texte}</div>}
 
