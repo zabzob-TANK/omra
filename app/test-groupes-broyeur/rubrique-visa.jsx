@@ -66,24 +66,31 @@ export async function chargerVisa(signal, paniersActuels = [], { groupesDuFichie
       if (!row || confirmationTime(row) > p.importedAt) continue
       Object.assign(row, res.fields)
     }
-    resultat.paniers = synchroniserCartes(paniersActuels, rows, p, false).map(g => ({ ...g, ferme: false, origines: g.origines || {} }))
-    // « ordre » : numéros des groupes dans l'ordre de la liste Nusuk (sert à numéroter 1, 2, 3…).
-    resultat.lecture = { importId: p.importId, importedAt: p.importedAt, contrat: p.contract, groupes: p.groups?.length || 0, adresse: derniere.origin || null, ordre: (p.groups || []).map(g => String(g.id)),
-      // Tous les groupes de la lecture (export Excel « liste des groupes »), avec effectif et état Nusuk.
-      // Pour chaque groupe, les lignes de l'Excel des pèlerins (préparation d'abord, sinon rapport des
-      // visas) : nombre de visas délivrés et en cours, pour classer un groupe sans pèlerin reconnu.
-      liste: (p.groups || []).map(g => {
-        const lignes = (p.observations || []).filter(o => String(o.groupId) === String(g.id))
-        const preparation = lignes.filter(o => o.source === 'preparation')
-        const membres = preparation.length ? preparation : lignes
-        return {
-          id: String(g.id), nom: g.name, effectif: g.count, etat: g.status, lignes: membres.length,
-          visasEmis: membres.filter(o => o.visaNumber).length,
-          visasEnCours: membres.filter(o => visaPending(o.visaStatus || '')).length,
-        }
-      }) }
+    // « ferme » : groupe masqué (le panneau des groupes le range en bas) ; une actualisation garde ce choix.
+    resultat.paniers = synchroniserCartes(paniersActuels, rows, p, false).map(g => ({ ...g, ferme: !!g.ferme, origines: g.origines || {} }))
+    resultat.lecture = resumeLecture(p, derniere.origin)
   } catch (e) { resultat.alerte = e.message || 'Lecture Nusuk non applicable.' }
   return resultat
+}
+
+// Résumé d'une lecture Nusuk (aperçu enregistré par l'extension) : celui du Poste de tri seul, et celui de l'écran
+// Groupes de l'espace client (même aperçu, déjà lu par le registre).
+export function resumeLecture(p, origine = null) {
+  // « ordre » : numéros des groupes dans l'ordre de la liste Nusuk (sert à numéroter 1, 2, 3…).
+  return { importId: p.importId, importedAt: p.importedAt, contrat: p.contract, groupes: p.groups?.length || 0, adresse: origine || null, ordre: (p.groups || []).map(g => String(g.id)),
+    // Tous les groupes de la lecture (export Excel « liste des groupes »), avec effectif et état Nusuk.
+    // Pour chaque groupe, les lignes de l'Excel des pèlerins (préparation d'abord, sinon rapport des
+    // visas) : nombre de visas délivrés et en cours, pour classer un groupe sans pèlerin reconnu.
+    liste: (p.groups || []).map(g => {
+      const lignes = (p.observations || []).filter(o => String(o.groupId) === String(g.id))
+      const preparation = lignes.filter(o => o.source === 'preparation')
+      const membres = preparation.length ? preparation : lignes
+      return {
+        id: String(g.id), nom: g.name, effectif: g.count, etat: g.status, lignes: membres.length,
+        visasEmis: membres.filter(o => o.visaNumber).length,
+        visasEnCours: membres.filter(o => visaPending(o.visaStatus || '')).length,
+      }
+    }) }
 }
 
 // Les cinq catégories de groupes (visa-appearance.js du fichier clients).
@@ -213,12 +220,13 @@ export function listeGroupesVisa({ paniers, rows, lecture }) {
   const liste = lecture?.liste || []
   const lus = new Map(liste.map((n, i) => [n.id, { ...n, rang: i + 1 }]))
   const vus = new Set()
-  const depuisPaniers = (paniers || []).filter(g => g.visaBrouillon && !g.visaBrouillon.obsolete).map(g => {
+  // « ordre » : la place du groupe dans l'ordre des groupes (celui qu'on règle en les déplaçant, commun au registre).
+  const depuisPaniers = (paniers || []).filter(g => g.visaBrouillon && !g.visaBrouillon.obsolete).map((g, ordre) => {
     const id = String(g.visaBrouillon?.nusukId || '')
     const nusuk = (id && lus.get(id)) || null
     if (nusuk) vus.add(id)
     const categorie = nusuk && familleNusuk(nusuk.etat) === 'rouge' ? 'refuse' : categorieMachine(g, rows)
-    return { g, categorie, rang: nusuk?.rang ?? null, nusuk }
+    return { g, categorie, rang: nusuk?.rang ?? null, nusuk, ordre }
   })
   const absents = [...lus.values()].filter(n => !vus.has(n.id)).map(n => ({
     g: { num: 100000 + n.rang, nomPerso: n.nom, ids: [], visaBrouillon: { nusukId: n.id, baseIds: [], baseNom: n.nom } },
@@ -228,7 +236,8 @@ export function listeGroupesVisa({ paniers, rows, lecture }) {
       : CATEGORIE_FAMILLE[familleNusuk(n.etat)],
     rang: n.rang, nusuk: n, absent: true,
   }))
-  return [...depuisPaniers, ...absents].sort((a, b) => RANG_LISTE[a.categorie] - RANG_LISTE[b.categorie] || a.g.num - b.g.num)
+  // Les groupes dans leur ordre ; ceux de la lecture Nusuk sans groupe ici, ensuite, par catégorie.
+  return [...depuisPaniers, ...absents.sort((a, b) => RANG_LISTE[a.categorie] - RANG_LISTE[b.categorie] || a.g.num - b.g.num)]
 }
 
 // Ce qu'affiche un groupe : l'effectif (Nusuk, ajusté des déplacements faits ici) et l'état lus sur Nusuk quand le groupe y est ; sinon (sans
@@ -266,6 +275,7 @@ export function resumeGroupe(x) {
 // défaut, rang Nusuk croissant (1, 2, 3… de haut en bas). « vue » : affichés d'abord, puis masqués. Les
 // groupes sans rang Nusuk restent en bas quand on trie par rang, dans les deux sens.
 const CLES_TRI = {
+  ordre: x => x.ordre ?? Infinity,
   rang: x => x.rang ?? Infinity,
   vue: (x, masques) => (masques.has(x.g.num) ? 1 : 0),
   nombre: x => infoGroupe(x).effectif,
@@ -276,14 +286,16 @@ const CLES_TRI = {
   ecart: x => { const d = deltaCarte(x.g); return d.plus + d.moins },
 }
 export const estTriable = cle => !!CLES_TRI[cle]
-export const TRI_INITIAL = { cle: 'rang', sens: 'haut' }
-export const triSuivant = (tri, cle) => (tri.cle === cle ? { cle, sens: tri.sens === 'haut' ? 'bas' : 'haut' } : { cle, sens: 'haut' })
+// Par défaut, l'ordre des groupes. Un titre de colonne trie pour consulter (croissant, puis décroissant) ; un troisième
+// clic revient à l'ordre des groupes.
+export const TRI_INITIAL = { cle: 'ordre', sens: 'haut' }
+export const triSuivant = (tri, cle) => (tri.cle !== cle ? { cle, sens: 'haut' } : tri.sens === 'haut' ? { cle, sens: 'bas' } : TRI_INITIAL)
 export function trierGroupes(groupes, tri, masques = new Set()) {
   const valeur = CLES_TRI[tri.cle] || CLES_TRI.rang
   const sens = tri.sens === 'bas' ? -1 : 1
   return [...groupes].sort((a, b) => {
     const x = valeur(a, masques), y = valeur(b, masques)
-    if (tri.cle === 'rang' && (x === Infinity) !== (y === Infinity)) return x === Infinity ? 1 : -1
+    if ((tri.cle === 'rang' || tri.cle === 'ordre') && (x === Infinity) !== (y === Infinity)) return x === Infinity ? 1 : -1
     const r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'ar', { numeric: true })
     return (r * sens) || ((a.rang ?? 1e9) - (b.rang ?? 1e9)) || (a.g.num - b.g.num)
   })

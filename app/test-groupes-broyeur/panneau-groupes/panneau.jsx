@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ChevronsDown, ChevronsUp, Info, PanelTop, PictureInPicture2, Pin, RotateCcw, Trash2 } from 'lucide-react'
+import { ChevronsDown, ChevronsUp, Info, PanelTop, PictureInPicture2, RotateCcw, Trash2 } from 'lucide-react'
 import { CATEGORIES_LISTE, iconeGroupe, resumeGroupe, trierGroupes, triSuivant, TRI_INITIAL } from '../rubrique-visa'
 import { BoutonAction, Ecart, NombreGlissant, Oeil, RangNusuk, S_EPINGLE, S_PILE, STYLE_RESSORTS, TitreTri } from './affichage'
 import './panneau.css'
@@ -60,17 +60,9 @@ function Cellules({ rubriques, rendu, nouvelles }) {
   })
 }
 
-// Épingles (Pin List, animate-ui) : les groupes épinglés passent dans une liste en haut, ceux sur
-// lesquels on travaille ; les autres restent dessous, sous « كل المجموعات ». Clé stable d'un groupe :
-// son numéro Nusuk, sinon l'identifiant de son brouillon. Retenues dans ce navigateur.
-const CLE_EPINGLES = 'mb-groupes-epingles'
-const cleEpingle = x => String(x.g.visaBrouillon?.nusukId || x.g.visaBrouillon?.id || 'num-' + x.g.num)
-const lireEnsemble = cle => { try { const v = JSON.parse(localStorage.getItem(cle) || '[]'); return new Set(Array.isArray(v) ? v.map(String) : []) } catch { return new Set() } }
-const lireEpingles = () => lireEnsemble(CLE_EPINGLES)
-// Les groupes temporaires (créés dans le logiciel, pas encore sur Nusuk) sont épinglés d'office et
-// passent en premier dans la liste du haut ; on peut quand même en désépingler un (retenu ici).
-const CLE_DESEPINGLES = 'mb-groupes-desepingles'
-const estTemporaire = x => x.categorie === 'temporaire'
+// Affichés et masqués (demande du commanditaire, 2026-10-25, à la place des épingles) : en haut, les groupes affichés
+// dans la page ; en bas, sous « المخفية », les groupes masqués. Un clic sur un groupe le fait passer de l'un à
+// l'autre. La visibilité vient de la page (« masques ») : sur le Poste de tri, c'est celle des groupes du registre.
 
 // Trois niveaux d'information, même forme de pastille : 1 nombre, icône, nom (un clic sur le nom
 // affiche ou masque le groupe) ; 2 ajoute rang, œil, numéro ; 3 ajoute tout le reste.
@@ -102,7 +94,8 @@ const lireAncre = () => { try { return localStorage.getItem(CLE_ANCRE) !== 'fene
 // Mémorisé : pendant un glisser dans la page, tant que ses groupes ne changent pas, le panneau n'est pas
 // recalculé à chaque mouvement de la souris (c'était une source de saccades sur les petits PC).
 // « outils » : réglages de la page posés dans l'en-tête du panneau (sur le Poste de tri : la vue de toutes les machines).
-export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer, ancrable = false, outils = null }) {
+// « onTirer » : la page prend en main le glisser d'un groupe depuis sa pastille (vers l'atelier du Poste de tri).
+export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer, onTirer = null, ancrable = false, outils = null }) {
   const bloc = useRef(null)
   const [ancreChoisi, setAncre] = useState(() => ancrable && lireAncre())
   const ancre = ancrable && ancreChoisi
@@ -121,11 +114,12 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   }
   const [tri, setTri] = useState(TRI_INITIAL)
   // Glissement des lignes : positions relevées juste avant un changement d'ordre, puis chaque ligne
-  // part de son ancienne place avec un ressort (tri : celui de la pile ; épingle : celui de la Pin List).
+  // part de son ancienne place avec un ressort (tri : celui de la pile ; affiché/masqué : celui de la Pin List). En
+  // largeur aussi : en mode ancré, un groupe passe d'une case à l'autre, côte à côte.
   const avant = useRef(null)
   const relever = (courbe = S_PILE) => {
     const positions = new Map()
-    bloc.current?.querySelectorAll('[data-flip]').forEach(el => positions.set(el.dataset.flip, el.getBoundingClientRect().top))
+    bloc.current?.querySelectorAll('[data-flip]').forEach(el => { const r = el.getBoundingClientRect(); positions.set(el.dataset.flip, [r.left, r.top]) })
     avant.current = { positions, courbe }
   }
   function jouer() {
@@ -133,13 +127,13 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
     avant.current = null
     if (!releve) return
     bloc.current?.querySelectorAll('[data-flip]').forEach(el => {
-      const haut = releve.positions.get(el.dataset.flip)
-      if (haut == null) return
-      const ecart = haut - el.getBoundingClientRect().top
-      if (Math.abs(ecart) <= 0.5) return
+      const ancienne = releve.positions.get(el.dataset.flip)
+      if (!ancienne) return
+      const r = el.getBoundingClientRect(), dx = ancienne[0] - r.left, dy = ancienne[1] - r.top
+      if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) return
       el.style.position = 'relative'
-      el.style.zIndex = Math.abs(ecart) > 80 ? '3' : '1'
-      const vol = el.animate([{ transform: `translateY(${ecart}px)` }, { transform: 'none' }], { duration: releve.courbe.duree, easing: releve.courbe.courbe })
+      el.style.zIndex = Math.hypot(dx, dy) > 80 ? '3' : '1'
+      const vol = el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: releve.courbe.duree, easing: releve.courbe.courbe })
       vol.onfinish = vol.oncancel = () => { el.style.zIndex = '' }
     })
   }
@@ -148,7 +142,8 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   const groupes = useMemo(() => trierGroupes(entree, tri, masques), [entree, tri, masques])
   const etat = {
     relever,
-    props: num => ({ masque: masques.has(num), onMasquer: () => { if (tri.cle === 'vue') relever(); onMasquer?.(num) } }),
+    // Afficher ou masquer fait changer le groupe de liste : il y glisse.
+    props: num => ({ masque: masques.has(num), onMasquer: () => { relever(S_EPINGLE); onMasquer?.(num) } }),
   }
 
   const [position, setPosition] = useState(lirePosition)
@@ -170,7 +165,6 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
     }
     window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', fin)
   }
-  const [epingles, setEpingles] = useState(lireEpingles)
   const [niveau, setNiveau] = useState(lireNiveau)
   const [cachees, setCachees] = useState(lireCachees)
   const basculerCategorie = categorie => {
@@ -210,39 +204,28 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
     const fin = setTimeout(() => setDepuis(null), S_PILE.duree + 80)
     return () => clearTimeout(fin)
   }, [niveau]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [desepingles, setDesepingles] = useState(() => lireEnsemble(CLE_DESEPINGLES))
-  const estEpingle = x => (estTemporaire(x) ? !desepingles.has(cleEpingle(x)) : epingles.has(cleEpingle(x)))
-  const basculerEpingle = x => {
-    etat.relever?.(S_EPINGLE)
-    const [cleStock, changer] = estTemporaire(x) ? [CLE_DESEPINGLES, setDesepingles] : [CLE_EPINGLES, setEpingles]
-    changer(s => {
-      const n = new Set(s), cle = cleEpingle(x)
-      n.has(cle) ? n.delete(cle) : n.add(cle)
-      try { localStorage.setItem(cleStock, JSON.stringify([...n])) } catch { /* préférence facultative */ }
-      return n
-    })
-  }
 
   const colonnes = useMemo(() => RUBRIQUES.filter(r => r.niveau <= niveau), [niveau])
   const nouvelles = useMemo(() => (depuis != null && depuis < niveau ? new Set(RUBRIQUES.filter(r => r.niveau > depuis && r.niveau <= niveau).map(r => r.cle)) : null), [depuis, niveau])
   // Actions des pastilles : un objet stable (les pastilles mémorisées ne se redessinent pas pour lui),
   // qui appelle toujours la version à jour.
   const aJour = useRef(null)
-  aJour.current = { masquer: num => etat.props(num).onMasquer(), epingler: x => basculerEpingle(x) }
-  const actions = useMemo(() => ({ masquer: num => aJour.current.masquer(num), epingler: x => aJour.current.epingler(x) }), [])
+  aJour.current = { masquer: num => etat.props(num).onMasquer(), tirer: (e, num) => onTirer?.(e, num) }
+  const actions = useMemo(() => ({ masquer: num => aJour.current.masquer(num), tirer: (e, num) => aJour.current.tirer(e, num) }), [])
   const pastille = (x, i, rangPile = null, totalPile = 0) => (
     <Pastille key={x.g.num} x={x} i={i} rangPile={rangPile} totalPile={totalPile} niveau={niveau} colonnes={colonnes} nouvelles={nouvelles}
-      epingle={estEpingle(x)} masque={masques.has(x.g.num)} actions={actions} />
+      masque={masques.has(x.g.num)} actions={actions} />
   )
   // « Pèlerins sans groupe Nusuk » : le groupe le plus important, toujours en tête, à part — ni
-  // épinglé, ni dans la pile, ni déplacé par le tri.
+  // dans les affichés, ni dans les masqués, ni déplacé par le tri (un clic l'affiche ou le masque aussi).
   const nombreParCategorie = groupes.reduce((m, x) => m.set(x.categorie, (m.get(x.categorie) || 0) + 1), new Map())
   const visibles = groupes.filter(x => !cachees.has(x.categorie))
   const sansGroupe = visibles.filter(x => x.categorie === 'sans-groupe')
   const autres = visibles.filter(x => x.categorie !== 'sans-groupe')
-  // En haut : les temporaires d'abord, puis les groupes épinglés, chacun dans l'ordre du tri.
-  const enHaut = [...autres.filter(x => estTemporaire(x) && estEpingle(x)), ...autres.filter(x => !estTemporaire(x) && estEpingle(x))]
-  const dessous = autres.filter(x => !estEpingle(x))
+  // En haut les groupes affichés, en bas les masqués, chacun dans l'ordre du tri (par défaut, l'ordre des groupes).
+  // Un groupe de la lecture Nusuk sans groupe dans la page (« absent ») ne peut pas être affiché : il reste en bas.
+  const enHaut = autres.filter(x => !x.absent && !masques.has(x.g.num))
+  const dessous = autres.filter(x => x.absent || masques.has(x.g.num))
   const titre = r => r.titre && <TitreTri cle={r.cle} titre={r.titre} bulle={r.bulle} tri={tri} onTrier={onTrier} />
 
   const panneau = (
@@ -286,17 +269,16 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
 
       <div className="d5-titres">
         <Cellules rubriques={colonnes} rendu={titre} nouvelles={nouvelles} />
-        <span className="d5-place-epingle" aria-hidden="true" />
       </div>
 
       {sansGroupe.length > 0 && <ul className="d5-liste d5-liste-fixe" aria-label="Groupe par défaut">{sansGroupe.map((x, i) => pastille(x, i))}</ul>}
-      {enHaut.length > 0 && <ul className="d5-liste d5-liste-epinglee" aria-label="Groupes épinglés">{enHaut.map((x, i) => pastille(x, sansGroupe.length + i))}</ul>}
+      {enHaut.length > 0 && <ul className="d5-liste d5-liste-epinglee" aria-label="Groupes affichés">{enHaut.map((x, i) => pastille(x, sansGroupe.length + i))}</ul>}
       {/* Tableau du bas : tous les autres groupes, en pile repliée façon « Notification List » ; elle
           s'étale au survol (ou au clavier). Seules les 3 premières pastilles dépassent au repos. */}
       {dessous.length > 0 && (
         <div className="d5-pile" tabIndex={-1} data-depliee={depliee}>
           <div className="d5-libelle">
-            <p>كل المجموعات <span>{dessous.length}</span></p>
+            <p>المخفية <span>{dessous.length}</span></p>
             <button type="button" className="d5-deplier" onClick={e => { if (depliee) e.currentTarget.blur(); basculerDepliee() }} aria-pressed={depliee}
               title={depliee ? 'Replier les groupes en pile (elle s’étale au survol)' : 'Déplier tous les groupes'}>
               {depliee ? <ChevronsUp size={14} /> : <ChevronsDown size={14} />}
@@ -314,8 +296,8 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   // trois cases indépendantes, chacune avec sa propre barre de défilement et son format, toujours le même (le
   // niveau 1/2/3 ne sert qu'à la fenêtre), et des largeurs fixes : la bande ne change pas d'une résolution à l'autre.
   //  - « sans groupe » : la moins visible, format minimal ;
-  //  - au centre, les épinglés, ceux sur lesquels on travaille : tout le détail, toujours entier ;
-  //  - tous les autres, nombreux : format minimal (icône, nom, nombre, épingle).
+  //  - au centre, les groupes affichés, ceux sur lesquels on travaille : tout le détail, toujours entier ;
+  //  - les groupes masqués, nombreux : format minimal (icône, nom, nombre).
   // Les réglages (filtres, vue, fenêtre) sont à part, sur leur propre ligne au-dessus.
   const caseGroupes = (cle, nom, liste, vide, depart, n, colonnesCase, reduite) => (
     <section className={`d5-case d5-case-${cle}${reduite ? ' d5-case-reduite' : ''}`} aria-label={nom} data-niveau={n}>
@@ -323,7 +305,7 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
       {liste.length
         ? <ul className="d5-case-liste">{liste.map((x, i) => (
           <Pastille key={x.g.num} x={x} i={depart + i} niveau={n} colonnes={colonnesCase} nouvelles={null}
-            epingle={estEpingle(x)} masque={masques.has(x.g.num)} actions={actions} />
+            masque={masques.has(x.g.num)} actions={actions} />
         ))}</ul>
         : <p className="d5-case-vide">{vide}</p>}
     </section>
@@ -352,8 +334,8 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
       </div>
       <div className="d5-compact-cases">
         {caseGroupes('sans-groupe', 'بدون مجموعة', sansGroupe, '—', 0, 1, RUBRIQUES_MINIMAL, true)}
-        {caseGroupes('epingles', 'المثبتة', enHaut, 'لا توجد مجموعة مثبتة', sansGroupe.length, 3, RUBRIQUES_DETAIL, true)}
-        {caseGroupes('tous', 'كل المجموعات', dessous, '—', sansGroupe.length + enHaut.length, 1, RUBRIQUES_MINIMAL, true)}
+        {caseGroupes('epingles', 'المعروضة', enHaut, 'لا توجد مجموعة معروضة', sansGroupe.length, 3, RUBRIQUES_DETAIL, true)}
+        {caseGroupes('tous', 'المخفية', dessous, 'لا توجد مجموعة مخفية', sansGroupe.length + enHaut.length, 1, RUBRIQUES_MINIMAL, true)}
       </div>
     </div>
   )
@@ -370,14 +352,13 @@ function memePastille(a, b) {
   return memeGroupe && a.x.categorie === b.x.categorie && a.x.rang === b.x.rang
     && a.x.nusuk?.etat === b.x.nusuk?.etat && a.x.nusuk?.effectif === b.x.nusuk?.effectif
     && a.i === b.i && a.rangPile === b.rangPile && a.totalPile === b.totalPile && a.niveau === b.niveau
-    && a.colonnes === b.colonnes && a.nouvelles === b.nouvelles && a.epingle === b.epingle && a.masque === b.masque && a.actions === b.actions
+    && a.colonnes === b.colonnes && a.nouvelles === b.nouvelles && a.masque === b.masque && a.actions === b.actions
 }
 
 // Une pastille. Mémorisée : redessinée seulement si son groupe ou son affichage change (voir memePastille).
 // « rangPile » : place dans la pile du bas (null ailleurs). « actions » est stable d'un rendu à l'autre.
-const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, niveau, colonnes, nouvelles, epingle, masque, actions }) {
+const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, niveau, colonnes, nouvelles, masque, actions }) {
     const r = resumeGroupe(x), p = { masque, onMasquer: () => actions.masquer(x.g.num) }
-    const fixe = x.categorie === 'sans-groupe'
     const contenu = {
       rang: () => <RangNusuk rang={r.rang} />,
       vue: () => <Oeil masque={p.masque} onMasquer={p.onMasquer} />,
@@ -400,17 +381,10 @@ const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, 
       ),
     }
     return (
-      <li key={x.g.num} data-flip={x.g.num} className="d5-pastille" data-masque={p.masque} data-rang-pile={rangPile ?? undefined} style={{ '--teinte': r.couleur, '--i': i, ...(rangPile == null ? {} : { '--rang': Math.min(rangPile, 3), '--z': totalPile - rangPile }) }}>
+      // Un clic n'importe où sur le groupe l'affiche ou le masque (les boutons gardent leur propre action).
+      <li key={x.g.num} data-flip={x.g.num} className="d5-pastille" data-masque={p.masque} data-rang-pile={rangPile ?? undefined} style={{ '--teinte': r.couleur, '--i': i, ...(rangPile == null ? {} : { '--rang': Math.min(rangPile, 3), '--z': totalPile - rangPile }) }}
+        onClick={e => { if (!e.target.closest('button, a, input')) p.onMasquer() }} onPointerDown={e => actions.tirer(e, x.g.num)} title={`${r.nom} — ${p.masque ? 'masqué : cliquer pour l’afficher' : 'affiché : cliquer pour le masquer'}`}>
         <Cellules rubriques={colonnes} rendu={c => contenu[c.cle]()} nouvelles={nouvelles} />
-        {/* La place de l'épingle existe toujours (même vide pour « sans groupe ») : toutes les
-            pastilles gardent la même taille. */}
-        {fixe
-          ? <span className="d5-place-epingle" aria-hidden="true" />
-          : (
-            <button type="button" className="d5-epingle" data-epingle={epingle} onClick={() => actions.epingler(x)} aria-pressed={epingle} title={epingle ? 'Désépingler' : 'Épingler en haut'}>
-              <Pin size={15} />
-            </button>
-          )}
       </li>
     )
 }, memePastille)

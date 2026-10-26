@@ -21,7 +21,7 @@ Registre lu par GET ; tout le reste vit en mémoire. Aucune sauvegarde, aucun en
 - `rubrique-visa.jsx` : fiche de réglages du Visa (chargement, 5 catégories, verrous, colonnes du tableau). Les autres rubriques (Aérien, Hôtels, Famille) auront chacune la leur ; le moteur `poste-de-tri.jsx` et `Tableau.jsx` restent communs.
 - Données : registre (`/api/client/passeports`) + dernière lecture Nusuk (`/api/client/nusuk/imports`), avec les fonctions du fichier client utilisées telles quelles, sans les modifier. Rien n'est écrit : ni dans Nusuk, ni dans la base.
 - Les lectures Nusuk sont rangées par adresse d'origine : les groupes réels n'apparaissent que si la page est ouverte sur `http://127.0.0.1:3001`.
-- Groupes à gauche, tableau AG Grid à droite (poignée ⠿ pour glisser une ligne, ou les lignes cochées), séparateur déplaçable.
+- Groupes à gauche, tableau AG Grid à droite, séparateur déplaçable. Tableau disposé et sélectionné comme celui du fichier clients (2026-10-25) : de droite à gauche, case à cocher à droite, balayage des cases (appuyer puis descendre ou monter), Maj+clic pour une plage ; on glisse une ligne (ou les lignes cochées si elle l'est) en la prenant par sa photo, son numéro ou son nom.
 - Verrous : rien ne sort d'un groupe « visa en traitement » ou « visa délivré », rien n'y entre. Seuls les groupes temporaires se démontent ; le nom ne se modifie ni sur les groupes verrouillés ni sur « sans groupe ».
 
 ## Panneau des groupes (`panneau-groupes/`)
@@ -30,3 +30,21 @@ Fenêtre fixe et déplaçable (par son titre), toujours visible quand la page d�
 - **Fond** (règles des groupes) : `rubrique-visa.jsx` — `listeGroupesVisa` (tous les groupes de la lecture Nusuk, y compris sans pèlerin reconnu ; groupes obsolètes écartés ; 6e catégorie « Refusé — Nusuk »), `infoGroupe` (effectif et état Nusuk, 4 familles de couleurs des 14 états), `trierGroupes`.
 - **Affichage** : `panneau-groupes/panneau.jsx` (pastilles, 3 niveaux d'information, « sans groupe » en tête, épingles en haut, pile repliée dessous, tri par titres, animations), `affichage.jsx`, `panneau.css`. Le panneau reçoit les groupes de la page et renvoie seulement « afficher / masquer » ; dans le Poste de tri, un groupe masqué disparaît de l'atelier.
 - **Atelier** `barre/` : affichage seulement ; groupes du fichier clients (temporaires compris, lus sans réécriture) + dernière lecture Nusuk toutes adresses (`lectures-nusuk/`, développement seulement) ; bouton « Actualiser depuis Nusuk (Excel) » (commande « refresh » du fichier clients).
+
+## Écran « Groupes » de l'espace client (`/client/groupes`, `ecran-groupes.jsx`)
+
+Le même Poste de tri, branché sur le registre de l'espace client au lieu de ses propres données (2026-10-25) : deux environnements de travail, une seule source.
+- Le registre (`/client`) reste chargé, caché, pendant l'écran Groupes : passer de l'un à l'autre (bouton « ⇄ Poste de tri » du registre, « ← Registre » ici) ne relit rien.
+- Pont : `modules/client-react/pont-groupes.js` — le registre publie son contrôleur et signale ses changements ; l'écran Groupes lit ses pèlerins, sa lecture Nusuk et ses groupes Visa.
+- Chaque changement de groupe est écrit dans le registre, avec ses règles Visa (refus = groupes remis et motif affiché ; pèlerin déjà enregistré dans Nusuk retiré d'un groupe = placé dans « Pèlerins sans groupe Nusuk »), et enregistré comme les siens.
+- Sélection partagée : les lignes cochées passent d'un tableau à l'autre en changeant d'écran.
+- Communs aux deux écrans : l'ordre des groupes et leur visibilité (affiché ici = ouvert dans la partie Visa du registre). « ← Registre » allume la partie Visa du registre.
+- Propre à chaque écran : vues Liste/Photos/Détails, mise en page.
+- Cette page-ci (`/test-groupes-broyeur`) reste le banc d'essai à part, sur ses propres données en mémoire.
+
+## Ordre et visibilité des groupes (2026-10-25)
+
+- Panneau des groupes : en haut (« المعروضة »), les groupes affichés dans l'atelier ; en bas (« المخفية »), les masqués. Un clic sur un groupe le fait passer de l'un à l'autre. Plus d'épingles. Le panneau suit l'ordre des groupes ; un titre de colonne trie pour consulter (croissant, décroissant, puis retour à l'ordre des groupes).
+- Atelier : un groupe se déplace en le tirant par son en-tête. Pendant le geste, une silhouette légère (en-tête et contour, sans les fiches) suit la souris ; la place visée est en pointillé et les autres groupes glissent (translations seulement). « Hors groupe Visa » et « sans groupe Nusuk » restent en tête.
+- Afficher ou masquer est animé : le groupe s'efface puis les suivants reprennent sa place ; il apparaît en fondu, les suivants s'écartent, son contour s'allume et l'atelier défile jusqu'à lui.
+- Un groupe se tire aussi depuis sa pastille du panneau (étiquette qui suit la souris) : lâché dans l'atelier, il y prend la place visée et s'affiche s'il était masqué ; lâché sur « المخفية », il est masqué (vaut aussi pour un groupe tiré de l'atelier) ; Échap ou lâché ailleurs : rien ne change.

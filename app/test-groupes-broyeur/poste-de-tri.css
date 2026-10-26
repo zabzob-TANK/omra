@@ -32,6 +32,8 @@
 .pdt-haut-gauche { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .pdt-haut-gauche .pdt-outils { order: -1; flex-wrap: nowrap; }
 .pdt-haut-gauche .pdt-lecture { margin: 0; }
+/* Écran Groupes de l'espace client : retour au registre (mêmes données). */
+.pdt-retour { order: -2; align-self: flex-start; min-height: 30px; font-weight: 600; }
 
 
 .pdt-attente { padding: 40px 0; color: var(--doux); }
@@ -274,9 +276,13 @@
 .pdt-separateur { position: relative; cursor: col-resize; touch-action: none; }
 .pdt-separateur::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; border-radius: 2px; background: var(--bord); transition: background-color .15s; }
 .pdt-separateur:hover::after { background: #4ea5f0; }
-.pdt-espace .pdt-atelier { position: relative; min-width: 0; height: 100%; overflow: auto; padding: 0 10px 30px 4px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-.pdt-poignee { display: inline-grid; place-items: center; width: 22px; height: 28px; border-radius: 5px; color: var(--doux); cursor: grab; user-select: none; touch-action: none; }
-.pdt-poignee:hover { background: #2a3039; color: var(--texte); }
+/* La zone qui défile porte la barre à gauche (sens droite-gauche). Les groupes se rangent eux aussi de droite à
+   gauche (demande du 2026-10-26) : le premier en haut à droite ; l'intérieur de chaque groupe garde le sens de la page. */
+.pdt-espace .pdt-atelier-defile { min-width: 0; height: 100%; overflow: auto; direction: rtl; }
+.pdt-espace .pdt-atelier { direction: rtl; position: relative; min-width: 0; min-height: 100%; padding: 0 4px 30px 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.pdt-espace .pdt-atelier > * { direction: ltr; }
+/* On prend un pèlerin par sa photo, son numéro ou son nom (toute la cellule). */
+.pdt-tableau .pdt-cellule-prise { cursor: grab; user-select: none; touch-action: none; }
 .pdt-tableau-photo { display: inline-grid; place-items: center; width: 26px; height: 32px; margin-top: 3px; border-radius: 3px; object-fit: cover; background: #333943; font-weight: 700; color: var(--doux); }
 .pdt-tableau-etat { display: inline-flex; align-items: center; gap: 6px; }
 .pdt-tableau-etat img { width: 18px; height: 18px; object-fit: contain; }
@@ -356,11 +362,11 @@
 .pdt-libre .pdt-haut, .pdt-libre .pdt-espace { display: contents; }
 /* Le séparateur ne sert qu'à la page normale ; le journal des passages (bas de page) n'a pas de place ici. */
 .pdt-libre .pdt-separateur, .pdt-libre .pdt-journal { display: none; }
-.pdt-libre .pdt-haut-gauche, .pdt-libre .d5-compact, .pdt-libre .pdt-espace .pdt-atelier, .pdt-libre .pdt-tableau { position: absolute; margin: 0; }
+.pdt-libre .pdt-haut-gauche, .pdt-libre .d5-compact, .pdt-libre .pdt-espace .pdt-atelier-defile, .pdt-libre .pdt-tableau { position: absolute; margin: 0; }
 .pdt-libre .pdt-haut-gauche { left: var(--options-x); top: var(--options-y); width: var(--options-l); height: var(--options-h); overflow: auto; }
 .pdt-libre .d5-compact { left: var(--groupes-x); top: var(--groupes-y); width: var(--groupes-l); height: var(--groupes-h); overflow: auto; }
 .pdt-libre .d5-compact .d5-compact-cases { height: auto; flex: 1; min-height: 0; }
-.pdt-libre .pdt-espace .pdt-atelier { left: var(--atelier-x); top: var(--atelier-y); width: var(--atelier-l); height: var(--atelier-h); }
+.pdt-libre .pdt-espace .pdt-atelier-defile { left: var(--atelier-x); top: var(--atelier-y); width: var(--atelier-l); height: var(--atelier-h); }
 .pdt-libre .pdt-tableau { left: var(--liste-x); top: var(--liste-y); width: var(--liste-l); height: var(--liste-h); }
 
 /* Calque d'édition : un rectangle de couleur par zone, des poignées aux coins et sur les côtés. */
@@ -383,3 +389,40 @@
 .pdt-mep-barre b { color: var(--texte); }
 .pdt-mep-barre button { height: 30px; padding: 0 12px; border: 1px solid var(--bord); border-radius: 8px; background: var(--panneau); color: var(--texte); }
 .pdt-mep-barre .pdt-mep-terminer { border-color: #4ea5f0; background: color-mix(in srgb, #4ea5f0 25%, var(--panneau)); }
+
+/* Déplacer un groupe (2026-10-25) : en-tête qu'on tire, silhouette légère qui suit la souris (en-tête et contour,
+   sans les fiches), place visée en pointillé à l'endroit où le groupe se posera. */
+.pdt-machine[data-mobile] > .pdt-plaque { cursor: grab; }
+.pdt-machine[data-mobile] > .pdt-plaque input { cursor: text; }
+.pdt-silhouette { position: fixed; left: 0; top: 0; z-index: 60; overflow: hidden; border: 1px solid var(--t); border-radius: 14px; background: var(--panneau); box-shadow: 0 24px 50px -16px rgba(0, 0, 0, .7); pointer-events: none; cursor: grabbing; will-change: transform; }
+.pdt-silhouette .pdt-plaque { border-bottom-color: color-mix(in srgb, var(--t) 45%, var(--bord)); }
+.pdt-groupe-place { outline: 2px dashed var(--t); outline-offset: -2px; background: transparent; box-shadow: none; }
+.pdt-groupe-place > * { visibility: hidden; }
+/* Groupe tiré depuis le panneau : son étiquette suit la souris ; la case du panneau survolée s'éclaire. */
+.pdt-etiquette-groupe { position: fixed; left: 0; top: 0; z-index: 60; display: flex; align-items: center; gap: 8px; max-width: 280px; height: 34px; padding: 0 12px; border: 1px solid var(--t); border-radius: 17px; background: #1f2228; color: #f2f2f2; font: 600 13px 'Segoe UI', system-ui, sans-serif; box-shadow: 0 16px 34px -12px rgba(0, 0, 0, .75); pointer-events: none; will-change: transform; }
+.pdt-etiquette-groupe img { width: 18px; height: 18px; object-fit: contain; }
+.pdt-etiquette-groupe span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pdt-etiquette-groupe b { min-width: 22px; padding: 0 6px; border-radius: 10px; background: color-mix(in srgb, var(--t) 30%, #2a2a2a); text-align: center; font-size: 11.5px; }
+.d5 [data-cible-groupe] { outline: 2px dashed #f2a541; outline-offset: -2px; border-radius: 14px; }
+
+/* Barres de défilement discrètes, façon « Scroll Area » (demande du 2026-10-25), pour toutes les zones qui défilent du
+   Poste de tri (atelier, groupes, tableau, panneau) : pas de rail, une fine poignée arrondie presque fondue dans le
+   fond sombre, un peu plus visible au survol. Les réglages standard (scrollbar-width / scrollbar-color) sont remis à
+   « auto » : quand ils sont posés, Chrome ignore ces styles. */
+html .pdt, html .pdt * { scrollbar-width: auto; scrollbar-color: auto; }
+html.pdt-page { scrollbar-width: auto; scrollbar-color: auto; }
+.pdt ::-webkit-scrollbar, html.pdt-page::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+.pdt ::-webkit-scrollbar-track, .pdt ::-webkit-scrollbar-corner, html.pdt-page::-webkit-scrollbar-track, html.pdt-page::-webkit-scrollbar-corner { background: transparent; }
+.pdt ::-webkit-scrollbar-thumb, html.pdt-page::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: rgba(255, 255, 255, .11) padding-box; }
+.pdt ::-webkit-scrollbar-thumb:hover, html.pdt-page::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, .22); }
+.pdt ::-webkit-scrollbar-button, html.pdt-page::-webkit-scrollbar-button { display: none; }
+/* Tableau de droite à gauche : sa barre de défilement verticale reste à droite (demande du 2026-10-25). */
+.pdt-tableau .ag-body-vertical-scroll { left: auto !important; right: 0 !important; inset-inline-start: auto !important; inset-inline-end: auto !important; }
+
+/* Barre du haut (CardNav, 2026-10-26) : recherche et sélection au centre, actions à droite, à la hauteur de la barre. */
+.pdt-haut-gauche > .card-nav { flex: none; }
+.card-nav__centre .pdt-recherche { flex: 0 1 340px; height: 40px; min-width: 200px; }
+.card-nav__centre .pdt-barre-selection { flex: 0 1 640px; height: 40px; min-width: 0; }
+.card-nav__centre .pdt-barre-selection > span:not(.pdt-barre-pastille) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.card-nav__droite .pdt-bouton-animations { height: 40px; min-height: 0; align-self: center; }
+.card-nav__droite .pdt-bouton-nouveau { color: var(--texte); }

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 export const ZONES = [
   { cle: 'options', nom: 'Options', selecteur: '.pdt-haut-gauche', couleur: '#f2a541' },
   { cle: 'groupes', nom: 'Groupes', selecteur: '.d5-compact', couleur: '#4ea5f0' },
-  { cle: 'atelier', nom: 'Groupes et pèlerins', selecteur: '.pdt-atelier', couleur: '#4ade80' },
+  { cle: 'atelier', nom: 'Groupes et pèlerins', selecteur: '.pdt-atelier-defile', couleur: '#4ade80' },
   { cle: 'liste', nom: 'Liste', selecteur: '.pdt-tableau', couleur: '#c084fc' },
 ]
 const CLE = 'pdt-disposition'
