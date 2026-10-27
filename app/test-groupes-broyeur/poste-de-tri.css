@@ -76,6 +76,9 @@
 .pdt-atelier input, .pdt-atelier textarea { user-select: text; -webkit-user-select: text; }
 
 .pdt-machine { position: relative; display: flex; flex-direction: column; background: linear-gradient(180deg, #20242b, var(--panneau)); border: 1px solid var(--bord); border-radius: 14px; box-shadow: 0 18px 40px -24px #000; transition: transform .38s cubic-bezier(.5, 0, .75, 0), opacity .38s, border-color .2s, box-shadow .2s; }
+/* Contour permanent (2026-10-27) : chaque groupe a un contour fin, à peine teinté de sa couleur, pour le reconnaître
+   d'un coup d'œil, lui et sa catégorie ; le groupe en cours l'a plein, avec un halo (plus bas). */
+.pdt-machine { border-color: color-mix(in srgb, var(--t) 32%, var(--bord)); }
 .pdt-visee { border-color: color-mix(in srgb, var(--t) 45%, var(--bord)); box-shadow: 0 0 28px -10px var(--t), 0 18px 40px -24px #000; }
 /* Trait de lumière qui fait le tour de la machine visée. Le dégradé conique est un calque carré qui pivote
    (transform) sous un liseré fixe (masque) : la carte graphique le fait tourner seule. Jusqu'au 2026-10-15,
@@ -164,6 +167,12 @@
 .pdt-eclat rect { width: calc(100% - 2px); height: calc(100% - 2px); fill: none; stroke: var(--t); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 14 86; filter: drop-shadow(0 0 3px var(--t)); animation: pdt-eclat-tour 1s ease-out both; }
 @keyframes pdt-eclat-tour { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
 @keyframes pdt-eclat-fondu { 0% { opacity: 0; } 12%, 70% { opacity: 1; } 100% { opacity: 0; } }
+/* Groupe en cours (2026-10-26) : contour à la couleur du groupe et léger halo, tant qu'il est choisi ; le trait de lumière
+   du clic fait le tour du groupe entier. Une règle de style sur ce seul groupe, sans animation continue. */
+/* Intensité adoucie le 2026-10-27 (« un peu moins ») : contour un peu atténué, halo plus discret. */
+.pdt-machine.pdt-en-cours { border-color: color-mix(in srgb, var(--t) 72%, var(--bord)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--t) 40%, transparent), 0 0 16px -7px color-mix(in srgb, var(--t) 45%, transparent), 0 18px 40px -24px #000; }
+.pdt-eclat-groupe { z-index: 3; }
+.pdt-eclat-groupe rect { stroke-width: 2; stroke-dasharray: 10 90; animation-duration: 1.2s; }
 
 /* Nom arabe en premier, à droite ; nom latin dessous, à gauche. */
 .pdt-fiche .pdt-nom-ar { font-size: 14px; text-align: right; }
@@ -187,9 +196,6 @@
 .pdt-couche { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
 .pdt-bande { position: fixed; margin: 0; will-change: transform; }
 
-.pdt-ajout { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 160px; border: 2px dashed var(--bord); border-radius: 14px; background: transparent; color: var(--doux); font-size: 14px; }
-.pdt-ajout span { font-size: 30px; }
-.pdt-ajout:hover { border-color: var(--doux); color: var(--texte); }
 
 .pdt-journal { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--bord); font-size: 12.5px; color: var(--doux); }
 .pdt-journal h3 { margin: 0 0 8px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
@@ -207,6 +213,15 @@
 /* Barre au-dessus de la liste : catégorie et numéro Nusuk sur leur propre ligne, boutons de vue dessous. */
 .pdt-barre-vue { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; padding: 8px 14px 0; }
 .pdt-barre-vue .pdt-categorie { flex: 1 1 100%; }
+/* Agrandir un groupe sur deux places (2026-10-27). */
+.pdt-agrandir { display: inline-grid; flex: none; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--bord); border-radius: 6px; background: transparent; color: var(--doux); }
+.pdt-agrandir:hover { color: var(--texte); border-color: #49505c; }
+.pdt-agrandir[aria-pressed="true"] { background: color-mix(in srgb, var(--t, #4ea5f0) 24%, #272c34); color: var(--texte); }
+.pdt-agrandir svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.pdt-espace .pdt-atelier > .pdt-machine.pdt-large { grid-column: span 2; }
+.pdt-liste.pdt-liste-double { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+.pdt-liste-double .pdt-vide { grid-column: 1 / -1; }
+.pdt-liste-double .pdt-trou[data-nb]::after { content: '+' attr(data-nb); position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; color: var(--t); }
 
 /* Numéro de la fiche dans son groupe. */
 .pdt-rang { flex: none; min-width: 18px; font: 600 11px Consolas, monospace; color: var(--encre-douce); text-align: center; }
@@ -283,7 +298,9 @@
 .pdt-espace .pdt-atelier > * { direction: ltr; }
 /* On prend un pèlerin par sa photo, son numéro ou son nom (toute la cellule). */
 .pdt-tableau .pdt-cellule-prise { cursor: grab; user-select: none; touch-action: none; }
-.pdt-tableau-photo { display: inline-grid; place-items: center; width: 26px; height: 32px; margin-top: 3px; border-radius: 3px; object-fit: cover; background: #333943; font-weight: 700; color: var(--doux); }
+/* Photo du tableau à la taille de celle du registre (27 × 36 px), cadre de 1,7 px aux couleurs du groupe Visa du
+   pèlerin, sinon neutre : pas de bleu ni de rose selon le sexe (2026-10-26). */
+.pdt-tableau-photo { box-sizing: border-box; display: inline-grid; place-items: center; width: 27px; height: 36px; margin-top: 3px; border: 1.7px solid var(--teinte-groupe, var(--bord)); border-radius: 6px; object-fit: cover; object-position: 50% 20%; background: #333943; font-weight: 700; color: var(--doux); vertical-align: middle; }
 .pdt-tableau-etat { display: inline-flex; align-items: center; gap: 6px; }
 .pdt-tableau-etat img { width: 18px; height: 18px; object-fit: contain; }
 .pdt-cellule-ar { direction: rtl; text-align: right; }
@@ -349,47 +366,57 @@
 .pdt-liste { padding-inline: 8px; }
 .pdt-vue-liste .pdt-nom-lat, .pdt-vue-photos .pdt-nom-lat { display: none; }
 .pdt-vue-photos { grid-template-columns: repeat(3, calc(64px + 8px)); }
+/* Par six, les colonnes se partagent toute la largeur : mêmes marges à droite et à gauche, mêmes écarts (2026-10-27). */
+.pdt-large .pdt-vue-photos { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .pdt-vue-photos .pdt-fiche, .pdt-fantome.pdt-vue-photos .pdt-fiche, .pdt-couche.pdt-vue-photos .pdt-fiche { padding-inline: 3px; }
 /* Le numéro passe sur le coin de la photo, sur une petite pastille pour rester lisible. */
 .pdt-vue-photos .pdt-rang { top: 3px; right: 3px; z-index: 1; min-width: 16px; padding: 0 3px; border-radius: 4px; background: var(--papier); line-height: 15px; }
 /* Seul, le nom arabe prend toute la ligne pour rester aligné à droite. */
 .pdt-vue-liste .pdt-fiche-noms .pdt-nom-ar { flex: 1 1 auto; }
 
-/* Mise en page libre (version test, voir mise-en-page.jsx) : la page fait la hauteur de l'écran et chaque grande zone
-   est posée à la place de son rectangle, en pourcentage de l'écran. Les conteneurs intermédiaires s'effacent
-   (display: contents) pour que les quatre zones soient placées directement dans la page. */
-.pdt-libre { height: 100vh; min-height: 0; padding: 0; overflow: hidden; }
-.pdt-libre .pdt-haut, .pdt-libre .pdt-espace { display: contents; }
-/* Le séparateur ne sert qu'à la page normale ; le journal des passages (bas de page) n'a pas de place ici. */
-.pdt-libre .pdt-separateur, .pdt-libre .pdt-journal { display: none; }
-.pdt-libre .pdt-haut-gauche, .pdt-libre .d5-compact, .pdt-libre .pdt-espace .pdt-atelier-defile, .pdt-libre .pdt-tableau { position: absolute; margin: 0; }
-/* La zone Options ne coupe pas ce qui dépasse : le menu de la barre du haut se déroule par-dessus les autres zones. */
-.pdt-libre .pdt-haut-gauche { left: var(--options-x); top: var(--options-y); width: var(--options-l); height: var(--options-h); overflow: visible; }
-.pdt-libre .d5-compact { left: var(--groupes-x); top: var(--groupes-y); width: var(--groupes-l); height: var(--groupes-h); overflow: auto; }
-.pdt-libre .d5-compact .d5-compact-cases { height: auto; flex: 1; min-height: 0; }
-.pdt-libre .pdt-espace .pdt-atelier-defile { left: var(--atelier-x); top: var(--atelier-y); width: var(--atelier-l); height: var(--atelier-h); }
-.pdt-libre .pdt-tableau { left: var(--liste-x); top: var(--liste-y); width: var(--liste-l); height: var(--liste-h); }
+/* Disposition ancrée (2026-10-26, voir PLACES_PANNEAU dans poste-de-tri.jsx) : la page fait la hauteur de l'écran ;
+   barre en haut, panneau des groupes à gauche (par défaut) ou en haut, liste à droite, à des tailles en pixels ;
+   l'atelier prend le reste. Les conteneurs intermédiaires s'effacent (display: contents) : les zones sont placées
+   directement dans la grille de la page. Sens gauche-droite pour la grille, pareil dans l'espace client (de droite à
+   gauche) : le panneau reste à gauche et la liste à droite. Les bords entre les zones se tirent (pistes de 12 px). */
+.pdt-docke {
+  display: grid; height: 100vh; min-height: 0; padding: 24px 28px 14px; overflow: hidden; direction: ltr;
+  grid-template-columns: var(--l-groupes) 12px minmax(0, 1fr) 12px var(--l-liste);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: 'options options options options options' 'groupes poignee-g atelier poignee-l liste';
+}
+.pdt-docke.pdt-groupes-haut {
+  grid-template-columns: minmax(0, 1fr) 12px var(--l-liste);
+  grid-template-rows: auto var(--h-groupes) 12px minmax(0, 1fr);
+  grid-template-areas: 'options options options' 'groupes groupes groupes' 'poignee-g poignee-g poignee-g' 'atelier poignee-l liste';
+}
+.pdt-docke.pdt-groupes-fenetre {
+  grid-template-columns: minmax(0, 1fr) 12px var(--l-liste);
+  grid-template-areas: 'options options options' 'atelier poignee-l liste';
+}
+.pdt-docke .pdt-haut, .pdt-docke .pdt-espace { display: contents; }
+/* Le journal des passages (bas de page) n'a pas de place ici. */
+.pdt-docke .pdt-journal { display: none; }
+/* La barre ne coupe pas ce qui dépasse : le menu se déroule par-dessus les autres zones. */
+.pdt-docke .pdt-haut-gauche { grid-area: options; position: relative; z-index: 5; margin-bottom: 12px; overflow: visible; }
+.pdt-docke .d5-compact { grid-area: groupes; min-width: 0; min-height: 0; height: 100%; }
+.pdt-docke .d5-place-haut { overflow: auto hidden; }
+.pdt-docke .d5-place-haut .d5-compact-cases { flex: 1; height: auto; min-height: 0; }
+.pdt-docke .pdt-espace .pdt-atelier-defile { grid-area: atelier; height: auto; min-height: 0; }
+.pdt-docke .pdt-tableau { grid-area: liste; height: auto; min-height: 0; }
+.pdt-docke .pdt-separateur-liste { grid-area: poignee-l; }
+.pdt-docke .pdt-separateur-groupes { grid-area: poignee-g; }
+.pdt-docke .pdt-separateur::after { left: 5px; }
+.pdt-groupes-haut .pdt-separateur-groupes { cursor: row-resize; }
+.pdt-groupes-haut .pdt-separateur-groupes::after { top: 5px; bottom: auto; left: 0; right: 0; width: auto; height: 2px; }
 
-/* Calque d'édition : un rectangle de couleur par zone, des poignées aux coins et sur les côtés. */
-.pdt-mep { position: absolute; inset: 0; z-index: 200; background: rgba(0, 0, 0, .18); }
-.pdt-mep-zone { position: absolute; border: 2px solid var(--c); border-radius: 6px; background: color-mix(in srgb, var(--c) 16%, transparent); cursor: move; touch-action: none; user-select: none; }
-.pdt-mep-zone:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
-.pdt-mep-nom { position: absolute; top: 6px; left: 8px; padding: 2px 8px; border-radius: 5px; background: var(--c); color: #111317; font-size: 12px; font-weight: 700; pointer-events: none; }
-.pdt-mep-nom small { margin-left: 6px; font-weight: 500; opacity: .8; }
-/* Les poignées passent au-dessus des autres rectangles : on peut toujours tirer un bord, même sous une zone voisine. */
-.pdt-mep-poignee { position: absolute; z-index: 2; width: 12px; height: 12px; border: 2px solid var(--c); border-radius: 3px; background: #111317; }
-.pdt-mep-n, .pdt-mep-s { left: calc(50% - 6px); cursor: ns-resize; }
-.pdt-mep-e, .pdt-mep-o { top: calc(50% - 6px); cursor: ew-resize; }
-.pdt-mep-n, .pdt-mep-ne, .pdt-mep-no { top: -7px; }
-.pdt-mep-s, .pdt-mep-se, .pdt-mep-so { bottom: -7px; }
-.pdt-mep-e, .pdt-mep-ne, .pdt-mep-se { right: -7px; }
-.pdt-mep-o, .pdt-mep-no, .pdt-mep-so { left: -7px; }
-.pdt-mep-ne, .pdt-mep-so { cursor: nesw-resize; }
-.pdt-mep-no, .pdt-mep-se { cursor: nwse-resize; }
-.pdt-mep-barre { position: fixed; left: 50%; bottom: 18px; z-index: 210; display: flex; align-items: center; gap: 12px; padding: 8px 12px; transform: translateX(-50%); border: 1px solid var(--bord); border-radius: 12px; background: #171a20; box-shadow: 0 16px 40px rgba(0, 0, 0, .6); font-size: 12.5px; color: var(--doux); white-space: nowrap; }
-.pdt-mep-barre b { color: var(--texte); }
-.pdt-mep-barre button { height: 30px; padding: 0 12px; border: 1px solid var(--bord); border-radius: 8px; background: var(--panneau); color: var(--texte); }
-.pdt-mep-barre .pdt-mep-terminer { border-color: #4ea5f0; background: color-mix(in srgb, #4ea5f0 25%, var(--panneau)); }
+/* Panneau tiré vers l'autre bord : les deux places s'allument, la visée plus fort ; une étiquette suit la souris. */
+.pdt-ancrage { position: fixed; inset: 0; z-index: 90; cursor: grabbing; }
+.pdt-ancrage-place { position: fixed; display: grid; place-items: center; border: 2px dashed color-mix(in srgb, #4ea5f0 45%, transparent); border-radius: 12px; background: color-mix(in srgb, #4ea5f0 6%, transparent); transition: background-color .15s, border-color .15s; }
+.pdt-ancrage-place span { padding: 4px 10px; border-radius: 8px; background: #15181d; color: var(--doux); font-size: 12.5px; font-weight: 600; }
+.pdt-ancrage-place.pdt-visee { z-index: 1; border-style: solid; border-color: #4ea5f0; background: color-mix(in srgb, #4ea5f0 16%, transparent); }
+.pdt-ancrage-place.pdt-visee span { color: var(--texte); }
+.pdt-ancrage-etiquette { position: fixed; left: 0; top: 0; z-index: 2; padding: 6px 12px; border: 1px solid #4ea5f0; border-radius: 9px; background: var(--panneau); color: var(--texte); font-size: 12.5px; font-weight: 600; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, .8); pointer-events: none; }
 
 /* Déplacer un groupe (2026-10-25) : en-tête qu'on tire, silhouette légère qui suit la souris (en-tête et contour,
    sans les fiches), place visée en pointillé à l'endroit où le groupe se posera. */
@@ -427,3 +454,58 @@ html.pdt-page { scrollbar-width: auto; scrollbar-color: auto; }
 .card-nav__centre .pdt-barre-selection > span:not(.pdt-barre-pastille) { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .card-nav__droite .pdt-bouton-animations { height: 40px; min-height: 0; align-self: center; }
 .card-nav__droite .pdt-bouton-nouveau { color: var(--texte); }
+
+/* Tableau : la case à cocher prend la couleur du groupe Visa du pèlerin (contour, intérieur légèrement teinté ; remplie
+   quand elle est cochée). */
+.pdt-tableau .ag-row[class*="pdt-cat-"] { --ag-checkbox-unchecked-border-color: var(--teinte-groupe); --ag-checkbox-unchecked-background-color: color-mix(in srgb, var(--teinte-groupe) 18%, transparent); --ag-checkbox-checked-background-color: var(--teinte-groupe); --ag-checkbox-checked-border-color: var(--teinte-groupe); }
+/* Déplacement refusé : la carte, sa photo, et la case et la photo de sa ligne clignotent en rouge une demi-seconde. */
+.pdt-fiche.pdt-refus-flash { animation: pdt-refus-carte .55s ease-out; }
+/* Fiches de la fenêtre « bloc trié » : les mêmes que dans les groupes, sans prise en main. */
+.pdt .ftb .pdt-fiche { cursor: default; }
+.pdt .ftb .pdt-fiche:hover { border-color: var(--papier-bord); }
+.pdt-fiche.pdt-refus-flash .pdt-portrait img { animation: pdt-refus-cadre .55s ease-out; }
+.pdt-tableau .ag-row.pdt-refus-flash .ag-checkbox-input-wrapper, .pdt-tableau .ag-row.pdt-refus-flash .pdt-tableau-photo { animation: pdt-refus-cadre .55s ease-out; }
+@keyframes pdt-refus-carte { 0%, 55% { box-shadow: 0 0 0 2px #e5484d, 0 0 14px -2px rgba(229, 72, 77, .55); } 100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0); } }
+@keyframes pdt-refus-cadre { 0%, 55% { border-color: #e5484d; outline: 2px solid #e5484d; outline-offset: 1px; } 100% { outline: 2px solid transparent; outline-offset: 1px; } }
+/* La cellule de la photo garde peu de marge : la photo y tient à sa taille (27 px de large). */
+.pdt-tableau .ag-cell[col-id="photo"] { padding-left: 6px; padding-right: 6px; }
+/* Lueur du tableau (2026-10-27) : une lumière très faible suit la souris sur les lignes, déplacée par transformation
+   (sans redessiner le tableau) ; éteinte pendant un glisser. L'en-tête porte une ombre douce sur les lignes. */
+.pdt-tableau { position: relative; }
+.pdt-tableau-lueur { position: absolute; inset: 0; z-index: 3; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.pdt-tableau-lueur > i { position: absolute; left: -300px; top: -300px; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle closest-side, rgba(170, 205, 255, 1.000) 0%, rgba(170, 205, 255, 0.991) 10%, rgba(170, 205, 255, 0.942) 20%, rgba(170, 205, 255, 0.837) 30%, rgba(170, 205, 255, 0.683) 40%, rgba(170, 205, 255, 0.500) 50%, rgba(170, 205, 255, 0.317) 60%, rgba(170, 205, 255, 0.163) 70%, rgba(170, 205, 255, 0.058) 80%, rgba(170, 205, 255, 0.009) 90%, rgba(170, 205, 255, 0.000) 100%); opacity: 0; transition: opacity .4s ease-out; }
+.pdt-tableau-lueur[data-actif] > i { opacity: .045; will-change: transform; }
+.pdt-tableau .ag-header { position: relative; z-index: 2; box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .65); }
+@media (prefers-reduced-motion: reduce) { .pdt-tableau-lueur { display: none; } }
+/* Suppression d'un groupe temporaire qui contient des pèlerins (2026-10-27) : un petit message avant. */
+.pdt-confirmer-fond { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; background: rgba(8, 10, 13, .45); }
+.pdt-confirmer { width: min(420px, 100%); padding: 16px 18px 14px; border: 1px solid var(--bord); border-radius: 12px; background: var(--panneau); color: var(--texte); box-shadow: 0 24px 50px -18px rgba(0, 0, 0, .8); font-size: 13px; }
+.pdt-confirmer h3 { margin: 0 0 8px; font-size: 14.5px; }
+.pdt-confirmer p { margin: 0 0 6px; color: var(--doux); line-height: 1.45; }
+.pdt-confirmer ul { margin: 0 0 12px; padding-left: 18px; color: var(--doux); }
+.pdt-confirmer-boutons { display: flex; justify-content: flex-end; gap: 8px; }
+.pdt-confirmer-boutons button { height: 32px; padding: 0 14px; border: 1px solid var(--bord); border-radius: 8px; background: transparent; color: var(--texte); }
+.pdt-confirmer-boutons .pdt-confirmer-oui { border-color: #ef6f6c; background: color-mix(in srgb, #ef6f6c 22%, var(--panneau)); }
+/* La barre de défilement du tableau, ramenée à droite, se pose par-dessus la colonne des cases (tout à droite) : les
+   cases se rangent à sa gauche, sans changer la largeur de la colonne (2026-10-27). */
+.pdt-tableau .ag-header-cell[col-id="ag-Grid-SelectionColumn"], .pdt-tableau .ag-cell[col-id="ag-Grid-SelectionColumn"] { padding-left: 4px !important; padding-right: 18px !important; }
+/* Couleurs du tableau dans l'espace client (2026-10-26) : il prend la vue et la présentation du registre
+   (tableau-commun), mais garde les couleurs sombres du Poste de tri, que le client soit en Jour ou en Nuit ; ses menus
+   de filtre aussi. En-têtes sans fond de rubrique, cellules sans teinte : les rubriques se lisent à leurs séparations. */
+.pdt .pdt-tableau.om-tableau-commun[data-theme], .om-popup-tableau-commun.pdt-popups[data-theme] {
+  --tableau-fond: #1b1e24; --tableau-texte: #e4e8eb; --tableau-entete: #15181d; --tableau-secondaire: #98a3ac;
+  --tableau-bord: #2c313a; --tableau-bord-fort: #4a525e; --tableau-accent: #4ea5f0; --tableau-sur-accent: #ffffff;
+  --tableau-survol: #232830; --tableau-selection: #24364a; --tableau-champ: #1b1e24;
+  --g-pass: var(--tableau-entete); --g-pass2: var(--tableau-entete); --g-pass3: var(--tableau-entete); --g-pass4: var(--tableau-entete);
+  --g-visa: var(--tableau-entete); --g-visa2: var(--tableau-entete); --g-visa3: var(--tableau-entete); --g-visa4: var(--tableau-entete);
+  --g-suivi: var(--tableau-entete); --g-suivi2: var(--tableau-entete); --g-vol: var(--tableau-entete); --g-vol2: var(--tableau-entete);
+  --g-vol3: var(--tableau-entete); --g-fin: var(--tableau-entete); --g-fin2: var(--tableau-entete); --g-sec: var(--tableau-entete);
+  --g-pass-cell: transparent; --g-pass2-cell: transparent; --g-pass3-cell: transparent; --g-pass4-cell: transparent;
+  --g-visa-cell: transparent; --g-visa2-cell: transparent; --g-visa3-cell: transparent; --g-visa4-cell: transparent;
+  --g-suivi-cell: transparent; --g-suivi2-cell: transparent; --g-vol-cell: transparent; --g-vol2-cell: transparent;
+  --g-vol3-cell: transparent; --g-fin-cell: transparent; --g-fin2-cell: transparent; --g-sec-cell: transparent;
+  color-scheme: dark;
+}
+.pdt .pdt-tableau.om-tableau-commun .ag-header-cell, .pdt .pdt-tableau.om-tableau-commun .ag-header-group-cell { color: var(--tableau-secondaire) !important; }
+.pdt .pdt-tableau.om-tableau-commun .pdt-tableau-photo { background-color: #333943; color: var(--doux); }
+.pdt-tableau-photo { flex: none; min-width: 27px; }

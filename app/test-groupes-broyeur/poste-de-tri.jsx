@@ -4,13 +4,14 @@ import { deplacerMembres } from '@/modules/client-react/groupes-integrite'
 import { nomGroupeUnique, prochainNomVisa } from '@/modules/client-react/groupes-locaux'
 import { chargerPhotos } from './photos'
 import Tableau from './Tableau'
+import FenetreTriBloc from '@/modules/client-react/fenetre-tri-bloc'
 // Fiche de réglages de la rubrique affichée (aujourd'hui le Visa) : données, catégories, règles.
 import { chargerVisa, categorieMachine, motifVerrouMachine, machineFixe, etatFiche, iconeCategorie, CATEGORIES, COLONNES, NUSUK_CHANNEL, nouveauBrouillon, listeGroupesVisa } from './rubrique-visa'
 // Panneau des groupes (fenêtre fixe), mis au point sur /test-groupes-broyeur/barre ; affichage seulement.
 import { PanneauGroupes } from './panneau-groupes/panneau'
 import CardNav from './card-nav/CardNav'
+import { colonnesDuRegistre } from './colonnes-registre'
 // Mise en page (version test) : placer les grandes zones de la page à la souris.
-import { DISPOSITION_DEFAUT, EditeurDisposition, ecrireDisposition, lireDisposition, releverDisposition, variablesDisposition } from './mise-en-page'
 import './poste-de-tri.css'
 
 // Poste de tri : glisser une fiche (ou une sélection) d'une machine à l'autre. Les fiches de la
@@ -25,6 +26,17 @@ const CASCADE = 90
 const PILE = 4
 const MAINTIEN = 700
 const TEINTES = ['#9aa0aa', '#f2a541', '#3fb8af', '#ef6f6c', '#9b8cf2', '#9bc53d', '#4ea5f0']
+// Disposition ancrée (2026-10-26, à la place de la mise en page libre en pourcentages de l'écran, qui déformait la liste
+// d'une résolution à l'autre) : barre en haut, panneau des groupes à gauche (par défaut), en haut ou en fenêtre, liste à
+// droite ; l'atelier prend le reste. Tailles en pixels, les mêmes à toutes les résolutions, réglées en tirant les bords
+// et retenues dans ce navigateur. Par défaut : la liste et la bande des groupes de la disposition réglée par le
+// commanditaire sur un écran de 1920 × 1080 (376 et 157 px) ; le panneau à gauche, 340 px.
+const PLACES_PANNEAU = ['gauche', 'haut', 'fenetre']
+const CLE_PLACE = 'pdt-place-groupes'
+const CLE_TAILLES = 'pdt-tailles'
+const CLE_HORS_GROUPE = 'pdt-hors-groupe-masque'
+const TAILLES_DEFAUT = { liste: 376, groupes: 340, hauteur: 157 }
+const BORNES_TAILLES = { liste: [260, 900], groupes: [240, 620], hauteur: [90, 420] }
 // Les trois vues des groupes du fichier clients.
 const VUES = [
   { id: 'liste', nom: 'Liste', icone: 'M3 4h10M3 8h10M3 12h10' },
@@ -33,6 +45,8 @@ const VUES = [
 ]
 const teinte = num => TEINTES[num % TEINTES.length]
 const cle = id => String(id)
+// Mêmes clés, quel que soit l'ordre.
+const memeEnsemble = (a, b) => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|')
 // Réglage « réduire les animations », lu une seule fois puis suivi : l'interroger à chaque image coûtait cher.
 let reglageCalme = null
 // Bouton « Rebond » de la barre d'outils (essai du 2026-10-15) : sans rebond, les fiches voisines glissent toujours
@@ -51,6 +65,8 @@ const nouvelleMachine = (num, nomPerso, visaBrouillon) => ({ num, nomPerso, ids:
 // Ordre de départ des groupes du banc seul : sans groupe Nusuk, groupes Nusuk, visas, temporaires. Ensuite, c'est
 // l'ordre qu'on règle en déplaçant les groupes.
 const RANG_CATEGORIE = { 'sans-groupe': 0, groupe: 1, 'attente-visa': 2, 'visa-emis': 3, temporaire: 4 }
+// Couleur de chaque catégorie de groupe, pour les cases et les photos du tableau.
+const TEINTES_CATEGORIES = Object.fromEntries(Object.entries(CATEGORIES).map(([k, c]) => [k, c.color]))
 
 // Taille d'une fiche de groupe en vue Liste : la plus large des fiches affichées (une liste qui défile a des fiches
 // plus étroites, de la largeur de sa barre de défilement), sinon la largeur utile d'une liste et la hauteur de fiche
@@ -554,9 +570,20 @@ const decouper = texte => (texte ? texte.split('|') : [])
 // comparé par son texte « idsCle », et les actions passent par un objet stable.
 const Machine = memo(function Machine({
   m, ids, vue, categorie, trou, trouOrigine, nbGlisse, glisseActif, choisisCle, trouvesCle, provenanceCle,
-  photos, parDossier, effectif, nbChoisis, demonte, allumeeT, maintenu, visee, actions,
+  photos, parDossier, effectif, nbChoisis, demonte, allumeeT, maintenu, visee, actions, enCoursT = null, large = false,
 }) {
+  // Groupe agrandi (2026-10-27) : deux places dans l'atelier ; la liste et les détails passent sur deux colonnes, lus
+  // ligne par ligne (1 2 / 3 4 / 5, comme les photos), les photos par six.
+  const double = large && vue !== 'photos'
   const verrou = motifVerrouMachine(categorie)
+  // Groupe en cours (2026-10-26) : un vrai clic sur le groupe, hors fiche, bouton ou champ, et sans glisser.
+  const appui = useRef(null)
+  const noterAppui = e => { appui.current = e.button === 0 && !e.target.closest('[data-fiche], button, input, label, select, a') ? { x: e.clientX, y: e.clientY } : null }
+  const surClic = e => {
+    const a = appui.current
+    appui.current = null
+    if (a && Math.hypot(e.clientX - a.x, e.clientY - a.y) < SEUIL) actions.choisirGroupe(m.num)
+  }
   const fixe = machineFixe(m)
   // « Hors groupe Visa » et « sans groupe Nusuk » restent en tête ; les autres groupes se déplacent par leur en-tête.
   const mobile = m.num !== LIBRE && !fixe
@@ -565,7 +592,7 @@ const Machine = memo(function Machine({
   const provenance = new Map(decouper(provenanceCle).map(x => { const i = x.lastIndexOf(':'); return [x.slice(0, i), Number(x.slice(i + 1))] }))
   // En grille, la place réservée vaut une case ; en liste, la hauteur de tout le bloc,
   // mesurée en fiches de la vue d'arrivée (qui peut différer de celle de départ).
-  const styleTrou = vue === 'photos' || !glisseActif ? undefined : { height: `calc(${nbGlisse} * var(--fiche) + ${nbGlisse - 1} * var(--espace))` }
+  const styleTrou = vue === 'photos' || double || !glisseActif ? undefined : { height: `calc(${nbGlisse} * var(--fiche) + ${nbGlisse - 1} * var(--espace))` }
   const place = <div key="trou" className={`pdt-trou${trouOrigine ? ' pdt-trou-origine' : ''}`} style={styleTrou} data-nb={nbGlisse > 1 ? nbGlisse : undefined} />
   const rangs = []
   ids.forEach((id, i) => {
@@ -585,9 +612,12 @@ const Machine = memo(function Machine({
   if (trou === ids.length) rangs.push(place)
   return (
     <section data-machine={m.num} data-categorie={categorie || 'hors'} data-mobile={mobile ? '' : undefined}
-      className={`pdt-machine${demonte ? ' pdt-demontage' : ''}${visee ? ` pdt-${visee}` : ''}${verrou ? ' pdt-verrouillee' : ''}`}
-      style={{ '--t': categorie ? CATEGORIES[categorie]?.color || teinte(m.num) : teinte(m.num) }} aria-label={m.nomPerso}>
+      className={`pdt-machine${demonte ? ' pdt-demontage' : ''}${visee ? ` pdt-${visee}` : ''}${verrou ? ' pdt-verrouillee' : ''}${enCoursT != null ? ' pdt-en-cours' : ''}${large ? ' pdt-large' : ''}`}
+      style={{ '--t': categorie ? CATEGORIES[categorie]?.color || teinte(m.num) : teinte(m.num) }} aria-label={m.nomPerso}
+      aria-current={enCoursT != null || undefined} onPointerDownCapture={noterAppui} onClick={surClic}>
       {visee === 'visee' && <span className="pdt-faisceau" aria-hidden="true" />}
+      {/* Au clic qui le choisit, un trait de lumière fait une fois le tour du groupe (comme pour une fiche choisie). */}
+      {enCoursT != null && <svg key={enCoursT} className="pdt-eclat pdt-eclat-groupe" aria-hidden="true"><rect x="1" y="1" rx="13" pathLength="100" /></svg>}
       <div key={allumeeT ?? 'repos'} className={`pdt-plaque${allumeeT != null ? ' pdt-allumee' : ''}`} onPointerDown={mobile ? e => actions.tirerGroupe(e, m.num) : undefined}>
         {categorie ? <img className="pdt-icone-categorie" src={iconeCategorie(categorie)} alt="" title={CATEGORIES[categorie]?.label} /> : <span className="pdt-voyant" />}
         {/* Nom modifiable seulement pour un groupe modifiable : pas pour le « sans groupe » fixe ni un groupe verrouillé. */}
@@ -598,13 +628,18 @@ const Machine = memo(function Machine({
         {nbChoisis > 0 && <span className="pdt-nb-choisis"><Compteur valeur={nbChoisis} /> sél.</span>}
         {verrou && <span className="pdt-cadenas" title={verrou} aria-label={verrou}>🔒</span>}
         <span className="pdt-effectif"><Compteur valeur={effectif} /></span>
+        {/* Agrandir sur deux places : dans l'en-tête, à côté du bouton de suppression (2026-10-27). */}
+        <button type="button" className="pdt-agrandir" aria-pressed={large} onClick={() => actions.basculerLarge(m.num)}
+          title={large ? 'Réduire le groupe à une place' : 'Agrandir le groupe sur deux places (plus de pèlerins visibles)'}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d={large ? 'M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4' : 'M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4'} /></svg>
+        </button>
         {/* Seul un groupe temporaire (préparé ici) se démonte ; les groupes Nusuk existent dans Nusuk. */}
         {categorie === 'temporaire' && (
           <button className={`pdt-demonter${maintenu ? ' pdt-maintenu' : ''}`} style={{ '--maintien': `${MAINTIEN}ms` }}
-            aria-label={`Démonter ${m.nomPerso} (maintenir appuyé)`} title="Maintenir appuyé pour démonter"
-            onPointerDown={e => { if (e.button === 0) actions.commencerMaintien(m.num) }} onPointerUp={actions.arreterMaintien} onPointerLeave={actions.arreterMaintien}
-            onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); actions.commencerMaintien(m.num) } }}
-            onKeyUp={e => { if (e.key === 'Enter' || e.key === ' ') actions.arreterMaintien() }}>
+            aria-label={effectif ? `Supprimer ${m.nomPerso}` : `Supprimer ${m.nomPerso} (vide)`}
+            title={effectif ? 'Clic : supprimer après confirmation · appui maintenu : supprimer tout de suite' : 'Supprimer ce groupe vide'}
+            onPointerDown={e => { if (e.button === 0 && effectif) actions.commencerMaintien(m.num) }} onPointerUp={actions.arreterMaintien} onPointerLeave={actions.arreterMaintien}
+            onClick={() => actions.demanderSuppression(m.num)}>
             <span>✕</span>
           </button>
         )}
@@ -616,7 +651,7 @@ const Machine = memo(function Machine({
         </span>
         <ChoixVue vue={vue} choisir={v => actions.choisirVue(m.num, v)} libelle={`Vue de ${m.nomPerso}`} />
       </div>
-      <div className={`pdt-liste pdt-vue-${vue}`}>
+      <div className={`pdt-liste pdt-vue-${vue}${double ? ' pdt-liste-double' : ''}`}>
         {rangs}
         {!rangs.length && <p className="pdt-vide">{verrou ? 'Groupe verrouillé' : glisseActif ? `Déposer ${nbGlisse > 1 ? `les ${nbGlisse} pèlerins` : 'le pèlerin'} ici` : 'Déposer une fiche ici'}</p>}
       </div>
@@ -718,15 +753,63 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   const [machines, setMachines] = useState([])
   // Groupes masqués depuis le panneau des groupes : ils disparaissent de l'atelier (rien n'est supprimé). C'est le
   // « ferme » des groupes : branché sur le registre, celui de sa partie Visa (fermé là-bas = masqué ici, et inversement).
+  // « Hors groupe Visa » (2026-10-26) : masqué par défaut, il s'affiche ou se masque depuis le panneau, dans la case
+  // « sans groupe », comme un groupe. Choix retenu dans ce navigateur (ce n'est pas un groupe du registre).
+  const [libreMasque, setLibreMasque] = useState(true)
+  const libreAJour = useRef(libreMasque)
+  libreAJour.current = libreMasque
+  useEffect(() => { try { if (localStorage.getItem(CLE_HORS_GROUPE) === '0') setLibreMasque(false) } catch { /* préférence facultative */ } }, [])
   const cleMasques = machines.filter(m => m.ferme).map(m => m.num).join(',')
-  const masques = useMemo(() => new Set(cleMasques ? cleMasques.split(',').map(Number) : []), [cleMasques])
+  const masques = useMemo(() => {
+    const s = new Set(cleMasques ? cleMasques.split(',').map(Number) : [])
+    if (libreMasque) s.add(LIBRE)
+    return s
+  }, [cleMasques, libreMasque])
   const basculerMasque = useCallback(num => actionsAJour.current.basculerVisibilite(num), [])
   const tirerDuPanneau = useCallback((e, num) => actionsAJour.current.tirerDepuisPanneau(e, num), [])
+  const supprimerDuPanneau = useCallback(num => actionsAJour.current.supprimerDepuisPanneau(num), [])
+  // Groupes qu'on vient de supprimer depuis le panneau : le geste de leur pastille, encore en cours, ne les tire plus.
+  const supprimes = useRef(new Set())
   const [actualisation, setActualisation] = useState(false)
   const [refus, setRefus] = useState(null)
-  const [largeurTableau, setLargeurTableau] = useState(() => { try { return Number(localStorage.getItem('pdt-largeur-tableau')) || 560 } catch { return 560 } })
+  // Bloc glissé refusé : pèlerins désélectionnés et pèlerins restés sélectionnés, montrés dans une fenêtre.
+  const [triBloc, setTriBloc] = useState(null)
+  // Groupe en cours (2026-10-26) : celui sur lequel on travaille, choisi d'un clic dans l'atelier ; un seul à la fois,
+  // un second clic sur lui l'enlève. Il s'allume aussi dans le panneau. Affichage seulement. S'allument aussi, en plus
+  // (2026-10-27), tous les groupes qui ont des pèlerins sélectionnés : fiches choisies ou cases cochées du tableau.
+  const [groupeEnCours, setGroupeEnCours] = useState(null)
+  // Sélection partagée avec le tableau (voir cochesTableau) : ce que le tableau vient de cocher, et la fiche à montrer.
+  const attenteTableau = useRef({ image: 0, valeur: null })
+  const ficheAMontrer = useRef(null)
+  // Message avant de supprimer un groupe temporaire qui contient des pèlerins.
+  const [confirmation, setConfirmation] = useState(null)
+  const choisirGroupe = num => setGroupeEnCours(g => (g?.num === num ? null : { num, t: Date.now() }))
   const tableau = useRef(null)
   const [vues, setVues] = useState({})
+  // Groupes agrandis sur deux places (2026-10-27), retenus dans ce navigateur.
+  const [larges, setLarges] = useState(() => new Set())
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem('pdt-groupes-larges') || '[]'); if (Array.isArray(v)) setLarges(new Set(v.map(Number))) } catch { /* préférence facultative */ } }, [])
+  // Agrandir ou réduire (2026-10-27) : les autres groupes glissent en entier à leur nouvelle place (comme pour afficher
+  // ou masquer un groupe) ; animer leurs fiches donnait l'impression que les pèlerins changeaient de groupe. Seules les
+  // fiches du groupe agrandi ou réduit glissent vers leur nouvelle place, sur une ou deux colonnes.
+  function basculerLarge(num) {
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      const nb = racine.current?.querySelectorAll('.pdt-atelier > [data-machine]').length || 0
+      const positions = releverAtelier()
+      positions.delete(num)
+      visibilite.current = { positions, apparait: null, attendu: nb }
+      const tout = releverPositions(racine.current), siennes = new Set(idsDe(num, etat.current.machines).map(cle))
+      const fiches = new Map([...tout].filter(([k]) => siennes.has(k)))
+      fiches.listes = tout.listes
+      avant.current = fiches
+    }
+    setLarges(s => {
+      const n = new Set(s)
+      n.has(num) ? n.delete(num) : n.add(num)
+      try { localStorage.setItem('pdt-groupes-larges', JSON.stringify([...n])) } catch { /* préférence facultative */ }
+      return n
+    })
+  }
   const [provenance, setProvenance] = useState({})
   const [allumee, setAllumee] = useState(null)
   const [demontage, setDemontage] = useState(null)
@@ -737,14 +820,38 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   const [annulable, setAnnulable] = useState(null)
   const [maintien, setMaintien] = useState(null)
   const [photos, setPhotos] = useState({})
-  // Disposition libre des zones (null : la page normale) et calque d'édition.
-  const [disposition, setDisposition] = useState(null)
-  const [miseEnPage, setMiseEnPage] = useState(false)
-  useEffect(() => { setDisposition(lireDisposition()) }, [])
-  const ouvrirMiseEnPage = () => {
-    if (!disposition) setDisposition(releverDisposition(racine.current))
-    setMiseEnPage(true)
+  // Disposition ancrée : place du panneau des groupes et tailles (lues après le premier affichage, comme la page servie).
+  const [place, setPlace] = useState('gauche')
+  const [tailles, setTailles] = useState(TAILLES_DEFAUT)
+  const taillesAJour = useRef(tailles)
+  taillesAJour.current = tailles
+  // La liste ne va pas au-delà de sa dernière colonne (2026-10-26) : sa largeur est bornée par celle de ses colonnes.
+  const [largeurColonnes, setLargeurColonnes] = useState(null)
+  const largeurListe = largeurColonnes ? Math.min(tailles.liste, Math.max(largeurColonnes, 120)) : tailles.liste
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem(CLE_PLACE)
+      if (PLACES_PANNEAU.includes(p)) setPlace(p)
+      const t = JSON.parse(localStorage.getItem(CLE_TAILLES) || 'null')
+      if (t && typeof t === 'object') setTailles(v => {
+        const n = { ...v }
+        for (const [k, [min, max]] of Object.entries(BORNES_TAILLES)) if (Number.isFinite(t[k])) n[k] = borner(t[k], min, max)
+        return n
+      })
+    } catch { /* préférences facultatives */ }
+  }, [])
+  const choisirPlace = useCallback(p => {
+    setPlace(p)
+    try { localStorage.setItem(CLE_PLACE, p) } catch { /* préférence facultative */ }
+  }, [])
+  const retenirTailles = t => { try { localStorage.setItem(CLE_TAILLES, JSON.stringify(t)) } catch { /* préférence facultative */ } }
+  const reinitialiserDisposition = () => {
+    choisirPlace('gauche'); setTailles(TAILLES_DEFAUT)
+    try { localStorage.removeItem(CLE_TAILLES) } catch { /* préférence facultative */ }
   }
+  // Panneau ancré tiré vers l'autre bord : places possibles et place visée (le reste suit la souris sans rendu).
+  const [ancrage, setAncrage] = useState(null)
+  const etiquetteAncrage = useRef(null)
   const [recherche, setRecherche] = useState('')
   const champRecherche = useRef(null)
   const racine = useRef(null)
@@ -841,6 +948,9 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
     const motif = connecte.ecrire(machines)
     if (typeof motif === 'string' && motif) {
       refuser(motif)
+      // Les pèlerins dont le registre a refusé le déplacement : ceux qui ne sont plus dans le même groupe.
+      const avantRefus = new Map(connecte.paniers.flatMap(g => g.ids.map(id => [cle(id), g.num])))
+      signalerRefus(machines.flatMap(g => g.ids.filter(id => avantRefus.get(cle(id)) !== g.num)))
       enReception.current = true
       setMachines(connecte.paniers)
       return
@@ -1063,6 +1173,17 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   }
   // Geste refusé : la raison s'affiche quelques secondes.
   const refuser = texte => setRefus({ id: Date.now(), texte })
+  // … et les pèlerins qui bloquent clignotent en rouge une demi-seconde, sur leur carte et sur leur ligne du tableau.
+  function signalerRefus(ids) {
+    if (!ids?.length) return
+    const cles = new Set(ids.map(cle))
+    for (const el of racine.current?.querySelectorAll('.pdt-atelier [data-fiche]') || []) {
+      if (!cles.has(el.dataset.fiche)) continue
+      el.classList.remove('pdt-refus-flash'); void el.offsetWidth; el.classList.add('pdt-refus-flash')
+      setTimeout(() => el.classList.remove('pdt-refus-flash'), 600)
+    }
+    tableau.current?.signaler?.([...cles])
+  }
 
   // Sélection : un clic sur la fiche (ou sa case) l'ajoute ou la retire (les clics arrivent toujours avec
   // « ctrl ») ; Maj ajoute la plage depuis l'ancre dans le même groupe. Échap ou « Désélectionner » vident.
@@ -1084,6 +1205,22 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
     }
     setSelection(next)
   }
+  // Une seule sélection (2026-10-27) : cocher dans le tableau sélectionne les fiches dans leurs groupes, et inversement.
+  // Ce que le tableau coche est appliqué une fois par image (un balayage coche des dizaines de lignes) ; un seul pèlerin
+  // ajouté depuis le tableau : l'atelier défile jusqu'à sa fiche.
+  function cochesTableau(dossiers) {
+    attenteTableau.current.valeur = dossiers.map(cle)
+    if (attenteTableau.current.image) return
+    attenteTableau.current.image = requestAnimationFrame(() => {
+      const suivante = attenteTableau.current.valeur
+      attenteTableau.current = { image: 0, valeur: null }
+      const avantSel = etat.current.selection
+      if (!suivante || memeEnsemble(suivante, avantSel)) return
+      const ajoutes = suivante.filter(k => !avantSel.includes(k))
+      if (ajoutes.length === 1) ficheAMontrer.current = ajoutes[0]
+      setSelection(suivante)
+    })
+  }
 
   // Carte des machines et de leurs fiches pendant un glisser, mesurée une seule fois puis après
   // chaque changement de mise en page ou défilement. Interroger le navigateur à chaque mouvement
@@ -1096,7 +1233,7 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
       return {
         el, num: Number(el.dataset.machine), r, liste, rListe: liste?.getBoundingClientRect(),
         deborde: !!liste && liste.scrollHeight > liste.clientHeight,
-        grille: !!liste?.classList.contains('pdt-vue-photos'),
+        grille: !!liste && (liste.classList.contains('pdt-vue-photos') || liste.classList.contains('pdt-liste-double')),
         // Les fiches d'un groupe ne sont mesurées que si la souris passe au-dessus de lui (et une seule fois
         // par mise en page) : mesurer les 1 000 fiches de tous les groupes à chaque image coûtait cher.
         get fiches() {
@@ -1323,9 +1460,26 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
         : [p.id]
       // Chaque fiche garde son groupe et son numéro de départ.
       p.sources = Object.fromEntries(p.ids.map(id => [cle(id), groupeDe(id)]))
-      // Rien ne sort d'un groupe verrouillé (visa en traitement ou délivré) : le geste est refusé.
-      const verrou = [...new Set(Object.values(p.sources))].map(num => motifVerrouMachine(categorieDe(num))).find(Boolean)
-      if (verrou) { nettoyer(); refuser(verrou); return }
+      // Pèlerins qui ne peuvent pas bouger (groupe verrouillé — visa en traitement ou délivré —, ou règle Visa du
+      // registre branché) : le geste s'arrête, rien n'est transféré ; ils sont désélectionnés et clignotent en rouge, et
+      // seuls les pèlerins acceptés restent sélectionnés, prêts à être glissés à nouveau (demande du 2026-10-26).
+      const motifBloque = id => motifVerrouMachine(categorieDe(p.sources[cle(id)])) || connecte?.motifBlocage?.(id) || ''
+      const bloques = p.ids.filter(id => motifBloque(id))
+      if (bloques.length) {
+        const retires = new Set(bloques.map(cle))
+        signalerRefus(bloques)
+        if (p.depuisTableau) tableau.current?.decocher?.([...retires]); else setSelection(s => s.filter(k => !retires.has(k)))
+        nettoyer()
+        // Un bloc : une fenêtre montre les désélectionnés (à droite, avec leur raison) et ceux qui restent (à gauche),
+        // en fiches comme dans les groupes. Un seul pèlerin : la raison s'affiche comme avant.
+        if (p.ids.length > 1) {
+          setTriBloc({
+            rejetes: bloques.map(id => ({ id: cle(id), source: p.sources[cle(id)], raison: motifBloque(id) })),
+            restants: p.ids.filter(id => !retires.has(cle(id))).map(id => ({ id: cle(id), source: p.sources[cle(id)] })),
+          })
+        } else refuser(motifBloque(bloques[0]))
+        return
+      }
       p.rangs = Object.fromEntries(p.ids.map(id => [cle(id), idsDe(p.sources[cle(id)], etat.current.machines).findIndex(x => cle(x) === cle(id)) + 1]))
       p.vue = p.depuisTableau ? 'liste' : etat.current.vues[p.depuis] ?? 'liste'
       p.selectionAvant = etat.current.selection
@@ -1446,9 +1600,8 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
       return
     }
     // Lâché hors des groupes, ou sur un groupe verrouillé : la fiche revient à sa place.
-    if (c?.refus) refuser(c.refus)
+    if (c?.refus) { refuser(c.refus); signalerRefus(ids) }
     if (!c || c.refus) { arrivee.current = { ids: ids.map(cle), de, depart, elan, transfert: false, rangs: p.rangs }; return }
-    if (p.depuisTableau) tableau.current?.deselectionner()
 
     const actuelles = etat.current.machines
     const sourceDe = id => p.sources[cle(id)]
@@ -1495,7 +1648,8 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
       startTransition(() => {
         setGlisse(null); setCible(null)
         if (suivantes !== actuelles) setMachines(suivantes)
-        // Les fiches déposées restent sélectionnées, comme dans le fichier clients.
+        // Les fiches déposées restent sélectionnées, comme dans le fichier clients : leur nouveau groupe s'allume et
+        // l'ancien s'éteint ; un groupe choisi d'un clic passe lui aussi au groupe d'arrivée (2026-10-27).
         setSelection(ids.map(cle))
         deposees.current = new Set(ids.map(cle))
         if (texte) {
@@ -1570,6 +1724,7 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
     if (!machine) return
     const pastille = e.currentTarget
     attendreMouvement(e, souris => {
+      if (supprimes.current.has(num)) return
       const etiquette = document.createElement('div')
       etiquette.className = 'pdt-etiquette-groupe'
       etiquette.style.setProperty('--t', pastille.style.getPropertyValue('--teinte') || '#888')
@@ -1709,9 +1864,22 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   const visibilite = useRef(null)
   const releverAtelier = () => new Map([...(racine.current?.querySelectorAll('.pdt-atelier > [data-machine]') || [])].map(g => { const r = g.getBoundingClientRect(); return [Number(g.dataset.machine), [r.left, r.top]] }))
   function basculerVisibilite(num) {
-    const m = etat.current.machines.find(x => x.num === num)
+    const m = num === LIBRE ? { num, ferme: libreAJour.current } : etat.current.machines.find(x => x.num === num)
     if (!m) return
-    const basculer = () => setMachines(liste => liste.map(x => (x.num === num ? { ...x, ferme: !x.ferme } : x)))
+    const basculer = num === LIBRE
+      ? () => setLibreMasque(v => { try { localStorage.setItem(CLE_HORS_GROUPE, v ? '0' : '1') } catch { /* préférence facultative */ } return !v })
+      // Affiché d'un clic (2026-10-27) : le groupe se place après le dernier groupe affiché, l'ordre des affichés est celui
+      // des clics. « Sans groupe Nusuk » garde sa place en tête. Masqué : il garde sa place.
+      : () => setMachines(liste => {
+        const cible = liste.find(x => x.num === num)
+        if (!cible) return liste
+        if (!cible.ferme || machineFixe(cible)) return liste.map(x => (x.num === num ? { ...x, ferme: !x.ferme } : x))
+        const reste = liste.filter(x => x.num !== num)
+        let apres = -1
+        reste.forEach((x, k) => { if (!x.ferme) apres = k })
+        reste.splice(apres + 1, 0, { ...cible, ferme: false })
+        return reste
+      })
     const nb = racine.current?.querySelectorAll('.pdt-atelier > [data-machine]').length || 0
     const calme = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     if (m.ferme) {
@@ -1788,12 +1956,20 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
 
   // Une nouvelle machine est un groupe Visa temporaire, « à créer » dans Nusuk, nommé comme dans
   // le fichier clients (« Nusuk temporaire N »).
+  // Le nouveau groupe se place tout en haut des groupes (2026-10-27), juste après « sans groupe Nusuk » qui garde la
+  // tête : il apparaît en fondu, les autres glissent d'une place et l'atelier remonte jusqu'à lui.
   function ajouterMachine() {
-    setMachines(liste => {
-      // Branché sur le registre : numéro libre et nom parmi tous ses groupes, brouillon comme les siens.
-      const num = connecte ? connecte.prochainNum() : Math.max(0, ...liste.map(m => m.num)) + 1
-      const nom = connecte ? connecte.prochainNom() : prochainNomVisa(liste.map(m => m.nomPerso))
-      return [...liste, nouvelleMachine(num, nom, connecte ? connecte.nouveauBrouillon(num) : nouveauBrouillon(num))]
+    const liste = etat.current.machines
+    // Branché sur le registre : numéro libre et nom parmi tous ses groupes, brouillon comme les siens.
+    const num = connecte ? connecte.prochainNum() : Math.max(0, ...liste.map(m => m.num)) + 1
+    const nom = connecte ? connecte.prochainNom() : prochainNomVisa(liste.map(m => m.nomPerso))
+    const nouvelle = nouvelleMachine(num, nom, connecte ? connecte.nouveauBrouillon(num) : nouveauBrouillon(num))
+    const nb = racine.current?.querySelectorAll('.pdt-atelier > [data-machine]').length || 0
+    if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) visibilite.current = { positions: releverAtelier(), apparait: num, attendu: nb + 1 }
+    setMachines(actuelles => {
+      const tete = actuelles.findIndex(m => !machineFixe(m))
+      const k = tete < 0 ? actuelles.length : tete
+      return [...actuelles.slice(0, k), nouvelle, ...actuelles.slice(k)]
     })
   }
 
@@ -1803,6 +1979,35 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
       if (!definitif) return { ...m, nomPerso: saisie }
       return { ...m, nomPerso: nomGroupeUnique(saisie || `Groupe ${num}`, liste.filter(o => o.num !== num).map(o => o.nomPerso)) }
     }))
+  }
+
+  // Clic sur le ✕ d'un groupe temporaire, ou sur sa poubelle ou son « ∅ » dans le panneau (2026-10-27) : vide, il est
+  // supprimé tout de suite (Ctrl+Z l'annule) ; avec des pèlerins, un petit message dit combien et où ils retournent.
+  function demanderSuppression(num) {
+    const m = etat.current.machines.find(x => x.num === num)
+    if (!m || demontage != null || categorieDe(num) !== 'temporaire') return
+    if (!m.ids.length) { supprimes.current.add(num); setTimeout(() => supprimes.current.delete(num), 1500); return demonter(num) }
+    const retours = new Map()
+    for (const id of m.ids) {
+      const origine = m.origines?.[cle(id)]
+      const nom = origine && etat.current.machines.some(x => x.num === origine.num) ? nomMachine(origine.num) : 'Hors groupe Visa'
+      retours.set(nom, (retours.get(nom) || 0) + 1)
+    }
+    setConfirmation({ num, nom: m.nomPerso, nombre: m.ids.length, retours: [...retours] })
+  }
+  function confirmerSuppression() {
+    const c = confirmation
+    setConfirmation(null)
+    if (c) demonter(c.num)
+  }
+
+  // Groupe temporaire supprimé depuis le panneau (appui maintenu sur sa pastille, 2026-10-26) : comme le ✕ de l'atelier,
+  // ses pèlerins retournent d'où ils venaient et Ctrl+Z annule. Les autres groupes ne se suppriment pas.
+  function supprimerDepuisPanneau(num) {
+    if (categorieDe(num) !== 'temporaire') return
+    supprimes.current.add(num)
+    setTimeout(() => supprimes.current.delete(num), 1500)
+    demonter(num)
   }
 
   function demonter(num) {
@@ -1836,7 +2041,7 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   // Catégorie de chaque groupe. Les groupes affichés, dans l'ordre des groupes (réglé en les déplaçant).
   const categories = new Map(machines.map(m => [m.num, categorieMachine(m, pelerins)]))
   // « apercu » : groupe masqué tiré depuis le panneau, rendu le temps du geste comme place visée.
-  const toutes = [MACHINE_LIBRE, ...machines.filter(m => !masques.has(m.num) || m.num === apercu)]
+  const toutes = [...(masques.has(LIBRE) ? [] : [MACHINE_LIBRE]), ...machines.filter(m => !masques.has(m.num) || m.num === apercu)]
   const parDossier = useMemo(() => new Map(pelerins.map(p => [cle(p.dossier), p])), [pelerins])
   // Groupe de chaque dossier, calculé une fois par changement des groupes (et non plus en parcourant tous les
   // groupes pour chaque pèlerin : un million de comparaisons avec 1 000 pèlerins).
@@ -1845,35 +2050,145 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   // Actions des groupes : un objet stable (les groupes mémorisés ne se refont pas pour lui), qui appelle
   // toujours la version à jour.
   const actionsAJour = useRef(null)
-  actionsAJour.current = { surPointeur, renommer, commencerMaintien, arreterMaintien, choisirVue, nomMachine, tirerGroupe, basculerVisibilite, tirerDepuisPanneau }
+  actionsAJour.current = { surPointeur, renommer, commencerMaintien, arreterMaintien, choisirVue, nomMachine, tirerGroupe, basculerVisibilite, tirerDepuisPanneau, supprimerDepuisPanneau, choisirGroupe, demanderSuppression, cochesTableau, basculerLarge }
   const actionsMachine = useMemo(() => ({
     surPointeur: (...a) => actionsAJour.current.surPointeur(...a), renommer: (...a) => actionsAJour.current.renommer(...a),
     commencerMaintien: (...a) => actionsAJour.current.commencerMaintien(...a), arreterMaintien: (...a) => actionsAJour.current.arreterMaintien(...a),
     choisirVue: (...a) => actionsAJour.current.choisirVue(...a), nomMachine: (...a) => actionsAJour.current.nomMachine(...a),
-    tirerGroupe: (...a) => actionsAJour.current.tirerGroupe(...a),
+    tirerGroupe: (...a) => actionsAJour.current.tirerGroupe(...a), choisirGroupe: (...a) => actionsAJour.current.choisirGroupe(...a),
+    demanderSuppression: (...a) => actionsAJour.current.demanderSuppression(...a),
+    basculerLarge: (...a) => actionsAJour.current.basculerLarge(...a),
   }), [])
+  const demanderSuppressionPanneau = useCallback(num => actionsAJour.current.demanderSuppression(num), [])
+  const surSelectionTableau = useCallback(dossiers => actionsAJour.current.cochesTableau(dossiers), [])
+  // Groupes allumés : ceux des pèlerins sélectionnés (atelier et tableau, une seule sélection), et le groupe choisi d'un
+  // clic tant qu'aucun pèlerin n'est sélectionné ensuite.
+  const groupesAllumes = useMemo(() => {
+    const s = new Set()
+    for (const k of selection) s.add(groupeParDossier.get(k)?.num ?? LIBRE)
+    return s
+  }, [selection, groupeParDossier])
+  // Sélectionner un pèlerin fait oublier le groupe choisi d'un clic (2026-10-27) : seuls restent allumés les groupes
+  // des pèlerins sélectionnés.
+  useEffect(() => { if (selection.length) setGroupeEnCours(g => (g ? null : g)) }, [selection])
+  // Le tableau suit la sélection de la page : mêmes cases cochées que de fiches choisies.
+  useEffect(() => {
+    const t = tableau.current
+    if (!t?.selection || memeEnsemble((t.selection() || []).map(cle), selection)) return
+    t.selectionner(selection)
+  }, [selection, chargement])
+  // Un pèlerin coché dans le tableau : l'atelier défile jusqu'à sa fiche si elle est hors de vue (son groupe affiché).
+  useEffect(() => {
+    const k = ficheAMontrer.current
+    ficheAMontrer.current = null
+    const fiche = k && racine.current?.querySelector(`.pdt-atelier [data-fiche="${CSS.escape(k)}"]`)
+    if (!fiche) return
+    for (let el = fiche.parentElement; el && el !== racine.current; el = el.parentElement) {
+      if (el.scrollHeight <= el.clientHeight + 1 || !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) continue
+      const r = el.getBoundingClientRect(), f = fiche.getBoundingClientRect()
+      const doux = el.classList.contains('pdt-atelier-defile')
+      if (f.top < r.top + 8 || f.bottom > r.bottom - 8) el.scrollTo({ top: el.scrollTop + f.top - r.top - r.height / 3, behavior: doux ? 'smooth' : 'auto' })
+      if (doux) break
+    }
+  }, [selection])
+  const cleAllumes = [...new Set([...groupesAllumes, ...(groupeEnCours ? [groupeEnCours.num] : [])])].sort((a, b) => a - b).join(',')
+  // Un groupe en cours supprimé (démonté, transfert annulé…) n'est plus en cours.
+  useEffect(() => {
+    if (groupeEnCours && groupeEnCours.num !== LIBRE && !machines.some(m => m.num === groupeEnCours.num)) setGroupeEnCours(null)
+  }, [machines, groupeEnCours])
   // Le panneau des groupes reçoit les groupes de cette page : une seule source, aucun conflit.
-  const groupesPanneau = useMemo(() => listeGroupesVisa({ paniers: machines, rows: pelerins, lecture: lecture?.nusuk }), [machines, pelerins, lecture])
+  const groupesPanneau = useMemo(() => {
+    // « Hors groupe Visa » en tête : les pèlerins d'aucun groupe ; sans ajout ni retrait (« base » = ses pèlerins).
+    const pris = new Set(machines.flatMap(m => m.ids.map(cle)))
+    const ids = pelerins.filter(p => !pris.has(cle(p.dossier))).map(p => p.dossier)
+    return [
+      { g: { num: LIBRE, nomPerso: MACHINE_LIBRE.nomPerso, ids, visaBrouillon: { baseIds: ids } }, categorie: 'hors-groupe', rang: null, nusuk: null },
+      ...listeGroupesVisa({ paniers: machines, rows: pelerins, lecture: lecture?.nusuk }),
+    ]
+  }, [machines, pelerins, lecture])
   // Lignes du tableau : les mêmes données que les groupes (nom du groupe Visa, état Nusuk).
-  const lignes = useMemo(() => pelerins.map(p => {
-    const m = groupeParDossier.get(cle(p.dossier))
-    const ef = etatFiche(p, m)
-    return { ...p, photo: photos[cle(p.dossier)], groupeVisa: m?.nomPerso || '', etatLibelle: ef.libelle, etatIcone: ef.icone }
-  }), [pelerins, groupeParDossier, photos])
+  // Colonnes du tableau : celles de la vue du registre (colonnes-registre.jsx), relues en arrivant sur l'écran et quand
+  // la page client change ses configurations dans un autre onglet ; avant d'être affiché, celles du Poste de tri.
+  const [lectureVue, setLectureVue] = useState(0)
+  useEffect(() => { if (actif) setLectureVue(n => n + 1) }, [actif])
+  useEffect(() => {
+    const changement = e => { if (!e.key || /omra-client-(registre-configs|config-active|config-modes)/.test(e.key)) setLectureVue(n => n + 1) }
+    window.addEventListener('storage', changement)
+    return () => window.removeEventListener('storage', changement)
+  }, [])
+  const colonnesTableau = useMemo(() => {
+    if (!lectureVue) return COLONNES
+    const propre = Object.fromEntries(COLONNES.map(c => [c.field, c]))
+    // Colonnes du Poste de tri qui gardent leur affichage : photo, numéro, nom, état Nusuk et groupe.
+    return colonnesDuRegistre(connecte?.controleur, { photo: propre.photo, dossier: propre.dossier, nomAr: propre.nomAr, nusukEtatApercu: propre.etatLibelle, nusukTemporaire: propre.groupeVisa }) || COLONNES
+  }, [lectureVue, connecte?.controleur]) // eslint-disable-line react-hooks/exhaustive-deps
+  const lignes = useMemo(() => {
+    // Catégorie du groupe de chaque pèlerin : couleur de sa case à cocher et du cadre de sa photo (2026-10-26).
+    const categorieDeNum = new Map(machines.map(m => [m.num, categorieMachine(m, pelerins)]))
+    return pelerins.map(p => {
+      const m = groupeParDossier.get(cle(p.dossier))
+      const ef = etatFiche(p, m)
+      return { ...p, photo: photos[cle(p.dossier)], groupeVisa: m?.nomPerso || '', etatLibelle: ef.libelle, etatIcone: ef.icone, categorieGroupe: m ? categorieDeNum.get(m.num) || null : null }
+    })
+  }, [pelerins, groupeParDossier, photos, machines])
 
-  // Barre entre les groupes et le tableau (à droite) : on la tire pour régler la largeur du tableau.
-  function commencerSeparation(e) {
+  // Bords qu'on tire : celui de la liste (vers la gauche, elle s'élargit), celui du panneau à gauche (vers la droite) ou en
+  // haut (vers le bas). Taille retenue au lâcher.
+  function tirerBord(e, cle) {
     if (e.button !== 0) return
     e.preventDefault()
-    const x0 = e.clientX, l0 = largeurTableau
-    let derniere = l0
-    const bouge = ev => { derniere = borner(l0 - ev.clientX + x0, 300, window.innerWidth - 420); setLargeurTableau(derniere) }
+    const x0 = e.clientX, y0 = e.clientY, depart = cle === 'liste' ? largeurListe : tailles[cle]
+    const [min, maxi] = BORNES_TAILLES[cle], max = cle === 'liste' && largeurColonnes ? Math.max(min, Math.min(maxi, largeurColonnes)) : maxi
+    let derniere = depart
+    const bouge = ev => {
+      const delta = cle === 'liste' ? x0 - ev.clientX : cle === 'groupes' ? ev.clientX - x0 : ev.clientY - y0
+      derniere = Math.round(borner(depart + delta, min, max))
+      setTailles(t => (t[cle] === derniere ? t : { ...t, [cle]: derniere }))
+    }
     const fin = () => {
       window.removeEventListener('pointermove', bouge); window.removeEventListener('pointerup', fin)
-      try { localStorage.setItem('pdt-largeur-tableau', String(Math.round(derniere))) } catch { /* préférence facultative */ }
+      setTailles(t => { retenirTailles(t); return t })
     }
     window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', fin)
   }
+  // Porter le panneau ancré vers l'autre bord : on le tire par sa ligne de réglages ; les deux places s'allument, la plus
+  // proche du pointeur est visée ; lâché, le panneau s'y ancre. Échap, ou lâché loin des deux, ne change rien.
+  const deplacerPanneau = useCallback(e => {
+    e.preventDefault()
+    const x0 = e.clientX, y0 = e.clientY
+    let zones = null, vise = null
+    const relever = () => {
+      const page = racine.current, r = page.getBoundingClientRect(), s = getComputedStyle(page)
+      const barre = page.querySelector('.pdt-haut-gauche')?.getBoundingClientRect()
+      const g = r.left + parseFloat(s.paddingLeft), d = r.right - parseFloat(s.paddingRight)
+      const haut = (barre?.bottom ?? r.top) + 12, bas = Math.min(r.bottom, window.innerHeight) - parseFloat(s.paddingBottom)
+      const t = taillesAJour.current
+      return { gauche: { left: g, top: haut, width: t.groupes, height: bas - haut }, haut: { left: g, top: haut, width: d - g, height: t.hauteur } }
+    }
+    // Distance au bord gauche rapportée à la largeur de la place de gauche, au bord haut rapportée à la hauteur de celle
+    // du haut : la plus petite l'emporte ; trop loin des deux, aucune.
+    const viser = (x, y) => {
+      const rg = (x - zones.gauche.left) / zones.gauche.width, rh = (y - zones.haut.top) / zones.haut.height
+      return Math.min(rg, rh) > 1.6 ? null : rg < rh ? 'gauche' : 'haut'
+    }
+    const bouge = ev => {
+      if (!zones && Math.hypot(ev.clientX - x0, ev.clientY - y0) < SEUIL) return
+      const premier = !zones
+      if (premier) zones = relever()
+      const v = viser(ev.clientX, ev.clientY)
+      if (premier) { vise = v; setAncrage({ zones, vise, x: ev.clientX, y: ev.clientY }) }
+      else if (v !== vise) { vise = v; setAncrage(a => a && { ...a, vise }) }
+      if (etiquetteAncrage.current) etiquetteAncrage.current.style.transform = `translate(${ev.clientX + 14}px, ${ev.clientY + 12}px)`
+    }
+    const arreter = () => {
+      window.removeEventListener('pointermove', bouge); window.removeEventListener('pointerup', lacher)
+      window.removeEventListener('keydown', touche, true); setAncrage(null)
+    }
+    const lacher = () => { arreter(); if (zones && vise) choisirPlace(vise) }
+    const touche = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); vise = null; arreter() } }
+    window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', lacher)
+    window.addEventListener('keydown', touche, true)
+  }, [choisirPlace])
   const pelerinDe = id => parDossier.get(cle(id))
   const enMain = glisse ? [glisse.principal, ...glisse.ids.filter(x => x !== glisse.principal)].map(pelerinDe).filter(Boolean) : []
   const choisis = new Set(selection)
@@ -1894,6 +2209,7 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
     { label: 'Affichage', description: 'Vue de tous les groupes, et effets de la page.', links: [
       ...['liste', 'photos', 'details'].map(v => ({ label: `Toutes en ${v === 'details' ? 'détails' : v}`, actif: vueCommune === v, agir: () => choisirVueToutes(v) })),
       { label: `Rebond : ${sansAnimation ? 'retiré' : 'avec'}`, actif: !sansAnimation, agir: basculerAnimations, titre: 'Petit rebond des fiches voisines quand une carte arrive' },
+      { label: 'Disposition par défaut', agir: reinitialiserDisposition, titre: 'Panneau des groupes à gauche, liste et panneau à leur taille d’origine' },
     ] },
     { label: 'Lecture Nusuk', description: texteLecture, links: connecte ? [] : [
       { label: actualisation ? 'Actualisation…' : 'Actualiser depuis Nusuk', desactive: actualisation, agir: () => setEssai(n => n + 1) },
@@ -1905,7 +2221,11 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
   ]
 
   return (
-    <div className={`pdt${disposition ? ' pdt-libre' : ''}`} ref={racine} style={variablesDisposition(disposition)}>
+    // Aucun glisser natif du navigateur ici (2026-10-26) : une icône tirée et lâchée sur le nom d'un groupe y collait son
+    // adresse (« Nusuhttp://127.0.0.1:3001/images/… »). Tous les gestes de la page sont les siens.
+    <div className={`pdt pdt-docke pdt-groupes-${place}`} ref={racine}
+      style={{ '--l-liste': `${largeurListe}px`, '--l-groupes': `${tailles.groupes}px`, '--h-groupes': `${tailles.hauteur}px` }}
+      onDragStart={e => e.preventDefault()} onDropCapture={e => e.preventDefault()}>
       {/* Haut de page (2026-10-16) : plus de titre, de compteurs ni de consignes ; le panneau des groupes, ancré en
           haut par défaut, porte la vue de toutes les machines. À sa gauche : lecture du registre et outils. */}
       <div className="pdt-haut">
@@ -1933,8 +2253,6 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
         )}
         droite={<>
           {retour && <button type="button" className="pdt-bouton-animations pdt-retour" onClick={retour} title="Revenir au registre : mêmes données, ce qui a été fait ici y est déjà">← Registre</button>}
-          {/* Mise en page : hors du menu, à portée directe (demande du 2026-10-26). */}
-          {chargement === 'pret' && <button type="button" className="pdt-bouton-animations" aria-pressed={miseEnPage} onClick={() => (miseEnPage ? setMiseEnPage(false) : ouvrirMiseEnPage())} title="Placer les zones de la page à la souris (version test)">Mise en page</button>}
           {chargement === 'pret' && <button type="button" className="pdt-bouton-animations pdt-bouton-nouveau" onClick={ajouterMachine} title="Créer un groupe Visa temporaire (préparation locale)">＋ Nouveau groupe temporaire</button>}
         </>} />
       {chargement === 'en-cours' && <p className="pdt-attente" role="status">Lecture du registre…</p>}
@@ -1943,12 +2261,18 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
       {chargement === 'pret' && lecture?.alerte && <p className="pdt-alerte-nusuk" role="alert">{lecture.alerte}</p>}
       </div>
       {chargement === 'pret' && (
-        <PanneauGroupes groupes={groupesPanneau} masques={masques} onMasquer={basculerMasque} onTirer={tirerDuPanneau} ancrable />
+        <PanneauGroupes groupes={groupesPanneau} masques={masques} onMasquer={basculerMasque} onTirer={tirerDuPanneau} onSupprimer={supprimerDuPanneau} onDemanderSuppression={demanderSuppressionPanneau} enCours={cleAllumes}
+          ancrable place={place} onPlace={choisirPlace} onDeplacer={deplacerPanneau} />
+      )}
+      {chargement === 'pret' && place !== 'fenetre' && (
+        <div className="pdt-separateur pdt-separateur-groupes" role="separator" aria-orientation={place === 'gauche' ? 'vertical' : 'horizontal'}
+          title={place === 'gauche' ? 'Glisser pour régler la largeur du panneau des groupes' : 'Glisser pour régler la hauteur du panneau des groupes'}
+          onPointerDown={e => tirerBord(e, place === 'gauche' ? 'groupes' : 'hauteur')} />
       )}
       </div>
 
       {chargement === 'pret' && (
-        <div className="pdt-espace" style={{ '--largeur-tableau': `${largeurTableau}px` }}>
+        <div className="pdt-espace">
         {/* Zone qui défile, barre à gauche (demande du 2026-10-25) : sens droite-gauche pour le défilement seulement ;
             les groupes, dedans, gardent leur sens. */}
         <div className="pdt-atelier-defile">
@@ -1967,22 +2291,56 @@ export default function PosteDeTri({ connecte = null, actif = true, retour = nul
                 nomsCle={nomsCle} photos={photos} parDossier={parDossier}
                 effectif={tous.length} nbChoisis={tous.filter(id => choisis.has(cle(id))).length}
                 demonte={demontage === m.num} allumeeT={allumee?.num === m.num ? allumee.t : null} maintenu={maintien === m.num}
+                enCoursT={groupeEnCours?.num === m.num ? groupeEnCours.t : groupesAllumes.has(m.num) ? 0 : null} large={larges.has(m.num)}
                 visee={viseeIci ? (cible.refus ? 'refusee' : 'visee') : null} actions={actionsMachine} />
             )
           })}
-          <button className="pdt-ajout" onClick={ajouterMachine}><span>＋</span>Nouveau groupe temporaire</button>
         </main>
         </div>
-        <div className="pdt-separateur" role="separator" aria-orientation="vertical" title="Glisser pour régler la largeur du tableau" onPointerDown={commencerSeparation} />
-        <Tableau ref={tableau} lignes={lignes} colonnes={COLONNES} surPrise={surPriseTableau} />
+        <div className="pdt-separateur pdt-separateur-liste" role="separator" aria-orientation="vertical" title="Glisser pour régler la largeur de la liste" onPointerDown={e => tirerBord(e, 'liste')} />
+        <Tableau ref={tableau} registre={connecte?.controleur} actif={actif} lignes={lignes} colonnes={colonnesTableau} surPrise={surPriseTableau} surSelection={surSelectionTableau} teintes={TEINTES_CATEGORIES} surLargeurContenu={setLargeurColonnes} />
         </div>
       )}
 
-      {miseEnPage && disposition && (
-        <EditeurDisposition racine={racine} disposition={disposition}
-          changer={d => { setDisposition(d); ecrireDisposition(d) }}
-          fermer={() => { ecrireDisposition(disposition); setMiseEnPage(false) }}
-          reinitialiser={() => { ecrireDisposition(null); setDisposition(DISPOSITION_DEFAUT); setMiseEnPage(false) }} />
+      {ancrage && (
+        <div className="pdt-ancrage" aria-hidden="true">
+          {['haut', 'gauche'].map(k => {
+            const z = ancrage.zones[k]
+            return (
+              <div key={k} className={`pdt-ancrage-place pdt-ancrage-${k}${ancrage.vise === k ? ' pdt-visee' : ''}`} style={{ left: z.left, top: z.top, width: z.width, height: z.height }}>
+                <span>{k === 'gauche' ? 'Ancrer à gauche' : 'Ancrer en haut'}</span>
+              </div>
+            )
+          })}
+          <div ref={etiquetteAncrage} className="pdt-ancrage-etiquette" style={{ transform: `translate(${ancrage.x + 14}px, ${ancrage.y + 12}px)` }}>Groupes</div>
+        </div>
+      )}
+      {triBloc && (
+        <FenetreTriBloc rejetes={triBloc.rejetes} restants={triBloc.restants} onOk={() => setTriBloc(null)}
+          rendreCarte={t => {
+            const p = parDossier.get(t.id)
+            if (!p) return null
+            const e = etatFiche(p, machines.find(x => x.num === t.source))
+            return (
+              <div className="pdt-fiche" style={{ '--t': couleurDe(t.source) }}>
+                <ContenuFiche p={p} photo={photos[t.id]} etatIcone={e.icone} etatLibelle={e.libelle} />
+              </div>
+            )
+          }} />
+      )}
+      {confirmation && (
+        <div className="pdt-confirmer-fond" role="presentation" onPointerDown={e => { if (e.target === e.currentTarget) setConfirmation(null) }}
+          onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setConfirmation(null) } }}>
+          <div className="pdt-confirmer" role="alertdialog" aria-modal="true" aria-label={`Supprimer ${confirmation.nom}`}>
+            <h3>Supprimer « {confirmation.nom} » ?</h3>
+            <p>Il contient {confirmation.nombre} pèlerin{confirmation.nombre > 1 ? 's' : ''} : {confirmation.nombre > 1 ? 'ils retourneront' : 'il retournera'} d’où {confirmation.nombre > 1 ? 'ils venaient' : 'il venait'}.</p>
+            <ul>{confirmation.retours.map(([nom, n]) => <li key={nom}>{nom} : {n}</li>)}</ul>
+            <div className="pdt-confirmer-boutons">
+              <button type="button" onClick={() => setConfirmation(null)}>Annuler</button>
+              <button type="button" className="pdt-confirmer-oui" onClick={confirmerSuppression} autoFocus>Supprimer</button>
+            </div>
+          </div>
+        </div>
       )}
       {refus && <div key={refus.id} className="pdt-refus-message" role="alert" onAnimationEnd={() => setRefus(r => (r?.id === refus.id ? null : r))}>🔒 {refus.texte}</div>}
 

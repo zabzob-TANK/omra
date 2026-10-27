@@ -239,4 +239,60 @@
 .d5-filtre[data-montree='false'] { opacity: .35; background: transparent; }
 .d5-filtre[data-montree='false'] b { text-decoration: line-through; }
 
+/* Place du panneau (2026-10-26) : à gauche, en haut ou en fenêtre ; la place active est en surbrillance. */
+.d5-places { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--bord); border-radius: 10px; background: #121212; }
+.d5-places button { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--discret); font-size: 12px; transition: color .15s, background-color .15s; }
+.d5-places button:hover { color: var(--texte); }
+.d5-places button[data-actif='true'] { background: #262626; color: var(--texte); }
+/* Panneau ancré : sa ligne de réglages se tire pour le porter vers l'autre bord. */
+.d5-compact-reglages[data-tirable='true'] { cursor: grab; user-select: none; touch-action: none; }
+.d5-compact-reglages[data-tirable='true'] button { cursor: pointer; }
+/* Ancré à gauche : une colonne, les trois cases l'une sous l'autre, chacune avec sa barre de défilement ; les
+   pastilles prennent toute la largeur, le nom du groupe s'allonge. */
+.d5-place-gauche .d5-compact-reglages { justify-content: space-between; }
+.d5-place-gauche .d5-compact-cases { flex: 1; height: auto; min-height: 0; flex-direction: column; }
+.d5-place-gauche .d5-case { flex: 2 1 0; min-height: 64px; }
+.d5-place-gauche .d5-case-sans-groupe { flex: none; }
+.d5-place-gauche .d5-case-epingles { flex: 3 1 0; min-width: 0; }
+.d5-place-gauche .d5-case-liste { align-items: stretch; }
+.d5-place-gauche .d5-pastille { width: 100%; }
+.d5-place-gauche .d5-case-reduite .d5-c-groupe { flex: 1; width: auto; }
 
+/* Niveau de détail du panneau à gauche (1 · 2 · 3), compact. */
+.d5-niveaux-court { padding: 2px; border-radius: 10px; }
+.d5-niveaux-court button { height: 26px; min-width: 28px; justify-content: center; padding: 0 8px; border-radius: 8px; }
+.d5-niveaux-court button b { font-size: 12px; opacity: 1; }
+/* Niveaux 2 et 3 à gauche : la pastille devient une petite fiche de deux ou trois lignes, à la même largeur. */
+.d5-pastille { position: relative; }
+.d5-fiche-groupe { flex-direction: column; align-items: stretch; gap: 4px; min-height: 0; padding: 6px 10px 7px; border-radius: 12px; }
+.d5-case-reduite .d5-pastille.d5-fiche-groupe { height: auto; min-height: 0; border-radius: 12px; }
+.d5-fg-ligne { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.d5-fg-ligne .d5-nom { flex: 1; min-width: 0; }
+.d5-fg-ligne .d5-icone { width: 17px; height: 17px; flex: none; }
+.d5-fiche-groupe .d5-nombre { min-width: 26px; height: 22px; padding: 0 5px; border-radius: 6px; font-size: 13px; }
+.d5-fg-sous { min-height: 20px; font-size: 11.5px; }
+.d5-fg-sous .d5-num, .d5-fg-sous .d5-logiciel { font-size: 11.5px; }
+.d5-fg-sous .d5-trait { height: 12px; }
+.d5-fg-sous .mb-pastille-libre { padding: 0 6px; font-size: 11px; }
+.d5-fg-vide { flex: 1; }
+.d5-fiche-groupe .d5-actions { gap: 4px; }
+.d5-fiche-groupe .mb-action { height: 20px; max-width: 22px; padding: 2px 4px; border-radius: 6px; }
+.d5-fiche-groupe .mb-action:hover { max-width: 22px; }
+.d5-fiche-groupe .mb-action svg { width: 13px; height: 13px; }
+.d5-fiche-groupe .mb-action-libelle { display: none; }
+.d5-fg-supprimer { display: inline-grid; place-items: center; width: 24px; height: 20px; padding: 0; border: 1px solid color-mix(in srgb, #ef6f6c 40%, transparent); border-radius: 6px; background: none; color: #ef8f8c; touch-action: none; }
+.d5-fg-supprimer:hover { background: color-mix(in srgb, #ef6f6c 16%, transparent); color: #ffb3b0; }
+/* Appui maintenu sur un groupe temporaire : une barre rouge se remplit le long du bas, de droite à gauche ; au bout, le
+   groupe est supprimé. */
+.d5-pastille[data-suppressible] { touch-action: none; }
+.d5-maintien { position: absolute; right: 10px; left: 10px; bottom: 2px; height: 3px; border-radius: 2px; background: #ef6f6c; transform: scaleX(0); transform-origin: right center; opacity: 0; pointer-events: none; }
+/* Groupe en cours dans la page (2026-10-26) : la pastille s'allume à la couleur du groupe. */
+.d5-pastille[data-en-cours] { border-color: color-mix(in srgb, var(--teinte) 75%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--teinte) 35%, transparent), 0 0 10px -4px color-mix(in srgb, var(--teinte) 45%, transparent); }
+.d5-pastille[data-maintenu] { border-color: #ef6f6c; }
+.d5-pastille[data-maintenu] .d5-maintien { opacity: 1; transform: scaleX(1); transition: transform var(--maintien, 700ms) linear; }
+/* Groupe temporaire vide : contour en pointillés et « ∅ » à la place du nombre, pour le supprimer vite. */
+.d5-pastille[data-vide] { border-style: dashed; border-color: color-mix(in srgb, var(--teinte) 70%, transparent); }
+.d5-nombre-vide { font-size: 15px; font-weight: 700; color: color-mix(in srgb, var(--teinte) 55%, #ffffff); }
+.d5-vide-supprimer { font-family: inherit; cursor: pointer; }
+.d5-vide-supprimer:hover { border-color: #ef6f6c; background: color-mix(in srgb, #ef6f6c 22%, transparent); color: #ffd9d6; }
+@media (prefers-reduced-motion: reduce) { .d5-pastille[data-maintenu] .d5-maintien { transition-duration: 1ms; } }

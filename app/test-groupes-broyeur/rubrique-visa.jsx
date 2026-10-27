@@ -3,6 +3,7 @@
 // et les groupes Nusuk viennent du registre et de la dernière lecture Nusuk, calculés avec les
 // mêmes fonctions que la partie Visa du fichier clients. Lecture seule : rien n'est écrit.
 import { versVoyageur } from '@/modules/client-react/intake/adaptateur'
+import { categorieGroupeVisa } from '@/modules/client-react/teinte-groupe-visa'
 import { confirmationsRegistre } from '@/modules/client-react/nusuk/registre-confirmations'
 import { confirmationTime, visaPending } from '@/modules/client-react/nusuk/reading-rules'
 import { etatVisuelVisa, resumeEtatGroupeVisa } from '@/modules/client-react/visa-restrictions'
@@ -95,17 +96,8 @@ export function resumeLecture(p, origine = null) {
 
 // Les cinq catégories de groupes (visa-appearance.js du fichier clients).
 export const CATEGORIES = VISA_CATEGORIES
-export function categorieMachine(panier, rows) {
-  const vb = panier?.visaBrouillon
-  if (!vb || (!vb.nusukId && !vb.sansGroupe)) return 'temporaire'
-  if (vb.sansGroupe) return 'sans-groupe'
-  if (vb.phase === 'visa-emis') return 'visa-emis'
-  if (vb.phase === 'visa-en-cours') return 'attente-visa'
-  const resume = resumeEtatGroupeVisa(panier, rows)
-  if (resume.icone === 'visa-emis') return 'visa-emis'
-  if (resume.icone === 'attente-visa') return 'attente-visa'
-  return 'groupe'
-}
+// Même catégorie que celle du registre (couleurs des cases et des photos des tableaux) : une seule règle.
+export const categorieMachine = (panier, rows) => categorieGroupeVisa(panier, rows)
 
 // Un groupe dont le visa est en traitement ou délivré est verrouillé : rien n'entre, rien ne sort.
 export function motifVerrouMachine(categorie) {
@@ -135,8 +127,10 @@ export const nouveauBrouillon = num => ({ id: `visa-local-${num}-${Date.now()}`,
 // groupe Visa et leur état (calculés depuis les mêmes données que le panneau des groupes).
 export const COLONNES = [
   {
-    field: 'photo', headerName: '', width: 48, sortable: false, filter: false,
-    cellRenderer: p => p.value ? <img className="pdt-tableau-photo" src={p.value} alt="" /> : <span className="pdt-tableau-photo pdt-tableau-sans-photo">{(p.data.nomAr || p.data.nomLat || '?').trim().slice(0, 1)}</span>,
+    field: 'photo', headerName: '', width: 52, sortable: false, filter: false,
+    // Cadre aux couleurs du groupe Visa du pèlerin (variable posée sur la ligne, voir Tableau.jsx), sinon neutre : comme
+    // le registre en mode Visa, le bleu et le rose du sexe ne s'appliquent pas ici.
+    cellRenderer: p => p.value ? <img className="pdt-tableau-photo" src={p.value} alt="" draggable={false} /> : <span className="pdt-tableau-photo pdt-tableau-sans-photo">{(p.data.nomAr || p.data.nomLat || '?').trim().slice(0, 1)}</span>,
   },
   { field: 'dossier', headerName: 'Dossier', width: 86 },
   { field: 'nomAr', headerName: 'الاسم', width: 160, cellClass: 'pdt-cellule-ar' },
@@ -187,12 +181,19 @@ export async function actualiserExcelNusuk(signal, suivre = () => {}) {
 // Les 5 catégories du logiciel, plus une 6e : « Refusé — Nusuk » (rouge), pour un groupe dont l'état
 // Nusuk est un refus ou un renvoi. Son icône est le dossier Nusuk passé au rouge (le triangle et la
 // flèche brisée restent réservés aux avertissements).
-export const CATEGORIES_LISTE = { ...VISA_CATEGORIES, refuse: { label: 'Refusé — Nusuk', color: '#C2514B' } }
-export const iconeGroupe = categorie => (categorie === 'refuse' ? iconeRefuse.src : visaIconSource(categorie))
+// « hors-groupe » : la machine « Hors groupe Visa » du Poste de tri, montrée dans le panneau pour l'afficher ou la
+// masquer comme un groupe (2026-10-26) ; ce n'est pas un groupe du registre.
+export const CATEGORIES_LISTE = { ...VISA_CATEGORIES, refuse: { label: 'Refusé — Nusuk', color: '#C2514B' }, 'hors-groupe': { label: 'Hors groupe Visa', color: '#7d8590' } }
+const ICONE_HORS_GROUPE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="#8b919c"/></svg>')}`
+export const iconeGroupe = categorie => (categorie === 'refuse' ? iconeRefuse.src : categorie === 'hors-groupe' ? ICONE_HORS_GROUPE : visaIconSource(categorie))
 // Ordre des catégories : sans groupe, modifiables, visa en attente, visa obtenu, refusés, temporaires.
 export const RANG_LISTE = { 'sans-groupe': 0, groupe: 1, 'attente-visa': 2, 'visa-emis': 3, refuse: 4, temporaire: 5 }
-export const LOGICIEL_LISTE = { 'sans-groupe': 'Par défaut', temporaire: 'Temporaire' }
-export const ETAT_LISTE = { 'sans-groupe': 'بدون مجموعة', groupe: 'قابل للتعديل', 'attente-visa': 'بانتظار التأشيرة', 'visa-emis': 'التأشيرة صادرة', refuse: 'مرفوضة', temporaire: 'محلي' }
+export const LOGICIEL_LISTE = { 'sans-groupe': 'Par défaut', temporaire: 'Temporaire', 'hors-groupe': 'Poste de tri' }
+export const ETAT_LISTE = { 'sans-groupe': 'بدون مجموعة', groupe: 'قابل للتعديل', 'attente-visa': 'بانتظار التأشيرة', 'visa-emis': 'التأشيرة صادرة', refuse: 'مرفوضة', temporaire: 'محلي', 'hors-groupe': 'خارج مجموعات التأشيرة' }
+// Ordre du panneau (demande du commanditaire, 2026-10-26) : temporaires d'abord, puis les bleus (modifiables), les
+// groupes en attente de visa, les verts (visa obtenu) et, tout en dernier, les rouges (refusés) ; dans chaque
+// couleur, l'ordre des groupes réglé à la main. « Hors groupe Visa » et « sans groupe » ont leur propre case.
+const ORDRE_PANNEAU = { 'hors-groupe': 0, 'sans-groupe': 1, temporaire: 2, groupe: 3, 'attente-visa': 4, 'visa-emis': 5, refuse: 6 }
 
 // Les 14 états du filtre « الحالة » de la liste des groupes Nusuk (relevés le 2026-10-13), rangés en
 // quatre familles : bleu = en préparation, orange = envoyé ou en traitement, vert = visas délivrés,
@@ -275,7 +276,7 @@ export function resumeGroupe(x) {
 // défaut, rang Nusuk croissant (1, 2, 3… de haut en bas). « vue » : affichés d'abord, puis masqués. Les
 // groupes sans rang Nusuk restent en bas quand on trie par rang, dans les deux sens.
 const CLES_TRI = {
-  ordre: x => x.ordre ?? Infinity,
+  ordre: x => (ORDRE_PANNEAU[x.categorie] ?? 7) * 1e6 + (Number.isFinite(x.ordre) ? x.ordre : 999999),
   rang: x => x.rang ?? Infinity,
   vue: (x, masques) => (masques.has(x.g.num) ? 1 : 0),
   nombre: x => infoGroupe(x).effectif,

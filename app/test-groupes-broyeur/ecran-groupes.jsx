@@ -34,6 +34,8 @@ export default function EcranGroupes({ actif }) {
   const groupesVisa = useMemo(() => (paniers || []).filter(estVisa).map(g => ({ ...g, origines: g.origines || {} })), [paniers])
 
   const connecte = useMemo(() => m && {
+    // Le registre lui-même : le tableau du Poste de tri reprend ses colonnes et sa vue (colonnes-registre.jsx).
+    controleur: m,
     paniers: groupesVisa,
     pelerins,
     lecture,
@@ -83,6 +85,8 @@ export default function EcranGroupes({ actif }) {
       if (fait === false) return motif || 'Le registre a refusé ce changement.'
       return replaces.length ? { avis: `Déjà enregistré${replaces.length > 1 ? 's' : ''} dans Nusuk : ${replaces.length > 1 ? `${replaces.length} pèlerins placés` : 'placé'} dans « Pèlerins sans groupe Nusuk ».` } : ''
     },
+    // Motif pour lequel un pèlerin ne peut pas être déplacé, selon les règles Visa du registre ('' s'il peut l'être).
+    motifBlocage: id => m.motifBlocageVisa?.(id) || '',
     // Nouveau groupe temporaire : numéro libre parmi tous les groupes du registre, nom et brouillon comme les siens.
     prochainNum: () => Math.max(0, ...(m.state.paniers || []).map(g => g.num)) + 1,
     prochainNom: () => prochainNomVisa(nomsReservesGroupes(m)),

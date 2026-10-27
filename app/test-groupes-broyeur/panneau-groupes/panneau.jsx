@@ -1,7 +1,7 @@
 'use client'
 
-import { Fragment, memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ChevronsDown, ChevronsUp, Info, PanelTop, PictureInPicture2, RotateCcw, Trash2 } from 'lucide-react'
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ChevronsDown, ChevronsUp, Info, PanelLeft, PanelTop, PictureInPicture2, RotateCcw, Trash2 } from 'lucide-react'
 import { CATEGORIES_LISTE, iconeGroupe, resumeGroupe, trierGroupes, triSuivant, TRI_INITIAL } from '../rubrique-visa'
 import { BoutonAction, Ecart, NombreGlissant, Oeil, RangNusuk, S_EPINGLE, S_PILE, STYLE_RESSORTS, TitreTri } from './affichage'
 import './panneau.css'
@@ -73,20 +73,48 @@ const NIVEAUX = [
 ]
 const CLE_NIVEAU = 'mb-groupes-niveau'
 const lireNiveau = () => { try { const n = Number(localStorage.getItem(CLE_NIVEAU)); return [1, 2, 3].includes(n) ? n : 2 } catch { return 2 } }
+// Panneau ancré à gauche (2026-10-26) : son propre niveau, 1 par défaut (icône, nom, nombre) ; 2 ajoute le numéro du
+// groupe et la suppression, 3 tout le détail, sur plusieurs lignes, sans élargir le panneau.
+const CLE_NIVEAU_GAUCHE = 'mb-groupes-niveau-gauche'
+const lireNiveauGauche = () => { try { const n = Number(localStorage.getItem(CLE_NIVEAU_GAUCHE)); return [1, 2, 3].includes(n) ? n : 1 } catch { return 1 } }
+const NIVEAUX_GAUCHE = [
+  { n: 1, bulle: 'Le nom et le nombre' },
+  { n: 2, bulle: 'Avec le numéro du groupe et la suppression' },
+  { n: 3, bulle: 'Tout le détail' },
+]
+// Suppression d'un groupe temporaire par appui maintenu : la barre part après ATTENTE (un clic reste un clic), puis se
+// remplit en MAINTIEN, comme le ✕ des groupes de l'atelier.
+const ATTENTE_MAINTIEN = 220
+const MAINTIEN_SUPPRESSION = 700
 
 // Fenêtre « comme sous Windows » : fixe à l'écran (visible même quand la page défile), déplaçable en
 // la tirant par son titre ; sa position est retenue dans ce navigateur.
 const CLE_POSITION = 'mb-fenetre-groupes'
 const lirePosition = () => { try { const p = JSON.parse(localStorage.getItem(CLE_POSITION) || 'null'); return Number.isFinite(p?.x) && Number.isFinite(p?.y) ? p : null } catch { return null } }
 
-// Ancré en haut de la page ou en fenêtre (demande du commanditaire, 2026-10-16) : un bouton de l'en-tête passe de
-// l'un à l'autre ; le choix est retenu dans ce navigateur. Seules les pages qui le permettent (« ancrable ») ont
-// ce bouton, et l'ancrage y est le choix par défaut ; ailleurs, le panneau reste une fenêtre.
-const CLE_ANCRE = 'mb-groupes-ancre'
+// Place du panneau (demandes du commanditaire, 2026-10-16 puis 2026-10-26) : ancré à gauche de la page (par défaut),
+// ancré en haut, ou en fenêtre. Seules les pages qui le permettent (« ancrable ») choisissent la place : elles la
+// gardent et la donnent au panneau (« place », « onPlace ») ; ailleurs, le panneau reste une fenêtre.
+const PLACES = [
+  { cle: 'gauche', nom: 'Gauche', bulle: 'Ancrer le panneau à gauche de la page', Icone: PanelLeft },
+  { cle: 'haut', nom: 'Haut', bulle: 'Ancrer le panneau en haut de la page', Icone: PanelTop },
+  { cle: 'fenetre', nom: 'Fenêtre', bulle: 'Détacher le panneau en fenêtre déplaçable', Icone: PictureInPicture2 },
+]
+function ChoixPlace({ place, onPlace }) {
+  return (
+    <div className="d5-places" role="radiogroup" aria-label="Place du panneau">
+      {PLACES.map(({ cle, nom, bulle, Icone }) => (
+        <button key={cle} type="button" role="radio" aria-checked={place === cle} data-actif={place === cle} title={bulle}
+          onClick={() => place !== cle && onPlace?.(cle)}>
+          <Icone size={14} /><span>{nom}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
 // « كل المجموعات » toujours dépliée, ou en pile repliée qui s'étale au survol (choix retenu dans ce navigateur).
 const CLE_DEPLIEE = 'mb-groupes-pile-depliee'
 const lireDepliee = () => { try { return localStorage.getItem(CLE_DEPLIEE) === '1' } catch { return false } }
-const lireAncre = () => { try { return localStorage.getItem(CLE_ANCRE) !== 'fenetre' } catch { return true } }
 
 // Le panneau ne fait qu'afficher : la page lui donne les groupes (listeGroupesVisa), les groupes
 // masqués et ce qu'il faut faire quand on affiche ou masque un groupe. Tri, épingles, niveau, position
@@ -95,14 +123,15 @@ const lireAncre = () => { try { return localStorage.getItem(CLE_ANCRE) !== 'fene
 // recalculé à chaque mouvement de la souris (c'était une source de saccades sur les petits PC).
 // « outils » : réglages de la page posés dans l'en-tête du panneau (sur le Poste de tri : la vue de toutes les machines).
 // « onTirer » : la page prend en main le glisser d'un groupe depuis sa pastille (vers l'atelier du Poste de tri).
-export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer, onTirer = null, ancrable = false, outils = null }) {
+// « onDeplacer » : la page prend en main le panneau ancré tiré par sa ligne de réglages (vers l'autre bord).
+// « onSupprimer » : la page supprime un groupe temporaire (appui maintenu sur sa pastille) ; sans elle, rien ne se supprime.
+// « enCours » : numéros des groupes sur lesquels la page travaille (« 1,4 ») ; leurs pastilles s'allument (affichage seulement).
+// « onDemanderSuppression » : clic sur la poubelle ou le « ∅ » d'un groupe temporaire ; la page supprime (groupe vide) ou
+// demande confirmation (groupe avec des pèlerins).
+export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, masques = AUCUN, onMasquer, onTirer = null, onSupprimer = null, onDemanderSuppression = null, enCours = null, ancrable = false, place = 'fenetre', onPlace = null, onDeplacer = null, outils = null }) {
   const bloc = useRef(null)
-  const [ancreChoisi, setAncre] = useState(() => ancrable && lireAncre())
-  const ancre = ancrable && ancreChoisi
-  const basculerAncre = () => setAncre(a => {
-    try { localStorage.setItem(CLE_ANCRE, a ? 'fenetre' : 'haut') } catch { /* préférence facultative */ }
-    return !a
-  })
+  const ancre = ancrable && place !== 'fenetre'
+  const allumes = useMemo(() => new Set(String(enCours ?? '').split(',').filter(Boolean).map(Number)), [enCours])
   // Fenêtre : la pile « كل المجموعات » peut rester dépliée pour de bon.
   const [depliee, setDepliee] = useState(lireDepliee)
   const basculerDepliee = () => {
@@ -166,6 +195,12 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
     window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', fin)
   }
   const [niveau, setNiveau] = useState(lireNiveau)
+  const [niveauGauche, setNiveauGauche] = useState(lireNiveauGauche)
+  const choisirNiveauGauche = n => {
+    relever()
+    setNiveauGauche(n)
+    try { localStorage.setItem(CLE_NIVEAU_GAUCHE, String(n)) } catch { /* préférence facultative */ }
+  }
   const [cachees, setCachees] = useState(lireCachees)
   const basculerCategorie = categorie => {
     relever()
@@ -210,21 +245,26 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   // Actions des pastilles : un objet stable (les pastilles mémorisées ne se redessinent pas pour lui),
   // qui appelle toujours la version à jour.
   const aJour = useRef(null)
-  aJour.current = { masquer: num => etat.props(num).onMasquer(), tirer: (e, num) => onTirer?.(e, num) }
-  const actions = useMemo(() => ({ masquer: num => aJour.current.masquer(num), tirer: (e, num) => aJour.current.tirer(e, num) }), [])
+  aJour.current = { masquer: num => etat.props(num).onMasquer(), tirer: (e, num) => onTirer?.(e, num), supprimer: num => onSupprimer?.(num), demanderSuppression: num => (onDemanderSuppression || onSupprimer)?.(num) }
+  const actions = useMemo(() => ({ masquer: num => aJour.current.masquer(num), tirer: (e, num) => aJour.current.tirer(e, num), supprimer: num => aJour.current.supprimer(num), demanderSuppression: num => aJour.current.demanderSuppression(num) }), [])
   const pastille = (x, i, rangPile = null, totalPile = 0) => (
     <Pastille key={x.g.num} x={x} i={i} rangPile={rangPile} totalPile={totalPile} niveau={niveau} colonnes={colonnes} nouvelles={nouvelles}
-      masque={masques.has(x.g.num)} actions={actions} />
+      masque={masques.has(x.g.num)} actions={actions} suppressible={!!onSupprimer && x.categorie === 'temporaire'} enCours={allumes.has(x.g.num)} />
   )
   // « Pèlerins sans groupe Nusuk » : le groupe le plus important, toujours en tête, à part — ni
   // dans les affichés, ni dans les masqués, ni déplacé par le tri (un clic l'affiche ou le masque aussi).
   const nombreParCategorie = groupes.reduce((m, x) => m.set(x.categorie, (m.get(x.categorie) || 0) + 1), new Map())
   const visibles = groupes.filter(x => !cachees.has(x.categorie))
-  const sansGroupe = visibles.filter(x => x.categorie === 'sans-groupe')
-  const autres = visibles.filter(x => x.categorie !== 'sans-groupe')
+  const aPart = x => x.categorie === 'sans-groupe' || x.categorie === 'hors-groupe'
+  const sansGroupe = visibles.filter(aPart)
+  const autres = visibles.filter(x => !aPart(x))
   // En haut les groupes affichés, en bas les masqués, chacun dans l'ordre du tri (par défaut, l'ordre des groupes).
   // Un groupe de la lecture Nusuk sans groupe dans la page (« absent ») ne peut pas être affiché : il reste en bas.
+  // Affichés (2026-10-27) : dans l'ordre des groupes de la page (celui de l'atelier), pas par couleur ; un tri choisi
+  // par un titre (fenêtre) s'applique toujours. Masqués : par couleur (trierGroupes).
+  const parOrdre = (a, b) => (a.ordre ?? Infinity) - (b.ordre ?? Infinity) || a.g.num - b.g.num
   const enHaut = autres.filter(x => !x.absent && !masques.has(x.g.num))
+  if (tri.cle === 'ordre') enHaut.sort(parOrdre)
   const dessous = autres.filter(x => x.absent || masques.has(x.g.num))
   const titre = r => r.titre && <TitreTri cle={r.cle} titre={r.titre} bulle={r.bulle} tri={tri} onTrier={onTrier} />
 
@@ -256,13 +296,7 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
         {(outils || ancrable) && (
           <div className="d5-outils">
             {outils}
-            {ancrable && (
-              <button type="button" className="d5-ancrer" onClick={basculerAncre} aria-pressed={!ancre}
-                title={ancre ? 'Détacher le panneau en fenêtre déplaçable' : 'Ancrer le panneau en haut de la page'}>
-                {ancre ? <PictureInPicture2 size={15} /> : <PanelTop size={15} />}
-                <span>{ancre ? 'Fenêtre' : 'Ancrer en haut'}</span>
-              </button>
-            )}
+            {ancrable && <ChoixPlace place={place} onPlace={onPlace} />}
           </div>
         )}
       </div>
@@ -298,28 +332,36 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
   //  - « sans groupe » : la moins visible, format minimal ;
   //  - au centre, les groupes affichés, ceux sur lesquels on travaille : tout le détail, toujours entier ;
   //  - les groupes masqués, nombreux : format minimal (icône, nom, nombre).
-  // Les réglages (filtres, vue, fenêtre) sont à part, sur leur propre ligne au-dessus.
+  // Les réglages (filtres, vue, place) sont à part, sur leur propre ligne au-dessus.
+  // Ancré à gauche (2026-10-26) : les trois cases l'une sous l'autre, au niveau choisi (1 · 2 · 3) ; la largeur ne change
+  // pas, les niveaux 2 et 3 allongent les pastilles en fiches. Le détail du groupe s'affiche aussi au survol.
+  const aGauche = place === 'gauche'
+  const fiche = aGauche && niveauGauche > 1 ? niveauGauche : 0
   const caseGroupes = (cle, nom, liste, vide, depart, n, colonnesCase, reduite) => (
     <section className={`d5-case d5-case-${cle}${reduite ? ' d5-case-reduite' : ''}`} aria-label={nom} data-niveau={n}>
       <h4>{nom} <span>{liste.length}</span></h4>
       {liste.length
         ? <ul className="d5-case-liste">{liste.map((x, i) => (
           <Pastille key={x.g.num} x={x} i={depart + i} niveau={n} colonnes={colonnesCase} nouvelles={null}
-            masque={masques.has(x.g.num)} actions={actions} />
+            masque={masques.has(x.g.num)} actions={actions} detail={aGauche} fiche={fiche}
+            suppressible={!!onSupprimer && x.categorie === 'temporaire'} enCours={allumes.has(x.g.num)} />
         ))}</ul>
         : <p className="d5-case-vide">{vide}</p>}
     </section>
   )
+  // La ligne de réglages se tire (hors boutons) pour porter le panneau vers l'autre bord.
+  const tirerPanneau = e => { if (e.button === 0 && !e.target.closest('button, input, label')) onDeplacer?.(e) }
   return (
-    <div ref={bloc} className="d5 d5-compact" dir="rtl" style={STYLE_RESSORTS}>
-      <div className="d5-compact-reglages">
+    <div ref={bloc} className={`d5 d5-compact d5-place-${place}`} dir="rtl" style={STYLE_RESSORTS}>
+      <div className="d5-compact-reglages" data-tirable={!!onDeplacer} onPointerDown={tirerPanneau}
+        title={onDeplacer ? 'Tirer pour ancrer le panneau à gauche ou en haut' : undefined}>
         <div className="d5-filtres" role="group" aria-label="Catégories affichées">
           {FILTRES.map(f => {
             const montree = !cachees.has(f.categorie)
             return (
               <button key={f.categorie} type="button" className="d5-filtre" data-montree={montree} aria-pressed={montree} onClick={() => basculerCategorie(f.categorie)}
                 style={{ '--teinte': CATEGORIES_LISTE[f.categorie]?.color }} title={`${f.nom} — ${montree ? 'affichée : cliquer pour cacher' : 'cachée : cliquer pour afficher'}`}>
-                <img src={iconeGroupe(f.categorie)} alt="" />
+                <img src={iconeGroupe(f.categorie)} alt="" draggable={false} />
                 <b>{nombreParCategorie.get(f.categorie) || 0}</b>
               </button>
             )
@@ -327,14 +369,23 @@ export const PanneauGroupes = memo(function PanneauGroupes({ groupes: entree, ma
         </div>
         <div className="d5-outils">
           {outils}
-          <button type="button" className="d5-ancrer" onClick={basculerAncre} title="Détacher le panneau en fenêtre déplaçable">
-            <PictureInPicture2 size={15} /><span>Fenêtre</span>
-          </button>
+          {aGauche && (
+            <div className="d5-niveaux d5-niveaux-court" role="radiogroup" aria-label="Niveau de détail">
+              {NIVEAUX_GAUCHE.map(n => (
+                <button key={n.n} type="button" role="radio" aria-checked={niveauGauche === n.n} data-actif={niveauGauche === n.n} onClick={() => choisirNiveauGauche(n.n)} title={n.bulle}>
+                  <b>{n.n}</b>
+                </button>
+              ))}
+            </div>
+          )}
+          <ChoixPlace place={place} onPlace={onPlace} />
         </div>
       </div>
       <div className="d5-compact-cases">
         {caseGroupes('sans-groupe', 'بدون مجموعة', sansGroupe, '—', 0, 1, RUBRIQUES_MINIMAL, true)}
-        {caseGroupes('epingles', 'المعروضة', enHaut, 'لا توجد مجموعة معروضة', sansGroupe.length, 3, RUBRIQUES_DETAIL, true)}
+        {aGauche
+          ? caseGroupes('epingles', 'المعروضة', enHaut, 'لا توجد مجموعة معروضة', sansGroupe.length, 1, RUBRIQUES_MINIMAL, true)
+          : caseGroupes('epingles', 'المعروضة', enHaut, 'لا توجد مجموعة معروضة', sansGroupe.length, 3, RUBRIQUES_DETAIL, true)}
         {caseGroupes('tous', 'المخفية', dessous, 'لا توجد مجموعة مخفية', sansGroupe.length + enHaut.length, 1, RUBRIQUES_MINIMAL, true)}
       </div>
     </div>
@@ -353,20 +404,73 @@ function memePastille(a, b) {
     && a.x.nusuk?.etat === b.x.nusuk?.etat && a.x.nusuk?.effectif === b.x.nusuk?.effectif
     && a.i === b.i && a.rangPile === b.rangPile && a.totalPile === b.totalPile && a.niveau === b.niveau
     && a.colonnes === b.colonnes && a.nouvelles === b.nouvelles && a.masque === b.masque && a.actions === b.actions
+    && a.detail === b.detail && a.fiche === b.fiche && a.suppressible === b.suppressible && a.enCours === b.enCours
 }
 
 // Une pastille. Mémorisée : redessinée seulement si son groupe ou son affichage change (voir memePastille).
 // « rangPile » : place dans la pile du bas (null ailleurs). « actions » est stable d'un rendu à l'autre.
-const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, niveau, colonnes, nouvelles, masque, actions }) {
-    const r = resumeGroupe(x), p = { masque, onMasquer: () => actions.masquer(x.g.num) }
+// « detail » : la bulle du groupe donne aussi ce que le format minimal ne montre pas (panneau ancré à gauche).
+// « fiche » : panneau ancré à gauche, niveaux 2 et 3 — même largeur, la pastille s'allonge en petite fiche.
+// « suppressible » : groupe temporaire d'une page qui sait le supprimer — un appui maintenu le supprime.
+const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, niveau, colonnes, nouvelles, masque, actions, detail = false, fiche = 0, suppressible = false, enCours = false }) {
+    const r = resumeGroupe(x)
+    // Appui maintenu (2026-10-26) : après un court instant, une barre rouge se remplit le long du groupe ; au bout, le
+    // groupe temporaire est supprimé. Lâcher avant ne fait rien (pas même afficher ou masquer) ; bouger la souris
+    // annule l'appui, et le geste devient le glisser habituel du groupe.
+    const [maintenu, setMaintenu] = useState(false)
+    const avaler = useRef(false)
+    const appui = useRef(null)
+    const debutAppui = useRef(null)
+    useEffect(() => () => appui.current?.arreter(), [])
+    function commencerAppui(e) {
+      debutAppui.current = e.button === 0 ? performance.now() : null
+      if (!suppressible || e.button !== 0 || e.target.closest('button:not(.d5-nom-bouton):not(.d5-fg-supprimer)')) return
+      appui.current?.arreter()
+      const x0 = e.clientX, y0 = e.clientY
+      const a = { parti: false }
+      const bouge = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 5) a.arreter() }
+      const lacher = () => { if (a.parti) avaler.current = true; a.arreter() }
+      a.arreter = () => {
+        clearTimeout(a.attente); clearTimeout(a.fin)
+        window.removeEventListener('pointermove', bouge); window.removeEventListener('pointerup', lacher); window.removeEventListener('pointercancel', lacher)
+        if (appui.current === a) appui.current = null
+        setMaintenu(false)
+      }
+      a.attente = setTimeout(() => {
+        a.parti = true; setMaintenu(true)
+        a.fin = setTimeout(() => { a.arreter(); avaler.current = true; actions.supprimer(x.g.num) }, MAINTIEN_SUPPRESSION)
+      }, ATTENTE_MAINTIEN)
+      appui.current = a
+      window.addEventListener('pointermove', bouge); window.addEventListener('pointerup', lacher); window.addEventListener('pointercancel', lacher)
+    }
+    // Un appui long n'affiche ni ne masque : sur un groupe qui ne se supprime pas, il ne fait rien.
+    const basculer = () => {
+      const long = debutAppui.current != null && performance.now() - debutAppui.current > 450
+      debutAppui.current = null
+      if (avaler.current || long) { avaler.current = false; return }
+      actions.masquer(x.g.num)
+    }
+    const p = { masque, onMasquer: basculer }
+    // Groupe temporaire vide : un signe à la place du nombre, pour le repérer et le supprimer vite.
+    const vide = x.categorie === 'temporaire' && !r.nombre
+    const consigne = p.masque ? 'masqué : cliquer pour l’afficher' : 'affiché : cliquer pour le masquer'
+    const bulle = detail
+      ? [r.nom, [r.nusuk ? `n° ${r.nusuk}` : 'sans numéro Nusuk', r.etat, r.logiciel].filter(Boolean).join(' · '),
+        r.plus || r.moins ? `+${r.plus} ajouté(s) / −${r.moins} retiré(s)` : '', consigne].filter(Boolean).join('\n')
+      : `${r.nom} — ${consigne}`
     const contenu = {
       rang: () => <RangNusuk rang={r.rang} />,
       vue: () => <Oeil masque={p.masque} onMasquer={p.onMasquer} />,
-      nombre: () => <b className="d5-nombre" title={r.lu ? `Sur Nusuk ; ${r.registre} dans le registre` : undefined}><NombreGlissant nombre={r.nombre} /></b>,
-      icone: () => <img className="d5-icone" src={r.icone} alt="" />,
+      // Groupe temporaire vide : le « ∅ » se clique pour le supprimer aussitôt.
+      nombre: () => vide
+        ? (suppressible
+          ? <button type="button" className="d5-nombre d5-nombre-vide d5-vide-supprimer" aria-label={`Supprimer ${r.nom} (vide)`} title="Groupe vide : cliquer pour le supprimer" onClick={() => actions.demanderSuppression(x.g.num)}>∅</button>
+          : <b className="d5-nombre d5-nombre-vide" aria-label="Groupe vide" title="Groupe vide">∅</b>)
+        : <b className="d5-nombre" title={r.lu ? `Sur Nusuk ; ${r.registre} dans le registre` : undefined}><NombreGlissant nombre={r.nombre} /></b>,
+      icone: () => <img className="d5-icone" src={r.icone} alt="" draggable={false} />,
       // Au niveau 1, sans œil : un clic sur le nom affiche ou masque le groupe.
       groupe: () => niveau === 1
-        ? <button type="button" className="d5-nom-bouton" onClick={p.onMasquer} aria-pressed={!p.masque} title={`${r.nom} — ${p.masque ? 'cliquer pour afficher' : 'cliquer pour masquer'}`}><span className="d5-nom" dir="auto">{r.nom}</span></button>
+        ? <button type="button" className="d5-nom-bouton" onClick={p.onMasquer} aria-pressed={!p.masque} title={detail ? undefined : `${r.nom} — ${p.masque ? 'cliquer pour afficher' : 'cliquer pour masquer'}`}><span className="d5-nom" dir="auto">{r.nom}</span></button>
         : <span className="d5-nom" dir="auto" title={r.nom}>{r.nom}</span>,
       numero: () => <span className="d5-num" dir="ltr">{r.nusuk || '—'}</span>,
       logiciel: () => <span className="d5-logiciel" dir="ltr">{r.logiciel}</span>,
@@ -375,16 +479,56 @@ const Pastille = memo(function Pastille({ x, i, rangPile = null, totalPile = 0, 
       actions: () => (
         <span className="d5-actions">
           <BoutonAction Icone={Info} libelle="معلومات" ton="gris" desactive raison="Détail du groupe : pas encore branché" />
-          <BoutonAction Icone={Trash2} libelle="حذف" ton="rouge" desactive raison={x.categorie === 'temporaire' ? 'Suppression : pas encore branchée' : 'Seuls les groupes temporaires se suppriment'} />
+          {!suppressible && <BoutonAction Icone={Trash2} libelle="حذف" ton="rouge" desactive raison={x.categorie === 'temporaire' ? 'Suppression : pas encore branchée' : 'Seuls les groupes temporaires se suppriment'} />}
           <BoutonAction Icone={RotateCcw} libelle="استعادة" ton="vert" desactive raison={r.plus || r.moins ? 'Restauration : pas encore branchée' : 'Aucun ajout ni retrait à annuler'} />
         </span>
       ),
     }
-    return (
+    // Bouton de suppression (niveaux 2 et 3 à gauche) : il ne fait que l'appui maintenu, comme toute la pastille.
+    const boutonSupprimer = suppressible && (
+      <button type="button" className="d5-fg-supprimer" aria-label={`Supprimer ${r.nom}`} onClick={() => actions.demanderSuppression(x.g.num)}
+        title={r.nombre ? 'Clic : supprimer après confirmation · appui maintenu : supprimer tout de suite' : 'Supprimer ce groupe vide'}>
+        <Trash2 size={13} />
+      </button>
+    )
+    const proprietes = {
+      'data-flip': x.g.num, 'data-masque': p.masque, 'data-rang-pile': rangPile ?? undefined, 'data-vide': vide || undefined,
+      'data-maintenu': maintenu || undefined, 'data-suppressible': suppressible || undefined, 'data-en-cours': enCours || undefined, title: bulle,
+      style: { '--teinte': r.couleur, '--i': i, '--maintien': `${MAINTIEN_SUPPRESSION}ms`, ...(rangPile == null ? {} : { '--rang': Math.min(rangPile, 3), '--z': totalPile - rangPile }) },
       // Un clic n'importe où sur le groupe l'affiche ou le masque (les boutons gardent leur propre action).
-      <li key={x.g.num} data-flip={x.g.num} className="d5-pastille" data-masque={p.masque} data-rang-pile={rangPile ?? undefined} style={{ '--teinte': r.couleur, '--i': i, ...(rangPile == null ? {} : { '--rang': Math.min(rangPile, 3), '--z': totalPile - rangPile }) }}
-        onClick={e => { if (!e.target.closest('button, a, input')) p.onMasquer() }} onPointerDown={e => actions.tirer(e, x.g.num)} title={`${r.nom} — ${p.masque ? 'masqué : cliquer pour l’afficher' : 'affiché : cliquer pour le masquer'}`}>
+      onClick: e => { if (!e.target.closest('button, a, input')) p.onMasquer() },
+      onPointerDown: e => { commencerAppui(e); actions.tirer(e, x.g.num) },
+    }
+    const barre = suppressible && <i className="d5-maintien" aria-hidden="true" />
+    if (fiche) return (
+      <li key={x.g.num} className="d5-pastille d5-fiche-groupe" data-niveau-fiche={fiche} {...proprietes}>
+        <div className="d5-fg-ligne">
+          {contenu.icone()}
+          <span className="d5-nom" dir="auto">{r.nom}</span>
+          {contenu.nombre()}
+        </div>
+        <div className="d5-fg-ligne d5-fg-sous">
+          {contenu.numero()}
+          {fiche >= 3 && <><i className="d5-trait" aria-hidden="true" />{contenu.logiciel()}</>}
+          <span className="d5-fg-vide" />
+          {boutonSupprimer}
+        </div>
+        {fiche >= 3 && (
+          <div className="d5-fg-ligne d5-fg-sous">
+            {contenu.etat()}
+            {contenu.ecart()}
+            <span className="d5-fg-vide" />
+            {contenu.rang()}
+            {contenu.actions()}
+          </div>
+        )}
+        {barre}
+      </li>
+    )
+    return (
+      <li key={x.g.num} className="d5-pastille" {...proprietes}>
         <Cellules rubriques={colonnes} rendu={c => contenu[c.cle]()} nouvelles={nouvelles} />
+        {barre}
       </li>
     )
 }, memePastille)
